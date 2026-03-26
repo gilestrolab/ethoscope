@@ -7,22 +7,20 @@
 # Purpose: Complete installation and configuration of ethoscope software on
 #          Raspberry Pi devices running Debian/Raspbian OS
 #
-# Target Platform: Raspberry Pi (tested on Pi 4) with Debian/Raspbian
+# Target Platform: Raspberry Pi (2/3/4/5) with Debian/Raspbian
 # Prerequisites: Fresh Debian/Raspbian installation with network connectivity
 #
-# What this script does:
-# 1. Installs required system packages and Python dependencies
-# 2. Creates ethoscope user account
-# 3. Clones ethoscope software from GitHub to /opt/ethoscope
-# 4. Configures systemd services for device operation
-# 5. Sets up MariaDB database with ethoscope user
-# 6. Configures network settings (ethernet + WiFi)
-# 7. Sets up NTP time synchronization with node
-# 8. Configures Raspberry Pi specific hardware (camera, I2C, etc.)
-#
 # Usage:
-#   sudo ./install_ethoscope_debian.sh           # Full installation
-#   sudo ./install_ethoscope_debian.sh --apt-install  # Package installation only
+#   sudo ./install_ethoscope_debian.sh              # Full installation (all steps)
+#   sudo ./install_ethoscope_debian.sh --from 3     # Resume from step 3
+#   sudo ./install_ethoscope_debian.sh --step 5     # Run only step 5
+#   sudo ./install_ethoscope_debian.sh --list       # List all steps
+#   sudo ./install_ethoscope_debian.sh --help       # Show this help
+#
+# The script reboots automatically after installing system packages
+# (step 1) to apply kernel/systemd updates, then resumes from step 2.
+# If interrupted, re-running the script will offer to resume where it
+# left off.
 #
 # Author: Giorgio Gilestro <giorgio@gilest.ro>
 # License: GPL3
@@ -31,23 +29,114 @@
 
 set -e  # Exit on any error
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# Progress tracking
+PROGRESS_FILE="/etc/ethoscope/.install_progress"
+SCRIPT_PATH="$(readlink -f "$0")"
+
+# Installation steps (order matters)
+STEP_NAMES=(
+    "Install system packages (apt)"
+    "Create ethoscope user"
+    "Clone and install ethoscope software"
+    "Install Arduino CLI (firmware management)"
+    "Configure system identity"
+    "Configure time sync (NTP)"
+    "Enable system services"
+    "Configure network (ethernet + WiFi)"
+    "Configure WiFi"
+    "Setup MariaDB database"
+    "Configure MariaDB"
+    "Configure Raspberry Pi hardware"
+)
+
+TOTAL_STEPS=${#STEP_NAMES[@]}
+
 #===============================================================================
 # UTILITY FUNCTIONS
 #===============================================================================
 
+print_header() {
+    echo ""
+    echo -e "${BLUE}===============================================${NC}"
+    echo -e "${BLUE} Ethoscope Device Installation${NC}"
+    echo -e "${BLUE}===============================================${NC}"
+    echo ""
+}
+
+print_step() {
+    local step_num=$1
+    local step_name=$2
+    echo ""
+    echo -e "${BOLD}[${step_num}/${TOTAL_STEPS}] ${step_name}${NC}"
+    echo -e "${BLUE}-----------------------------------------------${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}  ✓ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}  ⚠ $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}  ✗ $1${NC}"
+}
+
+print_info() {
+    echo -e "  $1"
+}
+
+list_steps() {
+    echo ""
+    echo "Installation steps:"
+    echo ""
+    for i in "${!STEP_NAMES[@]}"; do
+        printf "  %2d. %s\n" $((i + 1)) "${STEP_NAMES[$i]}"
+    done
+    echo ""
+    echo "Usage:"
+    echo "  sudo $0                # Run all steps"
+    echo "  sudo $0 --from 3      # Resume from step 3"
+    echo "  sudo $0 --step 5      # Run only step 5"
+    echo ""
+}
+
+show_help() {
+    echo ""
+    echo "Ethoscope Device Installation Script"
+    echo ""
+    echo "Installs and configures ethoscope software on a Raspberry Pi."
+    echo "Requires root privileges and network connectivity."
+    echo ""
+    echo "Options:"
+    echo "  (no args)       Run full installation (all ${TOTAL_STEPS} steps)"
+    echo "  --from N        Resume installation from step N"
+    echo "  --step N        Run only step N"
+    echo "  --list          List all installation steps"
+    echo "  --help          Show this help message"
+    echo ""
+    list_steps
+}
+
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-       echo "This script must be run as root. Use sudo to run it." 1>&2
-       exit 1
+        print_error "This script must be run as root. Use: sudo $0"
+        exit 1
     fi
 }
 
 detect_pi_model() {
-    # Get the hardware model from /proc/cpuinfo
-    local model=$(grep 'Model' /proc/cpuinfo | awk -F': ' '{print $2}')
     local revision=$(grep 'Revision' /proc/cpuinfo | awk '{print $3}')
 
-    # Determine Pi model for filename
     if [[ "$revision" == "a01041" || "$revision" == "a21041" || "$revision" == "a22042" ]]; then
         PI_MODEL="pi2"
     elif [[ "$revision" == "a02082" || "$revision" == "a22082" || "$revision" == "a32082" || "$revision" == "a020d3" ]]; then
@@ -60,11 +149,10 @@ detect_pi_model() {
         PI_MODEL="pi"
     fi
 
-    echo "Detected Raspberry Pi model: $PI_MODEL (revision: $revision)"
+    print_info "Detected Raspberry Pi model: ${BOLD}${PI_MODEL}${NC} (revision: ${revision})"
 }
 
 determine_config_paths() {
-    # Initialize configuration paths
     MYCNF=""
     BOOTCFG=""
 
@@ -82,15 +170,79 @@ determine_config_paths() {
 }
 
 #===============================================================================
-# PACKAGE INSTALLATION
+# PROGRESS TRACKING
 #===============================================================================
 
-install_apt_packages() {
-    echo "Installing system packages and Python dependencies on $PI_MODEL..."
-    sudo apt-get update && apt-get upgrade -y
+save_progress() {
+    local next_step=$1
+    mkdir -p "$(dirname "$PROGRESS_FILE")"
+    echo "$next_step" > "$PROGRESS_FILE"
+}
 
-    echo "Installing basic system packages..."
-    sudo apt-get install -y \
+clear_progress() {
+    rm -f "$PROGRESS_FILE"
+}
+
+get_saved_progress() {
+    if [[ -f "$PROGRESS_FILE" ]]; then
+        cat "$PROGRESS_FILE"
+    else
+        echo "0"
+    fi
+}
+
+reboot_and_resume() {
+    local resume_step=$1
+
+    save_progress "$resume_step"
+
+    echo ""
+    echo -e "${YELLOW}===============================================${NC}"
+    echo -e "${YELLOW} Reboot required before continuing${NC}"
+    echo -e "${YELLOW}===============================================${NC}"
+    echo ""
+    echo "  System packages have been installed/upgraded."
+    echo "  A reboot is needed to apply kernel and systemd updates."
+    echo ""
+    echo "  Remaining: steps ${resume_step}-${TOTAL_STEPS} of ${TOTAL_STEPS}"
+    echo ""
+    echo -e "  ${BOLD}After rebooting, run:${NC}"
+    echo -e "    ${BOLD}sudo $0 --from ${resume_step}${NC}"
+    echo ""
+    echo -e "  Or re-run without arguments — the script will offer to resume."
+    echo ""
+
+    read -p "  Reboot now? [Y/n] " -n 1 -r
+    echo ""
+
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        echo ""
+        echo -e "  When ready: ${BOLD}sudo reboot${NC}"
+        echo -e "  Then run:   ${BOLD}sudo $0 --from ${resume_step}${NC}"
+        echo ""
+    else
+        echo ""
+        echo "  Rebooting in 3 seconds..."
+        sleep 3
+        reboot
+    fi
+
+    exit 0
+}
+
+#===============================================================================
+# STEP 1: PACKAGE INSTALLATION
+#===============================================================================
+
+step_install_apt_packages() {
+    print_info "Updating package lists..."
+    apt-get update
+
+    print_info "Upgrading existing packages..."
+    apt-get upgrade -y
+
+    print_info "Installing system packages..."
+    apt-get install -y \
         mariadb-server \
         mariadb-client \
         sqlite3 \
@@ -99,13 +251,23 @@ install_apt_packages() {
         python3-dev \
         libcap-dev \
         pkg-config \
-        ntp git
+        git wget curl
 
-    echo "Restarting network services..."
-    sudo systemctl restart systemd-networkd systemd-resolved
+    # NTP: ntp was removed in Trixie, replaced by ntpsec
+    print_info "Installing NTP service..."
+    if apt-cache show ntp >/dev/null 2>&1 && apt-get install -y ntp 2>/dev/null; then
+        print_success "Installed ntp"
+    elif apt-get install -y ntpsec 2>/dev/null; then
+        print_success "Installed ntpsec (ntp replacement)"
+    else
+        print_warning "No NTP package found — time sync will rely on systemd-timesyncd"
+    fi
 
-    echo "Installing Python system packages..."
-    sudo apt-get install -y \
+    print_info "Restarting network services..."
+    systemctl restart systemd-networkd systemd-resolved || true
+
+    print_info "Installing Python packages..."
+    apt-get install -y \
         python3-pip \
         python3-venv \
         python3-setuptools \
@@ -113,223 +275,208 @@ install_apt_packages() {
         python3-usb \
         python3-protobuf
 
-    #the rest will be installed via pip
-
-    echo "All necessary packages were installed. Now reboot."
+    print_success "All system packages installed"
 }
 
 #===============================================================================
-# ARDUINO CLI INSTALLATION
+# STEP 2: USER MANAGEMENT
 #===============================================================================
 
-install_arduino_cli() {
-    echo "Installing arduino-cli for firmware management..."
-
-    ARDUINO_CLI_VERSION="1.4.1"
-    ARCH=$(dpkg --print-architecture)  # armhf or arm64
-
-    wget -q "https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_CLI_VERSION}/arduino-cli_${ARDUINO_CLI_VERSION}-1_${ARCH}.deb" \
-        -O /tmp/arduino-cli.deb
-    sudo dpkg -i /tmp/arduino-cli.deb
-    rm -f /tmp/arduino-cli.deb
-
-    arduino-cli core update-index
-    arduino-cli core install arduino:avr
-    arduino-cli lib install SerialCommand
-
-    echo "arduino-cli installation complete."
-}
-
-#===============================================================================
-# USER MANAGEMENT
-#===============================================================================
-
-setup_ethoscope_user() {
-    echo "Setting up ethoscope user account..."
+step_setup_ethoscope_user() {
     if id "ethoscope" &>/dev/null; then
-        echo "User 'ethoscope' already exists, skipping user creation"
+        print_info "User 'ethoscope' already exists"
     else
-        echo "Creating ethoscope user account..."
+        print_info "Creating ethoscope user account..."
         useradd -m ethoscope
     fi
-    echo -e "ethoscope\nethoscope" | passwd ethoscope
+    echo -e "ethoscope\nethoscope" | passwd ethoscope 2>/dev/null
     usermod -a -G root ethoscope
+    print_success "Ethoscope user configured (password: ethoscope)"
 }
 
 #===============================================================================
-# SOFTWARE INSTALLATION
+# STEP 3: SOFTWARE INSTALLATION
 #===============================================================================
 
-install_ethoscope_software() {
-
+step_install_ethoscope_software() {
     # Create system-wide pip config
     cat > /etc/pip.conf << 'EOF'
 [global]
 break-system-packages = true
 EOF
 
-    echo "Cloning ethoscope software repository..."
     if [[ -d "/opt/ethoscope" ]]; then
-        echo "Removing existing /opt/ethoscope directory for clean installation..."
+        print_info "Removing existing /opt/ethoscope for clean install..."
         rm -rf /opt/ethoscope
     fi
+
+    print_info "Cloning ethoscope repository..."
     git clone https://github.com/gilestrolab/ethoscope.git /opt/ethoscope
 
-    echo "Configuring git repository (dev branch, node remote)..."
+    print_info "Configuring git repository..."
     cd /opt/ethoscope/
     git checkout dev
     git remote set-url origin git://node/ethoscope.git
-    git config --global --add safe.directory /opt/ethoscope
 
-    echo "Installing ethoscope Python package..."
+    # Use --system instead of --global to avoid requiring $HOME
+    git config --system --add safe.directory /opt/ethoscope
+
+    print_info "Installing ethoscope Python package..."
     cd /opt/ethoscope/src/ethoscope
-    pip3 install -e . --break-system-packages
+    pip3 install -e . --break-system-packages --ignore-installed
 
-    #Make sure we use only picamera2 (if the PI is at least a PI3?)
-    pip3 uninstall -y picamera 2>/dev/null && pip3 install picamera2
+    print_info "Configuring picamera2..."
+    pip3 uninstall -y picamera 2>/dev/null || true
+    pip3 install picamera2 --break-system-packages 2>/dev/null || true
 
-    echo "Installing systemd service files..."
-    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service >> /dev/null
-    ln -s /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service /usr/lib/systemd/system/
+    print_info "Installing systemd service files..."
+    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service 2>/dev/null
+    ln -sf /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service /usr/lib/systemd/system/
 
-    echo "Creating ethoclient command line tool..."
+    print_info "Creating ethoclient command line tool..."
     echo $'#!/bin/env bash\npython /opt/ethoscope/src/ethoscope/scripts/ethoclient.py $@' > /usr/bin/ethoclient
     chmod +x /usr/bin/ethoclient
+
+    print_success "Ethoscope software installed to /opt/ethoscope"
 }
 
 #===============================================================================
-# SYSTEM CONFIGURATION
+# STEP 4: ARDUINO CLI INSTALLATION
 #===============================================================================
 
-configure_system_identity() {
-    echo "Setting up default machine identity (ETHOSCOPE_000)..."
+step_install_arduino_cli() {
+    ARDUINO_CLI_VERSION="1.4.1"
+    ARCH=$(dpkg --print-architecture)  # armhf or arm64
+
+    print_info "Downloading arduino-cli v${ARDUINO_CLI_VERSION} for ${ARCH}..."
+    wget -q "https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_CLI_VERSION}/arduino-cli_${ARDUINO_CLI_VERSION}-1_${ARCH}.deb" \
+        -O /tmp/arduino-cli.deb
+
+    print_info "Installing arduino-cli package..."
+    dpkg -i /tmp/arduino-cli.deb
+    rm -f /tmp/arduino-cli.deb
+
+    print_info "Installing Arduino AVR core (this may take a few minutes)..."
+    arduino-cli core update-index
+    arduino-cli core install arduino:avr
+
+    print_info "Installing SerialCommand library..."
+    arduino-cli lib install SerialCommand
+
+    print_success "Arduino CLI installed ($(arduino-cli version 2>/dev/null | head -1))"
+}
+
+#===============================================================================
+# STEP 5: SYSTEM IDENTITY
+#===============================================================================
+
+step_configure_system_identity() {
+    print_info "Setting default hostname to ETHOSCOPE_000..."
     echo "ETHOSCOPE_000" > /etc/machine-name
     echo "ETHOSCOPE_000" > /etc/hostname
 
-    echo "Configuring login prompt with network information..."
+    print_info "Configuring login banner..."
     echo 'Ethoscope Linux \r  (\n) (\l)' > /etc/issue
     echo 'Ethernet IP: \4{eth0}' >> /etc/issue
     echo 'WIFI IP: \4{wlan0}' >> /etc/issue
     echo 'Time on Device: \d \t' >> /etc/issue
 
-    echo "Limiting systemd journal log space to 250MB..."
+    print_info "Limiting journal log to 250MB..."
     echo 'SystemMaxUse=250MB' >> /etc/systemd/journald.conf
 
-    echo "Generating en_GB.UTF-8 locale..."
+    print_info "Generating en_GB.UTF-8 locale..."
     echo "en_GB.UTF-8 UTF-8" >> /etc/locale.gen
     locale-gen
 
-    # Create a timestamp for this SD card image installation
     echo $(date +%Y%m%d)_ethoscope_${PI_MODEL}.img > /etc/sdimagename
+
+    print_success "System identity configured as ETHOSCOPE_000"
 }
 
-configure_time_sync() {
-    echo "Configuring NTP time synchronization with node..."
-    echo 'server node' > /etc/ntp.conf
-    echo 'server 127.127.1.0' >> /etc/ntp.conf
-    echo 'fudge 127.127.1.0 stratum 10' >> /etc/ntp.conf
-    echo 'restrict default kod limited nomodify nopeer noquery notrap' >> /etc/ntp.conf
-    echo 'restrict 127.0.0.1' >> /etc/ntp.conf
-    echo 'restrict ::1' >> /etc/ntp.conf
-    echo 'driftfile /var/lib/ntp/ntp.drift' >> /etc/ntp.conf
+#===============================================================================
+# STEP 6: TIME SYNC
+#===============================================================================
+
+step_configure_time_sync() {
+    print_info "Configuring NTP to sync with node server..."
+
+    local ntp_config="server node
+server 127.127.1.0
+fudge 127.127.1.0 stratum 10
+restrict default kod limited nomodify nopeer noquery notrap
+restrict 127.0.0.1
+restrict ::1
+driftfile /var/lib/ntp/ntp.drift"
+
+    # ntpsec uses /etc/ntpsec/ntp.conf, classic ntp uses /etc/ntp.conf
+    if [[ -d "/etc/ntpsec" ]]; then
+        echo "$ntp_config" > /etc/ntpsec/ntp.conf
+        print_success "NTP configured (ntpsec) to use node as time source"
+    else
+        echo "$ntp_config" > /etc/ntp.conf
+        print_success "NTP configured to use node as time source"
+    fi
 }
 
-enable_system_services() {
-    echo "Enabling ethoscope device services..."
-    systemctl enable ethoscope_device.service ethoscope_listener.service ethoscope_update.service ethoscope_GPIO_listener.service
+#===============================================================================
+# STEP 7: SYSTEM SERVICES
+#===============================================================================
 
-    # Enable system services with proper service names for Debian/Raspbian
-    echo "Enabling system services..."
+step_enable_system_services() {
+    print_info "Enabling ethoscope services..."
+    systemctl enable ethoscope_device.service ethoscope_listener.service \
+        ethoscope_update.service ethoscope_GPIO_listener.service
 
-    # NTP service - handle aliases and find the real service
-    echo "Configuring NTP service..."
-
-    # First try to resolve the actual service behind ntp.service alias
-    local actual_ntp_service=""
-
-    # Method 1: Check what ntp.service is aliased to
-    if [ -L "/lib/systemd/system/ntp.service" ]; then
-        actual_ntp_service=$(readlink -f "/lib/systemd/system/ntp.service" | xargs basename)
-        echo "Found ntp.service aliased to: $actual_ntp_service"
-    elif [ -L "/usr/lib/systemd/system/ntp.service" ]; then
-        actual_ntp_service=$(readlink -f "/usr/lib/systemd/system/ntp.service" | xargs basename)
-        echo "Found ntp.service aliased to: $actual_ntp_service"
-    fi
-
-    # Method 2: Check if ntp.service is a real file (not alias)
-    if [ -z "$actual_ntp_service" ] && [ -f "/lib/systemd/system/ntp.service" ] && [ ! -L "/lib/systemd/system/ntp.service" ]; then
-        actual_ntp_service="ntp.service"
-        echo "Found actual ntp.service file"
-    fi
-
-    # Method 3: Fall back to common alternatives
-    if [ -z "$actual_ntp_service" ]; then
-        for service in "systemd-timesyncd.service" "ntpd.service" "chronyd.service"; do
-            if systemctl list-unit-files | grep -q "^$service"; then
-                actual_ntp_service="$service"
-                echo "Using fallback NTP service: $service"
-                break
-            fi
-        done
-    fi
-
-    # Enable the actual service
-    if [ -n "$actual_ntp_service" ]; then
-        if systemctl enable "$actual_ntp_service"; then
-            echo "Successfully enabled $actual_ntp_service"
-        else
-            echo "Warning: Failed to enable $actual_ntp_service, but NTP should still work"
+    # NTP service
+    print_info "Enabling NTP service..."
+    local ntp_enabled=false
+    for service in "ntpsec.service" "ntp.service" "ntpd.service" "systemd-timesyncd.service" "chronyd.service"; do
+        if systemctl list-unit-files 2>/dev/null | grep -q "^${service}"; then
+            systemctl enable "$service" 2>/dev/null && ntp_enabled=true && break
         fi
+    done
+    if $ntp_enabled; then
+        print_success "NTP service enabled"
     else
-        echo "Warning: No NTP service found - manual NTP configuration may be required"
+        print_warning "No NTP service found — time sync may need manual setup"
     fi
 
-    # MariaDB/MySQL service (usually mariadb.service on Debian)
-    if systemctl list-unit-files | grep -q "^mariadb\.service"; then
-        systemctl enable mariadb.service
-        echo "Enabled mariadb.service"
-    elif systemctl list-unit-files | grep -q "^mysql\.service"; then
-        systemctl enable mysql.service
-        echo "Enabled mysql.service"
-    elif systemctl list-unit-files | grep -q "^mysqld\.service"; then
-        systemctl enable mysqld.service
-        echo "Enabled mysqld.service"
-    else
-        echo "Warning: No MySQL/MariaDB service found"
-    fi
+    # MariaDB service
+    print_info "Enabling database service..."
+    for service in "mariadb.service" "mysql.service" "mysqld.service"; do
+        if systemctl list-unit-files 2>/dev/null | grep -q "^${service}"; then
+            systemctl enable "$service" 2>/dev/null
+            print_success "Enabled $service"
+            break
+        fi
+    done
 
-    # SSH service (usually ssh.service on Debian)
-    if systemctl list-unit-files | grep -q "^ssh\.service"; then
-        systemctl enable ssh.service
-        echo "Enabled ssh.service"
-    elif systemctl list-unit-files | grep -q "^sshd\.service"; then
-        systemctl enable sshd.service
-        echo "Enabled sshd.service"
-    else
-        echo "Warning: No SSH service found"
-    fi
+    # SSH service
+    for service in "ssh.service" "sshd.service"; do
+        if systemctl list-unit-files 2>/dev/null | grep -q "^${service}"; then
+            systemctl enable "$service" 2>/dev/null
+            print_success "Enabled $service"
+            break
+        fi
+    done
 
-    # Avahi daemon (usually available)
-    if systemctl list-unit-files | grep -q "^avahi-daemon\.service"; then
-        systemctl enable avahi-daemon.service
-        echo "Enabled avahi-daemon.service"
-    else
-        echo "Warning: avahi-daemon.service not found"
+    # Avahi
+    if systemctl list-unit-files 2>/dev/null | grep -q "^avahi-daemon\.service"; then
+        systemctl enable avahi-daemon.service 2>/dev/null
+        print_success "Enabled avahi-daemon.service"
     fi
 }
 
 #===============================================================================
-# NETWORK CONFIGURATION
+# STEP 8: NETWORK CONFIGURATION
 #===============================================================================
 
-configure_network() {
-    echo "Configuring network interfaces (ethernet + WiFi)..."
+step_configure_network() {
+    print_info "Disabling conflicting network managers..."
+    systemctl disable NetworkManager ModemManager dhcpcd 2>/dev/null || true
+    systemctl stop NetworkManager ModemManager dhcpcd 2>/dev/null || true
 
-    # Disable conflicting network managers first
-    systemctl disable NetworkManager ModemManager dhcpcd || true
-    systemctl stop NetworkManager ModemManager dhcpcd || true
-
-    # Create wired network config for eth0
+    print_info "Configuring wired network (eth0)..."
     cat > /etc/systemd/network/20-wired.network << 'EOF'
 [Match]
 Name=eth0
@@ -343,7 +490,7 @@ RouteMetric=10
 UseDNS=yes
 EOF
 
-    # WiFi configuration
+    print_info "Configuring wireless network (wlan0)..."
     cat > /etc/systemd/network/25-wireless.network << 'EOF'
 [Match]
 Name=wlan0
@@ -357,232 +504,203 @@ RouteMetric=20
 UseDNS=yes
 EOF
 
-    # Enable systemd-networkd and resolved
     systemctl enable systemd-networkd systemd-resolved
-    systemctl disable systemd-networkd-wait-online  # Prevent boot hangs
+    systemctl disable systemd-networkd-wait-online 2>/dev/null || true
 
-    # Ensure interfaces are up
-    echo "Bringing up network interfaces..."
-    ip link set eth0 up || true
-    ip link set wlan0 up || true
+    ip link set eth0 up 2>/dev/null || true
+    ip link set wlan0 up 2>/dev/null || true
 
-    # Create resolved configuration
     mkdir -p /etc/systemd/resolved.conf.d
     cat > /etc/systemd/resolved.conf.d/ethoscope.conf << 'EOF'
 [Resolve]
 DNS=8.8.8.8 1.1.1.1
 FallbackDNS=8.8.4.4 1.0.0.1
 EOF
+
+    print_success "Network configured"
 }
 
-configure_wifi() {
-    echo "Configuring Wi-Fi country and unblocking rfkill..."
-    # Set Wi-Fi country to GB (adjust as needed)
+#===============================================================================
+# STEP 9: WIFI CONFIGURATION
+#===============================================================================
+
+step_configure_wifi() {
+    print_info "Setting WiFi country to GB..."
     if command -v raspi-config >/dev/null 2>&1; then
-        echo "Setting Wi-Fi country to GB using raspi-config..."
         raspi-config nonint do_wifi_country GB
     else
-        echo "raspi-config not available, setting Wi-Fi country manually..."
         if [[ ! -f /etc/wpa_supplicant/wpa_supplicant.conf ]] || ! grep -q "country=" /etc/wpa_supplicant/wpa_supplicant.conf; then
             echo "country=GB" >> /etc/wpa_supplicant/wpa_supplicant.conf
         fi
     fi
 
-    # Unblock Wi-Fi if rfkill is blocking it
     if command -v rfkill >/dev/null 2>&1; then
-        echo "Unblocking Wi-Fi with rfkill..."
+        print_info "Unblocking WiFi..."
         rfkill unblock wifi
         rfkill unblock all
-    else
-        echo "rfkill not available, skipping Wi-Fi unblock"
     fi
 
+    print_info "Configuring default WiFi (ETHOSCOPE_WIFI)..."
     wpa_passphrase ETHOSCOPE_WIFI ETHOSCOPE_1234 > /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
     systemctl enable wpa_supplicant
     systemctl enable wpa_supplicant@wlan0.service
+
+    print_success "WiFi configured (SSID: ETHOSCOPE_WIFI)"
 }
 
 #===============================================================================
-# DATABASE CONFIGURATION
+# STEP 10: MARIADB SETUP
 #===============================================================================
 
-setup_mariadb() {
-    echo "Setting up MariaDB database..."
-    # Initialize MariaDB data directory if not already done
+step_setup_mariadb() {
     if [ ! -d "/var/lib/mysql/mysql" ]; then
-        echo "Initializing MariaDB data directory..."
+        print_info "Initializing MariaDB data directory..."
         mysql_install_db --user=mysql --basedir=/usr --datadir=/var/lib/mysql
     fi
 
-    # Ensure proper ownership
     chown -R mysql:mysql /var/lib/mysql
 
-    # Start MariaDB service
-    systemctl start mysqld.service
+    print_info "Starting MariaDB..."
+    systemctl start mysqld.service || systemctl start mariadb.service || true
 
-    # Wait for MariaDB to be ready
-    echo "Waiting for MariaDB to start..."
+    print_info "Waiting for MariaDB to be ready..."
     for i in {1..30}; do
         if mysqladmin ping >/dev/null 2>&1; then
-            echo "MariaDB is ready"
             break
         fi
         if [ $i -eq 30 ]; then
-            echo "ERROR: MariaDB failed to start within 30 seconds"
+            print_error "MariaDB failed to start within 30 seconds"
             exit 1
         fi
         sleep 1
     done
 
-    # Set up ethoscope database user
-    echo "Creating ethoscope database user..."
+    print_info "Creating database users..."
     mysql -u root <<EOF
--- Create users for local and network connections
 CREATE USER IF NOT EXISTS 'ethoscope'@'localhost' IDENTIFIED BY 'ethoscope';
 CREATE USER IF NOT EXISTS 'node'@'%' IDENTIFIED BY 'node';
-
--- Grant necessary permissions to ethoscope (full access)
 GRANT ALL PRIVILEGES ON *.* TO 'ethoscope'@'localhost' WITH GRANT OPTION;
-
--- Grant ONLY reading privileges to node user
 GRANT SELECT ON *.* TO 'node'@'%';
-
--- Flush privileges to ensure changes take effect
 FLUSH PRIVILEGES;
 EOF
 
-    if [ $? -eq 0 ]; then
-        echo "Database user created successfully"
-    else
-        echo "ERROR: Failed to create database user"
-        exit 1
-    fi
+    print_success "MariaDB configured (user: ethoscope, password: ethoscope)"
 }
 
-configure_mariadb() {
-    echo "Configuring MariaDB for ethoscope use on $PI_MODEL..."
+#===============================================================================
+# STEP 11: MARIADB CONFIGURATION
+#===============================================================================
 
-    # Set memory limits based on Pi model
+step_configure_mariadb() {
     local buffer_pool_size="64M"
     local log_file_size="16M"
     local key_buffer_size="16M"
     local max_connections="50"
 
-    if [[ "$PI_MODEL" == "pi2" ]]; then
-        buffer_pool_size="32M"
-        log_file_size="8M"
-        key_buffer_size="8M"
-        max_connections="25"
-    elif [[ "$PI_MODEL" == "pi3" ]]; then
-        buffer_pool_size="64M"
-        log_file_size="16M"
-        key_buffer_size="16M"
-        max_connections="40"
-    elif [[ "$PI_MODEL" == "pi4" ]]; then
-        buffer_pool_size="128M"
-        log_file_size="32M"
-        key_buffer_size="32M"
-        max_connections="75"
-    elif [[ "$PI_MODEL" == "pi5" ]]; then
-        buffer_pool_size="256M"
-        log_file_size="64M"
-        key_buffer_size="64M"
-        max_connections="100"
-    fi
+    case "$PI_MODEL" in
+        pi2)  buffer_pool_size="32M";  log_file_size="8M";  key_buffer_size="8M";  max_connections="25" ;;
+        pi3)  buffer_pool_size="64M";  log_file_size="16M"; key_buffer_size="16M"; max_connections="40" ;;
+        pi4)  buffer_pool_size="128M"; log_file_size="32M"; key_buffer_size="32M"; max_connections="75" ;;
+        pi5)  buffer_pool_size="256M"; log_file_size="64M"; key_buffer_size="64M"; max_connections="100" ;;
+    esac
 
-    # Ensure config directory exists
     if [ -n "$MYCNF" ]; then
         mkdir -p "$(dirname "$MYCNF")"
-
-        echo "Creating MariaDB configuration at $MYCNF..."
+        print_info "Writing MariaDB config to $MYCNF (tuned for $PI_MODEL)..."
         cat > "$MYCNF" <<EOF
 [server]
-# Binary logging configuration for replication/backup
 log-bin          = mysql-bin
 binlog_format    = mixed
 expire_logs_days = 10
 max_binlog_size  = 100M
-
-# Network configuration - allow connections from ethoscope network
 bind-address     = 0.0.0.0
-
-# Performance optimizations for $PI_MODEL
 innodb_buffer_pool_size = $buffer_pool_size
 innodb_log_file_size = $log_file_size
 key_buffer_size = $key_buffer_size
 max_connections = $max_connections
-
-# Reduce disk I/O for SD card longevity
 innodb_flush_log_at_trx_commit = 2
 sync_binlog = 0
 EOF
-
-        echo "MariaDB configuration written successfully for $PI_MODEL"
+        print_success "MariaDB tuned for $PI_MODEL"
     else
-        echo "WARNING: Could not determine MariaDB config location for this OS"
+        print_warning "Could not determine MariaDB config location"
     fi
 }
 
 #===============================================================================
-# HARDWARE CONFIGURATION
+# STEP 12: HARDWARE CONFIGURATION
 #===============================================================================
 
-configure_raspberry_pi_hardware() {
-    local revision=$(grep 'Revision' /proc/cpuinfo | awk '{print $3}')
+step_configure_raspberry_pi_hardware() {
+    print_info "Configuring hardware for $PI_MODEL..."
 
-    echo "Configuring Raspberry Pi $PI_MODEL hardware..."
-
-    # Common settings for all Pi versions
-    echo "Disabling Bluetooth (not needed for ethoscope)..."
     echo 'dtoverlay=disable-bt' >> "$BOOTCFG"
-
-    echo "Enable default HDMI output"
     echo 'hdmi_force_hotplug=1' >> "$BOOTCFG"
-
-    echo "Enabling I2C support for hardware interfaces..."
     echo 'dtparam=i2c_arm=on' >> "$BOOTCFG"
     echo 'i2c-dev' >> /etc/modules-load.d/raspberrypi.conf
-
-    # Camera configuration based on Pi model
-    echo "Configuring camera for $PI_MODEL..."
     echo 'disable_camera_led=1' >> "$BOOTCFG"
 
-    if [[ "$PI_MODEL" == "pi2" || "$PI_MODEL" == "pi3" ]]; then
-        echo "Configuring legacy camera (Pi 2/3)..."
-        echo 'start_file=start_x.elf' >> "$BOOTCFG"
-        echo 'fixup_file=fixup_x.dat' >> "$BOOTCFG"
-        echo 'gpu_mem=256' >> "$BOOTCFG"
-        echo 'cma_lwm=' >> "$BOOTCFG"
-        echo 'cma_hwm=' >> "$BOOTCFG"
-        echo 'cma_offline_start=' >> "$BOOTCFG"
+    case "$PI_MODEL" in
+        pi2|pi3)
+            print_info "Configuring legacy camera (Pi 2/3)..."
+            echo 'start_file=start_x.elf' >> "$BOOTCFG"
+            echo 'fixup_file=fixup_x.dat' >> "$BOOTCFG"
+            echo 'gpu_mem=256' >> "$BOOTCFG"
+            echo 'cma_lwm=' >> "$BOOTCFG"
+            echo 'cma_hwm=' >> "$BOOTCFG"
+            echo 'cma_offline_start=' >> "$BOOTCFG"
+            echo 'awb_auto_is_greyworld=1' >> "$BOOTCFG"
+            echo 'bcm2835-v4l2' > /etc/modules-load.d/picamera.conf
+            ;;
+        pi4|pi5)
+            print_info "Configuring camera for Pi ${PI_MODEL#pi}..."
+            echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
+            echo 'gpu_mem=256' >> "$BOOTCFG"
+            echo 'dtoverlay=imx219' >> "$BOOTCFG"
+            ;;
+        *)
+            print_info "Using basic camera configuration..."
+            echo 'gpu_mem=128' >> "$BOOTCFG"
+            echo 'dtoverlay=imx219' >> "$BOOTCFG"
+            ;;
+    esac
 
-        # https://github.com/raspberrypi/firmware/issues/1167
-        echo 'awb_auto_is_greyworld=1' >> "$BOOTCFG"
-
-        echo 'Loading bcm2835 module for legacy camera'
-        echo 'bcm2835-v4l2' > /etc/modules-load.d/picamera.conf
-
-    elif [[ "$PI_MODEL" == "pi4" ]]; then
-        echo "Configuring camera for Pi 4..."
-        echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
-        echo 'gpu_mem=256' >> "$BOOTCFG"
-        echo 'dtoverlay=imx219' >> "$BOOTCFG"
-
-    elif [[ "$PI_MODEL" == "pi5" ]]; then
-        echo "Configuring camera for Pi 5..."
-        echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
-        echo 'gpu_mem=256' >> "$BOOTCFG"
-        echo 'dtoverlay=imx219' >> "$BOOTCFG"
-
-    else
-        echo "Unknown Pi model, using basic camera configuration..."
-        echo 'gpu_mem=128' >> "$BOOTCFG"
-        echo 'dtoverlay=imx219' >> "$BOOTCFG"
-    fi
-
-    # Enable camera interface for all models
     echo 'camera_auto_detect=1' >> "$BOOTCFG"
     echo 'dtparam=camera=on' >> "$BOOTCFG"
+
+    print_success "Hardware configured for $PI_MODEL"
+}
+
+#===============================================================================
+# STEP DISPATCHER
+#===============================================================================
+
+# Steps that require a reboot AFTER completion before continuing.
+# The value is the next step to resume from.
+REBOOT_AFTER_STEP=1  # Reboot after apt upgrade (kernel/systemd updates)
+
+# Map step numbers to functions
+run_step() {
+    local step_num=$1
+    print_step "$step_num" "${STEP_NAMES[$((step_num - 1))]}"
+
+    case $step_num in
+        1)  step_install_apt_packages ;;
+        2)  step_setup_ethoscope_user ;;
+        3)  step_install_ethoscope_software ;;
+        4)  step_install_arduino_cli ;;
+        5)  step_configure_system_identity ;;
+        6)  step_configure_time_sync ;;
+        7)  step_enable_system_services ;;
+        8)  step_configure_network ;;
+        9)  step_configure_wifi ;;
+        10) step_setup_mariadb ;;
+        11) step_configure_mariadb ;;
+        12) step_configure_raspberry_pi_hardware ;;
+        *)  print_error "Unknown step: $step_num"; exit 1 ;;
+    esac
+
+    print_success "Step ${step_num} complete"
 }
 
 #===============================================================================
@@ -590,42 +708,113 @@ configure_raspberry_pi_hardware() {
 #===============================================================================
 
 main() {
+    local start_step=1
+    local end_step=$TOTAL_STEPS
+    local single_step=0
+
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --help|-h)
+                show_help
+                exit 0
+                ;;
+            --list|-l)
+                list_steps
+                exit 0
+                ;;
+            --from)
+                start_step="$2"
+                if [[ -z "$start_step" ]] || [[ "$start_step" -lt 1 ]] || [[ "$start_step" -gt $TOTAL_STEPS ]]; then
+                    print_error "Invalid step number. Use --list to see available steps."
+                    exit 1
+                fi
+                shift 2
+                ;;
+            --step)
+                single_step="$2"
+                if [[ -z "$single_step" ]] || [[ "$single_step" -lt 1 ]] || [[ "$single_step" -gt $TOTAL_STEPS ]]; then
+                    print_error "Invalid step number. Use --list to see available steps."
+                    exit 1
+                fi
+                start_step=$single_step
+                end_step=$single_step
+                shift 2
+                ;;
+            --apt-install)
+                # Legacy flag — equivalent to --step 1
+                print_warning "The --apt-install flag is deprecated. Use --step 1 instead."
+                single_step=1
+                start_step=1
+                end_step=1
+                shift
+                ;;
+            *)
+                print_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+
     check_root
+    print_header
     detect_pi_model
     determine_config_paths
 
-    setup_ethoscope_user
-    install_ethoscope_software
-    install_arduino_cli
-    configure_system_identity
-    configure_time_sync
-    enable_system_services
-    configure_network
-    configure_wifi
-    setup_mariadb
-    configure_mariadb
-    configure_raspberry_pi_hardware
+    # Check for saved progress from a previous interrupted run
+    local saved=$(get_saved_progress)
+    if [[ $saved -gt 0 ]] && [[ $start_step -eq 1 ]] && [[ $single_step -eq 0 ]]; then
+        echo ""
+        echo -e "  ${YELLOW}Previous installation was interrupted at step ${saved}.${NC}"
+        read -p "  Resume from step ${saved}? [Y/n] " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            start_step=$saved
+        else
+            clear_progress
+        fi
+    fi
+
+    if [[ $single_step -gt 0 ]]; then
+        print_info "Running step ${single_step} only"
+    elif [[ $start_step -gt 1 ]]; then
+        print_info "Resuming from step ${start_step} of ${TOTAL_STEPS}"
+    else
+        print_info "Running full installation (${TOTAL_STEPS} steps)"
+    fi
 
     echo ""
-    echo "==============================================="
-    echo "Ethoscope installation completed successfully!"
-    echo "==============================================="
-    echo ""
-    echo "Next steps:"
-    echo "1. Reboot this Raspberry Pi: sudo reboot"
-    echo "2. After reboot, the device will be accessible as ETHOSCOPE_000"
-    echo "3. Change the device ID from 000 to a unique number"
-    echo "4. Connect to the ethoscope network node for full functionality"
-    echo ""
-    echo "Please reboot now: sudo reboot"
+
+    # Run the steps
+    for ((step = start_step; step <= end_step; step++)); do
+        run_step $step
+
+        # Reboot gate: if this step requires a reboot and we have more steps to go
+        if [[ $step -eq $REBOOT_AFTER_STEP ]] && [[ $step -lt $end_step ]] && [[ $single_step -eq 0 ]]; then
+            reboot_and_resume $((step + 1))
+        fi
+    done
+
+    # Clean up progress tracking
+    clear_progress
+
+    # Show completion message only for full or tail-end installs
+    if [[ $end_step -eq $TOTAL_STEPS ]]; then
+        echo ""
+        echo -e "${GREEN}===============================================${NC}"
+        echo -e "${GREEN} Ethoscope installation completed!${NC}"
+        echo -e "${GREEN}===============================================${NC}"
+        echo ""
+        echo "  Next steps:"
+        echo "  1. Reboot: sudo reboot"
+        echo "  2. After reboot, device will be accessible as ETHOSCOPE_000"
+        echo "  3. Change the device ID from 000 to a unique number"
+        echo "  4. Connect to the ethoscope network node"
+        echo ""
+        echo -e "  ${BOLD}Please reboot now: sudo reboot${NC}"
+        echo ""
+    fi
 }
 
-# Check for "--apt-install" flag
-if [ "$1" == "--apt-install" ]; then
-  check_root
-  install_apt_packages
-  exit 0
-fi
-
-# Run main installation
-main
+main "$@"

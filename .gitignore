@@ -72,6 +72,9 @@ docs/_build/
 *.db
 .vscode
 
+# Environment files
+.env
+
 #folders
 Docker/node/etc-ethoscope
 .claude

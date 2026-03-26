@@ -93,6 +93,40 @@ function enable_services() {
     done
 }
 
+function ensure_system_services() {
+    # Ensure critical system services are enabled.
+    # These are not ethoscope-specific but ethoscopes depend on them.
+    echo "Ensuring system services are enabled..."
+
+    # NTP — required for time sync with node. ntp was replaced by ntpsec in Trixie.
+    local ntp_enabled=false
+    for service in "ntpsec.service" "ntp.service" "ntpd.service" "systemd-timesyncd.service"; do
+        if systemctl list-unit-files 2>/dev/null | grep -q "^${service}"; then
+            systemctl enable "$service" 2>/dev/null && ntp_enabled=true
+            echo "  NTP: enabled $service"
+            break
+        fi
+    done
+    if ! $ntp_enabled; then
+        echo "  Warning: No NTP service found — time sync may not work"
+    fi
+
+    # SSH — required for rsync backups and remote access
+    for service in "ssh.service" "sshd.service"; do
+        if systemctl list-unit-files 2>/dev/null | grep -q "^${service}"; then
+            systemctl enable "$service" 2>/dev/null
+            echo "  SSH: enabled $service"
+            break
+        fi
+    done
+
+    # Avahi — used for mDNS device discovery
+    if systemctl list-unit-files 2>/dev/null | grep -q "^avahi-daemon\.service"; then
+        systemctl enable avahi-daemon.service 2>/dev/null
+        echo "  Avahi: enabled avahi-daemon.service"
+    fi
+}
+
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
     echo "Error: This script must be run as root"
@@ -137,6 +171,7 @@ case "$1" in
         # Reload systemd and enable services
         reload_systemd
         enable_services "${NODE_ENABLE_SERVICES[@]}"
+        ensure_system_services
         ;;
 
     --ethoscope)
@@ -167,6 +202,7 @@ case "$1" in
         # Reload systemd and enable services
         reload_systemd
         enable_services "${ETHOSCOPE_ENABLE_SERVICES[@]}"
+        ensure_system_services
         ;;
 
     *)
