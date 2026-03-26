@@ -320,7 +320,9 @@ def generate_new_device_map():
     return devices_map
 
 
-def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=None):
+def updates_api_wrapper(
+    ip, id, what="check_update", type=None, port=8888, data=None, timeout=10
+):
     response = ""
 
     hn = urllib.parse.urlparse(ip).hostname
@@ -339,7 +341,7 @@ def updates_api_wrapper(ip, id, what="check_update", type=None, port=8888, data=
     logging.info("requesting %s" % request_url)
 
     try:
-        f = urllib.request.urlopen(req, timeout=10)
+        f = urllib.request.urlopen(req, timeout=timeout)
         message = f.read()
 
         if message:

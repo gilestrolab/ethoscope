@@ -1,19 +1,21 @@
 import logging
 import os
+import threading
 import traceback
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from optparse import OptionParser
 
 import bottle
 import updater
-from helpers import WrongMachineID
-from helpers import assert_node
-from helpers import generate_new_device_map
-from helpers import get_commit_version
-from helpers import reload_device_daemon
-from helpers import reload_node_daemon
-from helpers import updates_api_wrapper
+from helpers import (
+    WrongMachineID,
+    assert_node,
+    generate_new_device_map,
+    get_commit_version,
+    reload_device_daemon,
+    reload_node_daemon,
+    updates_api_wrapper,
+)
 
 
 class UnexpectedAction(Exception):
@@ -41,6 +43,16 @@ def monitored_paths():
     }
 
     return MONITORED_PATHS["NODE"] if is_node else MONITORED_PATHS["ETHOSCOPE"]
+
+
+def _schedule_restart(delay=5):
+    """Schedule a service restart after a delay, so the HTTP response can be sent first."""
+    restart_fn = reload_node_daemon if is_node else reload_device_daemon
+    label = "node" if is_node else "device"
+    logging.info(f"Scheduling {label} service restart in {delay}s")
+    timer = threading.Timer(delay, restart_fn)
+    timer.daemon = True
+    timer.start()
 
 
 def handle_node_update():
@@ -79,27 +91,37 @@ def handle_node_daemon_restart():
 
 def process_device_update(device):
     """Process update for a single device in parallel"""
+    logging.info("Starting update for device {}".format(device["id"]))
+
+    # Update device via API (longer timeout for git pull)
     try:
-        logging.info("Starting update for device {}".format(device["id"]))
-
-        # Update device via API
         update_response = updates_api_wrapper(
-            device["ip"], device["id"], what="device/update"
+            device["ip"], device["id"], what="device/update", timeout=30
         )
+    except Exception as e:
+        logging.error("Error updating device {}: {}".format(device["id"], str(e)))
+        error_response = {"status": "error", "device_id": device["id"], "error": str(e)}
+        return [error_response, error_response]
 
-        # Restart daemon via API
+    # Restart daemon via API — may fail if device already self-restarted
+    try:
         restart_response = updates_api_wrapper(
             device["ip"], device["id"], what="device/restart_daemon"
         )
-
-        logging.info("Completed update for device {}".format(device["id"]))
-
-        return [update_response, restart_response]
-
     except Exception as e:
-        logging.error("Error processing device {}: {}".format(device["id"], str(e)))
-        error_response = {"status": "error", "device_id": device["id"], "error": str(e)}
-        return [error_response, error_response]
+        logging.warning(
+            "Restart call failed for device {} (device may be self-restarting): {}".format(
+                device["id"], str(e)
+            )
+        )
+        restart_response = {
+            "status": "self_restarting",
+            "device_id": device["id"],
+        }
+
+    logging.info("Completed update for device {}".format(device["id"]))
+
+    return [update_response, restart_response]
 
 
 def process_device_branch_switch(device, new_branch):
@@ -241,6 +263,10 @@ def device(action, id):
             old_commit, _ = ethoscope_updater.get_local_and_origin_commits()
             ethoscope_updater.update_active_branch()
             new_commit, _ = ethoscope_updater.get_local_and_origin_commits()
+
+            # Auto-restart services if the commit actually changed
+            if str(old_commit) != str(new_commit):
+                _schedule_restart()
 
             return {
                 "old_commit": get_commit_version(old_commit),
