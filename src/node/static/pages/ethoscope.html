@@ -477,7 +477,7 @@
                 <li data-toggle="modal" data-target="#changeInfo">Settings</li>
                 <li data-toggle="modal" data-target="#backupProgress" ng-click="ethoscope.backup()">Backup</li>
                 <li data-toggle="modal" data-target="#SQLdumpProgress" ng-click="ethoscope.SQLdump()">SQL dump</li>
-                <li ng-class="{'disabled':!machine_info.Module.Connected}" data-toggle="modal" data-target="#ModuleTest" ng-click="ethoscope.testModule()">Test Module</li>
+                <li ng-class="{'disabled':!machine_info.Module.Connected}" data-toggle="modal" data-target="#ModuleTest">Module Info</li>
             </ul>
         </label>
 
@@ -629,10 +629,79 @@
                         </ul>
                     </div>
 
-                    <!-- Test button info -->
+                    <!-- Test button -->
                     <div ng-if="module_info.interface.test_button" style="margin-top: 15px; padding: 10px; background-color: #f0f7ff; border-radius: 4px;">
-                        <strong>{{module_info.interface.test_button.title}}</strong>
-                        <p style="margin: 5px 0 0; font-size: 13px; color: #6c757d;">{{module_info.interface.test_button.description}}</p>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>{{module_info.interface.test_button.title}}</strong>
+                                <p style="margin: 5px 0 0; font-size: 13px; color: #6c757d;">{{module_info.interface.test_button.description}}</p>
+                            </div>
+                            <button class="btn btn-sm btn-info"
+                                    ng-click="ethoscope.testModule()"
+                                    ng-disabled="module_testing">
+                                <i class="fa fa-play" ng-if="!module_testing"></i>
+                                <i class="fa fa-spinner fa-spin" ng-if="module_testing"></i>
+                                {{module_testing ? 'Testing...' : 'Run Test'}}
+                            </button>
+                        </div>
+                        <div ng-if="module_test_result" style="margin-top: 8px; font-size: 13px;"
+                             ng-class="{'text-success': module_test_result === 'success', 'text-danger': module_test_result === 'failed'}">
+                            <i class="fa fa-check-circle" ng-if="module_test_result === 'success'"></i>
+                            <i class="fa fa-exclamation-circle" ng-if="module_test_result === 'failed'"></i>
+                            Test {{module_test_result}}
+                        </div>
+                    </div>
+
+                    <!-- Firmware Update Section (only shown when arduino-cli is available on device) -->
+                    <div ng-if="firmware_status.arduino_cli_available" style="margin-top: 20px; padding: 12px; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <h6 style="font-weight: 600; margin-bottom: 10px;">
+                            <i class="fa fa-microchip"></i> Firmware Management
+                        </h6>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-size: 13px;">
+                                    Running: <code>{{firmware_status.running_version || 'unknown'}}</code>
+                                </span>
+                                <br>
+                                <span style="font-size: 13px;">
+                                    Source: <code>v{{firmware_status.source_version || 'unknown'}}</code>
+                                </span>
+                            </div>
+                            <div>
+                                <span ng-if="firmware_status.update_available" class="badge badge-warning" style="font-size: 12px;">Update Available</span>
+                                <span ng-if="!firmware_status.update_available && !firmware_updating" class="badge badge-success" style="font-size: 12px;">Up to date</span>
+                            </div>
+                        </div>
+
+                        <!-- Update button -->
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-sm btn-primary"
+                                    ng-click="ethoscope.updateFirmware()"
+                                    ng-disabled="!firmware_status.update_available || firmware_updating || device.status !== 'stopped'">
+                                <i class="fa fa-upload" ng-if="!firmware_updating"></i>
+                                <i class="fa fa-spinner fa-spin" ng-if="firmware_updating"></i>
+                                {{firmware_updating ? 'Updating...' : 'Update Firmware'}}
+                            </button>
+                            <span ng-if="device.status !== 'stopped'" style="font-size: 12px; color: #dc3545; margin-left: 8px;">
+                                Stop tracking first
+                            </span>
+                        </div>
+
+                        <!-- Update result -->
+                        <div ng-if="firmware_update_result" style="margin-top: 10px; padding: 8px; border-radius: 4px;"
+                             ng-class="{'background-color: #d4edda': firmware_update_result.status === 'updated', 'background-color: #f8d7da': firmware_update_result.status === 'failed'}"
+                             ng-style="{'background-color': firmware_update_result.status === 'updated' ? '#d4edda' : (firmware_update_result.status === 'failed' ? '#f8d7da' : '#fff3cd')}">
+                            <span ng-if="firmware_update_result.status === 'updated'" style="color: #155724;">
+                                <i class="fa fa-check-circle"></i> Updated to v{{firmware_update_result.new_fw}}
+                            </span>
+                            <span ng-if="firmware_update_result.status === 'up_to_date'" style="color: #856404;">
+                                <i class="fa fa-info-circle"></i> Already up to date
+                            </span>
+                            <span ng-if="firmware_update_result.status === 'failed'" style="color: #721c24;">
+                                <i class="fa fa-exclamation-circle"></i> {{firmware_update_result.error}}
+                            </span>
+                        </div>
                     </div>
                 </div>
 

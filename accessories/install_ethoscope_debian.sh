@@ -119,6 +119,28 @@ install_apt_packages() {
 }
 
 #===============================================================================
+# ARDUINO CLI INSTALLATION
+#===============================================================================
+
+install_arduino_cli() {
+    echo "Installing arduino-cli for firmware management..."
+
+    ARDUINO_CLI_VERSION="1.4.1"
+    ARCH=$(dpkg --print-architecture)  # armhf or arm64
+
+    wget -q "https://github.com/arduino/arduino-cli/releases/download/v${ARDUINO_CLI_VERSION}/arduino-cli_${ARDUINO_CLI_VERSION}-1_${ARCH}.deb" \
+        -O /tmp/arduino-cli.deb
+    sudo dpkg -i /tmp/arduino-cli.deb
+    rm -f /tmp/arduino-cli.deb
+
+    arduino-cli core update-index
+    arduino-cli core install arduino:avr
+    arduino-cli lib install SerialCommand
+
+    echo "arduino-cli installation complete."
+}
+
+#===============================================================================
 # USER MANAGEMENT
 #===============================================================================
 
@@ -574,6 +596,7 @@ main() {
 
     setup_ethoscope_user
     install_ethoscope_software
+    install_arduino_cli
     configure_system_identity
     configure_time_sync
     enable_system_services

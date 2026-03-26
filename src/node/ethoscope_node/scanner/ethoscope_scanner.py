@@ -236,6 +236,31 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return {}
 
+    def firmware_status(self) -> Dict[str, Any]:
+        """Get firmware status from device (read-only check)."""
+        if not self._id:
+            return {}
+
+        try:
+            url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['controls']}/{self._id}/firmware_status"
+            return self._get_json(url, timeout=15, post_data=b"{}")
+        except ScanException:
+            return {}
+
+    def update_firmware(self) -> Dict[str, Any]:
+        """Trigger firmware update on device (compile + upload).
+
+        Uses a longer timeout (120s) since compilation and upload take time.
+        """
+        if not self._id:
+            return {}
+
+        try:
+            url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['controls']}/{self._id}/update_firmware"
+            return self._get_json(url, timeout=120, post_data=b"{}")
+        except ScanException as e:
+            return {"status": "failed", "error": str(e)}
+
     def videofiles(self) -> List[str]:
         """Get list of available video files."""
         try:
