@@ -258,14 +258,20 @@ jobs:
     - name: Check device package dependencies
       run: |
         cd src/ethoscope
-        pip-audit --desc --format json --output device-audit.json || true
-        pip-audit --desc --format markdown
+        # CVE-2026-4539: pygments<=2.19.2, transitive dep via Sphinx; no fix available yet
+        pip-audit --desc --format json --output device-audit.json \
+          --ignore-vuln CVE-2026-4539 || true
+        pip-audit --desc --format markdown \
+          --ignore-vuln CVE-2026-4539
 
     - name: Check node package dependencies
       run: |
         cd src/node
-        pip-audit --desc --format json --output node-audit.json || true
-        pip-audit --desc --format markdown
+        # CVE-2026-4539: pygments<=2.19.2, transitive dep via Sphinx; no fix available yet
+        pip-audit --desc --format json --output node-audit.json \
+          --ignore-vuln CVE-2026-4539 || true
+        pip-audit --desc --format markdown \
+          --ignore-vuln CVE-2026-4539
 
     - name: Upload dependency audit reports
       uses: actions/upload-artifact@v4
