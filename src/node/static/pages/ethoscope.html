@@ -6,7 +6,7 @@
         <div class="status-icons" style="position: absolute; top: 0px; right: 0px; display: flex; align-items: center; gap: 20px;">
 
             <!-- Robot Icon for Module Connected -->
-            <span ng-if="machine_info.Module.Connected" class="fa fa-robot fa-3x" title="Hardware module connected" style="color: var(--medium-gray); transform: scale(0.9);">
+            <span ng-if="machine_info.Module.Connected" class="fa fa-robot fa-3x" ng-attr-title="{{module_info.module.name || 'Hardware module connected'}}{{module_info.version ? ' (' + module_info.version + ')' : ''}}" style="color: var(--medium-gray); transform: scale(0.9);">
             </span>
 
             <!-- Underpowered Icon -->
@@ -128,9 +128,29 @@
                 <h5 style="margin: 0; color: #495057;">
                     <i class="fa fa-robot"></i> Stimulator Status
                 </h5>
-                <span class="badge" ng-class="machine_info.Module.Connected ? 'badge-success' : 'badge-danger'">
-                    {{machine_info.Module.Connected ? 'Hardware Connected' : 'Hardware Disconnected'}}
-                </span>
+                <div style="text-align: right;">
+                    <span class="badge" ng-class="machine_info.Module.Connected ? 'badge-success' : 'badge-danger'">
+                        {{machine_info.Module.Connected ? 'Hardware Connected' : 'Hardware Disconnected'}}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Module Identity Details (from serial interrogation) -->
+            <div ng-if="module_info.module" style="margin-bottom: 15px; padding: 10px; background-color: #e9ecef; border-radius: 4px;">
+                <div style="font-weight: 600; color: #337ab7; margin-bottom: 5px;">
+                    {{module_info.module.name}}
+                    <span style="font-weight: normal; color: #6c757d; font-size: 12px;" ng-if="module_info.version">v{{module_info.version}}</span>
+                </div>
+                <div style="color: #6c757d; font-size: 13px;" ng-if="module_info.module.description">{{module_info.module.description}}</div>
+                <div style="color: #495057; font-size: 13px; margin-top: 5px;" ng-if="module_info.capabilities">
+                    <span ng-if="module_info.capabilities.motors > 0"><i class="fa fa-cog"></i> {{module_info.capabilities.motors}} motors </span>
+                    <span ng-if="module_info.capabilities.valves > 0"><i class="fa fa-wind"></i> {{module_info.capabilities.valves}} valves </span>
+                    <span ng-if="module_info.capabilities.leds > 0"><i class="fa fa-lightbulb"></i> {{module_info.capabilities.leds}} LEDs </span>
+                </div>
+            </div>
+            <!-- Loading indicator while module info is being fetched -->
+            <div ng-if="!module_info.module && machine_info.Module.Connected" style="margin-bottom: 15px; color: #6c757d; font-size: 13px;">
+                <i class="fa fa-spinner fa-spin"></i> Loading module details...
             </div>
 
             <!-- Current Active Stimulator -->
@@ -457,7 +477,7 @@
                 <li data-toggle="modal" data-target="#changeInfo">Settings</li>
                 <li data-toggle="modal" data-target="#backupProgress" ng-click="ethoscope.backup()">Backup</li>
                 <li data-toggle="modal" data-target="#SQLdumpProgress" ng-click="ethoscope.SQLdump()">SQL dump</li>
-                <li ng-class="{'disabled':!machine_info.Module.Connected}" data-toggle="modal" data-target="#ModuleTest" ng-click="ethoscope.testModule()">Test Module</li>
+                <li ng-class="{'disabled':!machine_info.Module.Connected}" data-toggle="modal" data-target="#ModuleTest">Module Info</li>
             </ul>
         </label>
 
@@ -565,8 +585,131 @@
             </div>
             <div class="modal-body">
 
-                <br>
-                <p>Attempting to send test command.</p>
+                <!-- Module identity info -->
+                <div ng-if="module_info.module">
+                    <h5 style="color: #337ab7;">{{module_info.module.name}}</h5>
+                    <p ng-if="module_info.module.description" style="color: #6c757d;">{{module_info.module.description}}</p>
+
+                    <table class="table table-sm table-bordered" style="margin-top: 15px;">
+                        <tbody>
+                            <tr ng-if="module_info.version">
+                                <td style="font-weight: 600; width: 40%;">Firmware Version</td>
+                                <td><code>{{module_info.version}}</code></td>
+                            </tr>
+                            <tr ng-if="module_info.module.type !== undefined">
+                                <td style="font-weight: 600;">Module Type</td>
+                                <td>{{module_info.module.type}}</td>
+                            </tr>
+                            <tr ng-if="module_info.capabilities">
+                                <td style="font-weight: 600;">Motors</td>
+                                <td>{{module_info.capabilities.motors}}</td>
+                            </tr>
+                            <tr ng-if="module_info.capabilities">
+                                <td style="font-weight: 600;">Valves</td>
+                                <td>{{module_info.capabilities.valves}}</td>
+                            </tr>
+                            <tr ng-if="module_info.capabilities">
+                                <td style="font-weight: 600;">LEDs</td>
+                                <td>{{module_info.capabilities.leds}}</td>
+                            </tr>
+                            <tr ng-if="module_info.capabilities.total_channels">
+                                <td style="font-weight: 600;">Total Channels</td>
+                                <td>{{module_info.capabilities.total_channels}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- Available commands -->
+                    <div ng-if="module_info.interface.commands" style="margin-top: 15px;">
+                        <h6 style="font-weight: 600;">Available Commands</h6>
+                        <ul class="list-group list-group-flush" style="font-size: 13px;">
+                            <li class="list-group-item py-1" ng-repeat="cmd in module_info.interface.commands">
+                                <code>{{cmd.command}}</code> &mdash; {{cmd.description}}
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Test button -->
+                    <div ng-if="module_info.interface.test_button" style="margin-top: 15px; padding: 10px; background-color: #f0f7ff; border-radius: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>{{module_info.interface.test_button.title}}</strong>
+                                <p style="margin: 5px 0 0; font-size: 13px; color: #6c757d;">{{module_info.interface.test_button.description}}</p>
+                            </div>
+                            <button class="btn btn-sm btn-info"
+                                    ng-click="ethoscope.testModule()"
+                                    ng-disabled="module_testing">
+                                <i class="fa fa-play" ng-if="!module_testing"></i>
+                                <i class="fa fa-spinner fa-spin" ng-if="module_testing"></i>
+                                {{module_testing ? 'Testing...' : 'Run Test'}}
+                            </button>
+                        </div>
+                        <div ng-if="module_test_result" style="margin-top: 8px; font-size: 13px;"
+                             ng-class="{'text-success': module_test_result === 'success', 'text-danger': module_test_result === 'failed'}">
+                            <i class="fa fa-check-circle" ng-if="module_test_result === 'success'"></i>
+                            <i class="fa fa-exclamation-circle" ng-if="module_test_result === 'failed'"></i>
+                            Test {{module_test_result}}
+                        </div>
+                    </div>
+
+                    <!-- Firmware Update Section (only shown when arduino-cli is available on device) -->
+                    <div ng-if="firmware_status.arduino_cli_available" style="margin-top: 20px; padding: 12px; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <h6 style="font-weight: 600; margin-bottom: 10px;">
+                            <i class="fa fa-microchip"></i> Firmware Management
+                        </h6>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-size: 13px;">
+                                    Running: <code>{{firmware_status.running_version || 'unknown'}}</code>
+                                </span>
+                                <br>
+                                <span style="font-size: 13px;">
+                                    Source: <code>v{{firmware_status.source_version || 'unknown'}}</code>
+                                </span>
+                            </div>
+                            <div>
+                                <span ng-if="firmware_status.update_available" class="badge badge-warning" style="font-size: 12px;">Update Available</span>
+                                <span ng-if="!firmware_status.update_available && !firmware_updating" class="badge badge-success" style="font-size: 12px;">Up to date</span>
+                            </div>
+                        </div>
+
+                        <!-- Update button -->
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-sm btn-primary"
+                                    ng-click="ethoscope.updateFirmware()"
+                                    ng-disabled="!firmware_status.update_available || firmware_updating || device.status !== 'stopped'">
+                                <i class="fa fa-upload" ng-if="!firmware_updating"></i>
+                                <i class="fa fa-spinner fa-spin" ng-if="firmware_updating"></i>
+                                {{firmware_updating ? 'Updating...' : 'Update Firmware'}}
+                            </button>
+                            <span ng-if="device.status !== 'stopped'" style="font-size: 12px; color: #dc3545; margin-left: 8px;">
+                                Stop tracking first
+                            </span>
+                        </div>
+
+                        <!-- Update result -->
+                        <div ng-if="firmware_update_result" style="margin-top: 10px; padding: 8px; border-radius: 4px;"
+                             ng-class="{'background-color: #d4edda': firmware_update_result.status === 'updated', 'background-color: #f8d7da': firmware_update_result.status === 'failed'}"
+                             ng-style="{'background-color': firmware_update_result.status === 'updated' ? '#d4edda' : (firmware_update_result.status === 'failed' ? '#f8d7da' : '#fff3cd')}">
+                            <span ng-if="firmware_update_result.status === 'updated'" style="color: #155724;">
+                                <i class="fa fa-check-circle"></i> Updated to v{{firmware_update_result.new_fw}}
+                            </span>
+                            <span ng-if="firmware_update_result.status === 'up_to_date'" style="color: #856404;">
+                                <i class="fa fa-info-circle"></i> Already up to date
+                            </span>
+                            <span ng-if="firmware_update_result.status === 'failed'" style="color: #721c24;">
+                                <i class="fa fa-exclamation-circle"></i> {{firmware_update_result.error}}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Fallback when module info not available -->
+                <div ng-if="!module_info.module">
+                    <p ng-if="machine_info.Module.Connected"><i class="fa fa-spinner fa-spin"></i> Fetching module information...</p>
+                    <p ng-if="!machine_info.Module.Connected" class="text-danger">No hardware module detected.</p>
+                </div>
 
             </div>
             <div class="modal-footer">
@@ -782,27 +925,21 @@
                                         </button>
                                     </div>
 
-                                    <!-- Stimulator type selection -->
-                                    <div class="form-group" style="margin-bottom: 15px;">
-                                        <label style="font-size: 14px; margin-bottom: 5px;">Stimulator Type:</label>
-                                        <select class="form-control" ng-model="stimulator.name" ng-change="updateStimulatorInSequence($index)" style="font-size: 14px;">
-                                            <option value="">-- Choose a stimulator --</option>
-                                            <option ng-repeat="opt in option" value="{{opt.name}}" title="{{opt.overview}}">{{opt.name}}</option>
-                                        </select>
-                                    </div>
-
-                                    <!-- Show description for selected stimulator -->
-                                    <div ng-if="stimulator.name" class="alert alert-info" style="margin-bottom: 15px; font-size: 14px; padding: 8px 12px;">
-                                        <strong>{{getInteractorOptionByName(stimulator.name).name}}:</strong> {{getInteractorOptionByName(stimulator.name).overview}}
-                                    </div>
-
-                                    <!-- Arguments for stimulator -->
-                                    <div ng-if="stimulator.name && stimulator.name != 'MultiStimulator'" class="stimulator-arguments-section" style="background-color: white; border-radius: 4px; padding: 15px; border: 1px solid #dee2e6;">
+                                    <!-- Arguments for stimulator (auto-selected as ComposedStimulator) -->
+                                    <div ng-if="stimulator.name" class="stimulator-arguments-section" style="background-color: white; border-radius: 4px; padding: 15px; border: 1px solid #dee2e6;">
                                         <h6 style="margin-bottom: 15px; color: #495057; font-size: 14px; font-weight: 600;">
                                             <i class="fa fa-cog"></i> Configuration:
                                         </h6>
-                                        <div ng-repeat="arg in getInteractorOptionByName(stimulator.name).arguments" class="form-group" style="margin-bottom: 15px;">
-                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range'" style="font-size: 14px; margin-bottom: 5px; font-weight: 500;">{{arg.description}}</label>
+                                        <div ng-repeat="arg in getInteractorOptionByName(stimulator.name).arguments" ng-if="isArgumentVisible(arg, stimulator.arguments)" class="form-group" style="margin-bottom: 15px;">
+                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" style="font-size: 14px; margin-bottom: 5px; font-weight: 500;">{{arg.description}}</label>
+
+                                            <!-- Select type (for trigger_type, action_type dropdowns) -->
+                                            <div ng-if="arg.type == 'select'" class="form-group" style="margin-bottom: 15px;">
+                                                <label style="font-size: 14px; margin-bottom: 5px; font-weight: 600; color: #337ab7;">{{arg.description}}</label>
+                                                <select class="form-control" ng-model="stimulator.arguments[arg.name]" style="font-weight: 500;">
+                                                    <option ng-repeat="opt in getFilteredActionOptions(arg)" value="{{opt.value}}">{{opt.label}}</option>
+                                                </select>
+                                            </div>
 
                                             <select ng-if="arg.type == 'filepath'" class="form-control" ng-model="stimulator.arguments[arg.name]">
                                                 <option value="">Available Movies</option>
@@ -869,8 +1006,16 @@
                                         {{opt.overview}}
                                     </div>
                                     <ul ng-if="selected_options.tracking[name]['name']==opt.name">
-                                        <li ng-repeat="arg in opt.arguments">
-                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+                                        <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.tracking[name]['arguments'])">
+                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+
+                                            <!-- Select type (for ComposedStimulator trigger/action dropdowns) -->
+                                            <div ng-if="arg.type == 'select'" style="margin-bottom: 10px;">
+                                                <label for="input-{{arg.name}}" style="font-weight: 600; color: #337ab7;">{{arg.description}}</label>
+                                                <select id="input-{{arg.name}}" name={{arg.name}} class="form-control" ng-model="selected_options.tracking[name]['arguments'][arg.name]" style="font-weight: 500;">
+                                                    <option ng-repeat="opt in getFilteredActionOptions(arg)" value="{{opt.value}}">{{opt.label}}</option>
+                                                </select>
+                                            </div>
 
                                             <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
                                                 <option value="">Available Movies</option>

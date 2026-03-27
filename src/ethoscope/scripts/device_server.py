@@ -385,6 +385,27 @@ def controls(id, action):
         module_info = interfaces.getModuleCapabilities(test=True)
         return info(id)
 
+    elif action == "firmware_status":
+        from ethoscope.hardware.interfaces.firmware import get_firmware_status
+
+        return get_firmware_status()
+
+    elif action == "update_firmware":
+        # Refuse if tracking is active (serial port held by stimulator)
+        current_info = send_command("info")
+        if isinstance(current_info, dict) and current_info.get("status") in (
+            "running",
+            "recording",
+            "streaming",
+        ):
+            return {
+                "status": "failed",
+                "error": "Cannot update firmware while tracking is active. Stop tracking first.",
+            }
+        from ethoscope.hardware.interfaces.firmware import update_firmware
+
+        return update_firmware()
+
     else:
         raise Exception("No such action: %s" % action)
 

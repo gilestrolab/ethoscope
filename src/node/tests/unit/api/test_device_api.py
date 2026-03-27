@@ -62,8 +62,8 @@ class TestDeviceAPI(unittest.TestCase):
         self.api.app.route = mock_route
         self.api.register_routes()
 
-        # Should register 22 routes
-        self.assertEqual(len(route_calls), 22)
+        # Should register 24 routes (including firmware status and update)
+        self.assertEqual(len(route_calls), 24)
 
         # Check specific routes
         paths = [call[0] for call in route_calls]

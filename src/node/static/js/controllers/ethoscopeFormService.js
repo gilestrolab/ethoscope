@@ -296,9 +296,22 @@
              * @param {Object} $scope - Controller scope
              */
             addStimulatorToSequence: function($scope) {
+                // Auto-select ComposedStimulator and initialize its arguments
+                var stimulatorName = 'ComposedStimulator';
+                var argDefs = this.getStimulatorArguments(stimulatorName, $scope);
+                var newArguments = {};
+
+                for (var i = 0; i < argDefs.length; i++) {
+                    var argDef = argDefs[i];
+                    if (argDef.type === 'date_range' && (argDef.default === '' || !argDef.default)) {
+                        continue;
+                    }
+                    newArguments[argDef.name] = argDef.default || '';
+                }
+
                 var newStimulator = {
-                    name: '',
-                    arguments: {}
+                    name: stimulatorName,
+                    arguments: newArguments
                 };
 
                 $scope.stimulatorSequence.push(newStimulator);
@@ -387,6 +400,54 @@
                     console.log('Moment.js locale configured to: en');
                 }
                 return this.momentLocaleConfigured;
+            },
+
+            /**
+             * Filter action_type options based on detected module capabilities.
+             * Maps each action value to the capability key it requires.
+             * @param {Array} allOptions - The full options array from the argument definition
+             * @param {Object} moduleInfo - Module info from /module endpoint (may be empty)
+             * @returns {Array} Filtered options array
+             */
+            getAvailableActions: function(allOptions, moduleInfo) {
+                if (!allOptions) return [];
+                if (!moduleInfo || !moduleInfo.capabilities) return allOptions;
+
+                var capabilityMap = {
+                    'motor_pulse': 'motors',
+                    'led_pulse': 'leds',
+                    'led_pulse_train': 'leds',
+                    'valve_pulse': 'valves'
+                };
+
+                return allOptions.filter(function(opt) {
+                    var requiredCap = capabilityMap[opt.value];
+                    if (!requiredCap) return true; // Unknown action type, show it
+                    return moduleInfo.capabilities[requiredCap] > 0;
+                });
+            },
+
+            /**
+             * Check if an argument should be visible based on its depends_on conditions.
+             * Used by ComposedStimulator to show/hide trigger- and action-specific arguments.
+             * @param {Object} arg - The argument definition (may have a depends_on field)
+             * @param {Object} currentArgValues - Current argument values for the stimulator
+             * @returns {boolean} True if the argument should be shown
+             */
+            isArgumentVisible: function(arg, currentArgValues) {
+                if (!arg || !arg.depends_on) return true;
+                if (!currentArgValues) return false;
+
+                for (var dep in arg.depends_on) {
+                    if (arg.depends_on.hasOwnProperty(dep)) {
+                        var allowedValues = arg.depends_on[dep];
+                        var currentVal = currentArgValues[dep];
+                        if (!currentVal || allowedValues.indexOf(currentVal) === -1) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
             },
 
             /**

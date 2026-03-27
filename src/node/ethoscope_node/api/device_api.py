@@ -64,6 +64,14 @@ class DeviceAPI(BaseAPI):
         )
         self.app.route("/device/<id>/log", method="POST")(self._get_log)
 
+        # Firmware management
+        self.app.route("/device/<id>/firmware/status", method="GET")(
+            self._get_firmware_status
+        )
+        self.app.route("/device/<id>/firmware/update", method="POST")(
+            self._update_firmware
+        )
+
         # Optimized batch endpoints
         self.app.route("/device/<id>/batch", method="GET")(self._get_device_batch)
         self.app.route("/device/<id>/batch-critical", method="GET")(
@@ -555,6 +563,18 @@ class DeviceAPI(BaseAPI):
         # These will be loaded separately by the UI
 
         return batch_data
+
+    @error_decorator
+    def _get_firmware_status(self, id):
+        """Get firmware status from device (read-only)."""
+        device = self.validate_device_exists(id)
+        return device.firmware_status()
+
+    @error_decorator
+    def _update_firmware(self, id):
+        """Trigger firmware update on device (compile + upload)."""
+        device = self.validate_device_exists(id)
+        return device.update_firmware()
 
     def _cache_img(self, file_like, basename):
         """Cache image file locally."""

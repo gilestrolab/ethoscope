@@ -30,6 +30,7 @@ from ethoscope.io import (
 )
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
+from ethoscope.stimulators.composed_stimulator import ComposedStimulator
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
 from ethoscope.stimulators.odour_stimulators import (
     DynamicOdourSleepDepriver,
@@ -139,6 +140,7 @@ class ControlThread(Thread):
                 {
                     "possible_classes": [
                         DefaultStimulator,
+                        ComposedStimulator,
                         SleepDepStimulator,
                         OptomotorSleepDepriver,
                         MiddleCrossingStimulator,

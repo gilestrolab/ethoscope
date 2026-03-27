@@ -126,6 +126,7 @@ class DynamicOdourDeliverer(HasChangedSideStimulator):
 class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
     _description = {
         "overview": "An stimulator to sleep deprive an animal using servo motor. See http://todo/fixme.html",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
@@ -209,6 +210,7 @@ class MiddleCrossingOdourStimulator(
 ):
     _description = {
         "overview": "A stimulator to send odour to an animal as it crosses the midline",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
@@ -279,6 +281,7 @@ class MiddleCrossingOdourStimulator(
 class MiddleCrossingOdourStimulatorFlushed(MiddleCrossingOdourStimulator):
     _description = {
         "overview": "A stimulator to send odour to an animal as it crosses the midline, and then flush it",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",

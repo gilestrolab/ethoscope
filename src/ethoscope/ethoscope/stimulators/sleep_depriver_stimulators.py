@@ -84,6 +84,7 @@ class IsMovingStimulator(BaseStimulator):
 class SleepDepStimulator(IsMovingStimulator):
     _description = {
         "overview": "A stimulator to sleep deprive an animal using servo motor.",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
@@ -273,6 +274,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
 
     _description = {
         "overview": "A stimulator to sleep deprive using motors and/or LEDs (MODULE 3). Supports motor, LED pulse, and LED pulse train modes.",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
@@ -442,6 +444,7 @@ class OptomotorSleepDepriver(SleepDepStimulator):
 class ExperimentalSleepDepStimulator(SleepDepStimulator):
     _description = {
         "overview": "A stimulator to sleep deprive an animal using servo motor.",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
@@ -509,6 +512,7 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
 class MiddleCrossingStimulator(BaseStimulator):
     _description = {
         "overview": "A stimulator to disturb animal as they cross the midline",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
@@ -612,6 +616,7 @@ class OptoSleepDepriver(SleepDepStimulator):
 
     _description = {
         "overview": "A stimulator to sleep deprive using LEDs only (MODULE 4). Supports LED pulse and LED pulse train modes.",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
@@ -817,6 +822,7 @@ class mAGO(SleepDepStimulator):
 
     _description = {
         "overview": "A stimulator to sleep deprive an animal using gear motors and probe arousal using air valves. See: https://www.notion.so/giorgiogilestro/The-new-Modular-SD-Device-05bbe90b6ee04b8aa439165f69d62de8",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",
@@ -946,6 +952,7 @@ class AGO(SleepDepStimulator):
 
     _description = {
         "overview": "A stimulator to send an odour puff to an AGO setup with only 10 ROIs. The valve channels are the same as the mAGO",
+        "hidden": True,
         "arguments": [
             {
                 "type": "number",

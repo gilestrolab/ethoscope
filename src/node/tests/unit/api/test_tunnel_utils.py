@@ -681,8 +681,7 @@ class TestTunnelUtils(unittest.TestCase):
 
     @patch("os.popen")
     def test_toggle_tunnel_enable_with_custom_systemctl(self, mock_popen):
-        """Test toggle_tunnel uses custom systemctl path."""
-        self.mock_server.systemctl = "/usr/local/bin/systemctl"
+        """Test toggle_tunnel uses hardcoded /usr/bin/systemctl path."""
         self.api.config.get_tunnel_config.return_value = {
             "token": "test-token",
             "enabled": False,
@@ -698,14 +697,13 @@ class TestTunnelUtils(unittest.TestCase):
         with patch.object(self.api, "update_tunnel_environment"):
             self.api.toggle_tunnel(True)
 
-        # Verify custom systemctl path used
+        # Verify /usr/bin/systemctl path used
         call_args = mock_popen.call_args[0][0]
-        self.assertIn("/usr/local/bin/systemctl", call_args)
+        self.assertIn("/usr/bin/systemctl", call_args)
 
     @patch("os.popen")
     def test_get_tunnel_status_custom_systemctl(self, mock_popen):
-        """Test get_tunnel_status uses custom systemctl path."""
-        self.mock_server.systemctl = "/custom/systemctl"
+        """Test get_tunnel_status uses hardcoded /usr/bin/systemctl path."""
         self.api.config.get_tunnel_config.return_value = {"enabled": True}
 
         # Mock popen
@@ -717,9 +715,9 @@ class TestTunnelUtils(unittest.TestCase):
 
         self.api.get_tunnel_status()
 
-        # Verify custom systemctl path used
+        # Verify /usr/bin/systemctl path used
         call_args = mock_popen.call_args[0][0]
-        self.assertIn("/custom/systemctl", call_args)
+        self.assertIn("/usr/bin/systemctl", call_args)
 
 
 if __name__ == "__main__":

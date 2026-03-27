@@ -23,6 +23,10 @@
         $scope.device = {}; // Device information and status
         $scope.ethoscope = {}; // Device control functions
         $scope.machine_info = {}; // Hardware and system information
+        $scope.module_info = {}; // Full module capabilities from serial interrogation
+        $scope.firmware_status = {}; // Firmware version comparison info
+        $scope.firmware_updating = false; // True while firmware update in progress
+        $scope.firmware_update_result = null; // Result of last firmware update
         $scope.user_options = {}; // Available tracking/recording options from server
         $scope.selected_options = {}; // Currently selected options for forms
         $scope.node = { // Node-level data (users, incubators, sensors)
@@ -240,10 +244,30 @@
          * Load non-critical device data in background after critical data is loaded
          */
         function loadNonCriticalDeviceData() {
-            // Load machine info asynchronously
+            // Load machine info asynchronously, then fetch full module capabilities if connected
             $http.get('/device/' + device_id + '/machineinfo')
                 .then(function(response) {
                     $scope.machine_info = response.data;
+
+                    // Fetch full module capabilities via serial interrogation (slower, separate call)
+                    if ($scope.machine_info.Module && $scope.machine_info.Module.Connected) {
+                        $http.get('/device/' + device_id + '/module')
+                            .then(function(modResponse) {
+                                $scope.module_info = modResponse.data;
+
+                                // After module info loads, check firmware status
+                                $http.get('/device/' + device_id + '/firmware/status')
+                                    .then(function(fwResponse) {
+                                        $scope.firmware_status = fwResponse.data;
+                                    })
+                                    .catch(function(error) {
+                                        console.warn('Failed to load firmware status:', error);
+                                    });
+                            })
+                            .catch(function(error) {
+                                console.warn('Failed to load module capabilities:', error);
+                            });
+                    }
                 })
                 .catch(function(error) {
                     console.error('Failed to load machine info:', error);
@@ -425,6 +449,19 @@
 
         $scope.getInteractorOptionByName = function(name) {
             return ethoscopeFormService.getInteractorOptionByName(name, $scope);
+        };
+
+        $scope.isArgumentVisible = function(arg, currentArgValues) {
+            return ethoscopeFormService.isArgumentVisible(arg, currentArgValues);
+        };
+
+        /**
+         * Filter action_type options based on detected module capabilities.
+         * Falls back to showing all options if module info is unavailable.
+         */
+        $scope.getFilteredActionOptions = function(arg) {
+            if (arg.name !== 'action_type') return arg.options;
+            return ethoscopeFormService.getAvailableActions(arg.options, $scope.module_info);
         };
 
         $scope.isRoiTemplateSelected = function() {
@@ -1418,15 +1455,55 @@
         /**
          * Test connected hardware module
          */
+        $scope.module_testing = false;
+        $scope.module_test_result = null;
+
         $scope.ethoscope.testModule = function() {
             console.log("Testing attached hardware module");
+            $scope.module_testing = true;
+            $scope.module_test_result = null;
+
             $http.post('/device/' + device_id + '/controls/test_module')
                 .then(function(response) {
+                    $scope.module_testing = false;
+                    $scope.module_test_result = 'success';
                     $scope.device.status = response.data.status;
-                    window.location.reload();
                 })
                 .catch(function(error) {
+                    $scope.module_testing = false;
+                    $scope.module_test_result = 'failed';
                     console.error('Failed to test module:', error);
+                });
+        };
+
+        /**
+         * Update connected module firmware
+         */
+        $scope.ethoscope.updateFirmware = function() {
+            console.log("Updating module firmware");
+            $scope.firmware_updating = true;
+            $scope.firmware_update_result = null;
+
+            $http.post('/device/' + device_id + '/firmware/update')
+                .then(function(response) {
+                    $scope.firmware_updating = false;
+                    $scope.firmware_update_result = response.data;
+
+                    // Refresh firmware status after update
+                    if (response.data.status === 'updated') {
+                        $http.get('/device/' + device_id + '/firmware/status')
+                            .then(function(fwResponse) {
+                                $scope.firmware_status = fwResponse.data;
+                            });
+                    }
+                })
+                .catch(function(error) {
+                    $scope.firmware_updating = false;
+                    $scope.firmware_update_result = {
+                        status: 'failed',
+                        error: 'Request failed: ' + (error.data || error.statusText || 'unknown error')
+                    };
+                    console.error('Failed to update firmware:', error);
                 });
         };
 

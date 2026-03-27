@@ -14,7 +14,7 @@ RUN pacman -Sy \
 
 RUN pacman -Sy --needed --noconfirm python-setuptools python-pip python-ifaddr python-numpy \
                                     python-bottle python-pyserial python-mysql-connector python-netifaces python-cherrypy \
-                                    python-eventlet python-dnspython python-greenlet python-monotonic \
+                                    python-eventlet python-dnspython python-greenlet \
                                     python-zeroconf python-cheroot python-gitpython \
                                     python-requests python-psutil python-scipy python-dateutil \
                                     openssh sshpass rsync curl

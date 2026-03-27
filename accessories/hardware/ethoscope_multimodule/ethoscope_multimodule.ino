@@ -102,6 +102,7 @@
  *   - Current monitoring (implementation placeholder) for advanced protection.
  *
  * Revision History:
+ *   v1.4 (2026-03-27) - Removed SerialCommand library dependency; inline serial parser.
  *   v1.3 (2026-02-27) - Added MODULE 3/4 for optogenetic LEDs, pulse train support.
  *   v2.1 (2023-08-20) - Added module flexibility, non-blocking activation, input validation.
  *   v2.0 (2023-07-15) - Implemented activate all motors feature with non-blocking timing.
@@ -145,9 +146,9 @@
 // =============================================================================
 // Version and Configuration
 // =============================================================================
-const float VERSION = 1.3;
+const float VERSION = 1.4;
 #define PCBVERSION 11    // PCB Version: 10 for v1.0, 11 for v1.1
-#define MODULE 4         // Module Type: 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
+#define MODULE 0         // Module Type: 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
 
 // =============================================================================
 // Module-Specific Definitions
@@ -189,8 +190,7 @@ const float VERSION = 1.3;
 // =============================================================================
 // Libraries and Global Variables
 // =============================================================================
-#include <SerialCommand.h>
-SerialCommand SCmd;
+// Built-in serial command parser — no external library needed
 
 #define BAUD 115200  // Fixed baud rate as per requirements
 #define ACTIVATION_DELAY 250 // activation delay to avoid drawing current all at once
@@ -217,7 +217,8 @@ SerialCommand SCmd;
     uint8_t LED_CHANNELS[LED_COUNT];
 #endif
 
-const uint8_t TOTAL_CHANNELS = MOTOR_COUNT + VALVE_COUNT + LED_COUNT;
+const uint8_t NUM_ACTUATORS = MOTOR_COUNT + VALVE_COUNT + LED_COUNT;
+const uint8_t TOTAL_CHANNELS = 20; // Always 20 physical channels (pins 0-19)
 
 // =============================================================================
 // Structures for Channel State Management
@@ -266,6 +267,59 @@ void updatePulseTrains();    // Updates pulse train states
 void emergencyShutdown();    // Emergency shutdown procedure
 
 // =============================================================================
+// Built-in Serial Command Parser
+// =============================================================================
+#define CMD_BUFFER_SIZE 64
+static char cmdBuffer[CMD_BUFFER_SIZE];
+static uint8_t cmdBufferIdx = 0;
+static char *cmdTokenPtr = NULL;
+
+// Returns next space-delimited token from the current command line
+char* cmdNext() {
+    return strtok_r(NULL, " ", &cmdTokenPtr);
+}
+
+// Command dispatch table (compile-time, replaces SCmd.addCommand())
+typedef void (*CmdCallback)();
+typedef struct { char letter; CmdCallback handler; } CmdEntry;
+static const CmdEntry cmdTable[] = {
+    {'P', control}, {'D', demo}, {'T', teach}, {'H', helpMenu},
+    #if MOTOR_COUNT > 0
+    {'A', activateAllMotors},
+    #endif
+    #if LED_COUNT > 0
+    {'W', pulseTrain}, {'B', activateAllLeds}, {'X', pulseTrainAllLeds},
+    #endif
+};
+static const uint8_t CMD_COUNT = sizeof(cmdTable) / sizeof(cmdTable[0]);
+
+// Dispatch a complete command line
+void dispatchCommand(char *line) {
+    char *cmd = strtok_r(line, " ", &cmdTokenPtr);
+    if (!cmd) return;
+    for (uint8_t i = 0; i < CMD_COUNT; i++) {
+        if (cmd[0] == cmdTable[i].letter) { cmdTable[i].handler(); return; }
+    }
+    Serial.println(F("ERROR: Unknown command. Type H for help."));
+}
+
+// Read and buffer serial input, dispatch on newline
+void readSerial() {
+    while (Serial.available()) {
+        char c = Serial.read();
+        if (c == '\n' || c == '\r') {
+            if (cmdBufferIdx > 0) {
+                cmdBuffer[cmdBufferIdx] = '\0';
+                cmdBufferIdx = 0;  // Reset before dispatch (re-entrant from demo)
+                dispatchCommand(cmdBuffer);
+            }
+        } else if (cmdBufferIdx < CMD_BUFFER_SIZE - 1) {
+            cmdBuffer[cmdBufferIdx++] = c;
+        }
+    }
+}
+
+// =============================================================================
 // Setup Function
 // =============================================================================
 void setup() {
@@ -298,28 +352,14 @@ void setup() {
         digitalWrite(pins[i], LOW);
     }
 
-    // Register serial commands
-    SCmd.addCommand("P", control);     // Pulse single channel
-    SCmd.addCommand("D", demo);        // Demo mode
-    SCmd.addCommand("T", teach);       // Teach command
-    SCmd.addCommand("H", helpMenu);    // Help menu
-
-    #if MOTOR_COUNT > 0
-        SCmd.addCommand("A", activateAllMotors);
-    #endif
-
-    #if LED_COUNT > 0
-        SCmd.addCommand("W", pulseTrain);        // Pulse train single channel
-        SCmd.addCommand("B", activateAllLeds);    // Activate all LEDs
-        SCmd.addCommand("X", pulseTrainAllLeds);  // Pulse train all LEDs
-    #endif
+    // Command dispatch is handled by the static cmdTable — no registration needed
 }
 
 // =============================================================================
 // Main Loop
 // =============================================================================
 void loop() {
-    SCmd.readSerial();       // Process incoming serial commands
+    readSerial();       // Process incoming serial commands
     updateChannels();        // Handle individual channel deactivations
     updateAllMotors();       // Handle "Activate All Motors" deactivation
     updatePulseTrains();     // Handle pulse train toggling
@@ -335,8 +375,8 @@ void loop() {
 
 // Handles 'P' command to pulse a single channel
 void control() {
-    char *arg1 = SCmd.next(); // Channel number
-    char *arg2 = SCmd.next(); // Duration in ms
+    char *arg1 = cmdNext(); // Channel number
+    char *arg2 = cmdNext(); // Duration in ms
 
     if (!arg1 || !arg2) {
         Serial.println(F("ERROR: P requires: P [channel 0-19] [ms]"));
@@ -364,7 +404,7 @@ void control() {
 // Handles 'A' command to activate all motors
 void activateAllMotors() {
     #if (MOTOR_COUNT > 0)
-        char *arg = SCmd.next(); // Duration in seconds
+        char *arg = cmdNext(); // Duration in seconds
 
         if (!arg) {
             Serial.println(F("ERROR: A requires: A [duration_s]"));
@@ -402,10 +442,10 @@ void activateAllMotors() {
 // Handles 'W' command for pulse train on a single channel
 void pulseTrain() {
     #if LED_COUNT > 0
-    char *arg1 = SCmd.next(); // Channel
-    char *arg2 = SCmd.next(); // ON duration in ms
-    char *arg3 = SCmd.next(); // OFF duration in ms
-    char *arg4 = SCmd.next(); // Number of cycles
+    char *arg1 = cmdNext(); // Channel
+    char *arg2 = cmdNext(); // ON duration in ms
+    char *arg3 = cmdNext(); // OFF duration in ms
+    char *arg4 = cmdNext(); // Number of cycles
 
     if (!arg1 || !arg2 || !arg3 || !arg4) {
         Serial.println(F("ERROR: W requires: W [ch] [on_ms] [off_ms] [cycles]"));
@@ -462,7 +502,7 @@ void pulseTrain() {
 // Handles 'B' command to activate all LEDs
 void activateAllLeds() {
     #if (LED_COUNT > 0)
-        char *arg = SCmd.next(); // Duration in seconds
+        char *arg = cmdNext(); // Duration in seconds
 
         if (!arg) {
             Serial.println(F("ERROR: B requires: B [duration_s]"));
@@ -496,9 +536,9 @@ void activateAllLeds() {
 // Handles 'X' command for pulse train on all LEDs
 void pulseTrainAllLeds() {
     #if (LED_COUNT > 0)
-        char *arg1 = SCmd.next(); // ON duration in ms
-        char *arg2 = SCmd.next(); // OFF duration in ms
-        char *arg3 = SCmd.next(); // Number of cycles
+        char *arg1 = cmdNext(); // ON duration in ms
+        char *arg2 = cmdNext(); // OFF duration in ms
+        char *arg3 = cmdNext(); // Number of cycles
 
         if (!arg1 || !arg2 || !arg3) {
             Serial.println(F("ERROR: X requires: X [on_ms] [off_ms] [cycles]"));
@@ -553,7 +593,7 @@ void demo() {
             activate(MOTOR_CHANNELS[i], 500);
             unsigned long start = millis();
             while(millis() - start < 600) {
-                SCmd.readSerial();
+                readSerial();
                 updateChannels();
                 delay(50);
             }
@@ -564,7 +604,7 @@ void demo() {
             activate(MOTOR_CHANNELS[i], 500);
             unsigned long start = millis();
             while(millis() - start < 600) {
-                SCmd.readSerial();
+                readSerial();
                 updateChannels();
                 delay(50);
             }
@@ -573,7 +613,7 @@ void demo() {
             activate(VALVE_CHANNELS[i], 500);
             unsigned long start = millis();
             while(millis() - start < 600) {
-                SCmd.readSerial();
+                readSerial();
                 updateChannels();
                 delay(50);
             }
@@ -584,7 +624,7 @@ void demo() {
             activate(VALVE_CHANNELS[i], 200);
             unsigned long start = millis();
             while(millis() - start < 300) {
-                SCmd.readSerial();
+                readSerial();
                 updateChannels();
                 delay(50);
             }
@@ -595,7 +635,7 @@ void demo() {
             activate(MOTOR_CHANNELS[i], 500);
             unsigned long start = millis();
             while(millis() - start < 600) {
-                SCmd.readSerial();
+                readSerial();
                 updateChannels();
                 delay(50);
             }
@@ -604,7 +644,7 @@ void demo() {
             activate(LED_CHANNELS[i], 300);
             unsigned long start = millis();
             while(millis() - start < 400) {
-                SCmd.readSerial();
+                readSerial();
                 updateChannels();
                 delay(50);
             }
@@ -615,7 +655,7 @@ void demo() {
             activate(LED_CHANNELS[i], 300);
             unsigned long start = millis();
             while(millis() - start < 400) {
-                SCmd.readSerial();
+                readSerial();
                 updateChannels();
                 delay(50);
             }
@@ -644,6 +684,8 @@ void teach() {
     Serial.print(LED_COUNT);
     Serial.print(F(",\"total_channels\":"));
     Serial.print(TOTAL_CHANNELS);
+    Serial.print(F(",\"num_actuators\":"));
+    Serial.print(NUM_ACTUATORS);
     Serial.print(F("},\"interface\":{\"test_button\":{\"title\":\"Test Output\",\"description\":\"Run demonstration sequence\",\"command\":\"D\"},\"commands\":["));
     Serial.print(F("{\"name\":\"Pulse\",\"format\":\"P [channel] [ms]\",\"description\":\"Activate single channel\",\"args\":[{\"name\":\"channel\",\"range\":\"0-"));
     Serial.print(TOTAL_CHANNELS-1);
