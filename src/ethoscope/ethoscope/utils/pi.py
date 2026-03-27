@@ -3,6 +3,7 @@ import glob
 import logging
 import os
 import re
+import subprocess
 import time
 from uuid import uuid4
 
@@ -92,22 +93,81 @@ def set_machine_name(id, path="/etc/machine-name"):
     Takes an id and updates the machine name accordingly in the format
     ETHOSCOPE_id; changes the hostname too.
 
+    The hostname uses hyphens instead of underscores (RFC 952 compliance).
+    On Raspberry Pi OS with cloud-init, we must also disable cloud-init's
+    hostname management and update /boot/firmware/user-data to prevent
+    reversion on reboot.
+
     :param id: integer
     """
 
     machine_name = f"ETHOSCOPE_{id:03d}"
+    hostname = f"ETHOSCOPE-{id:03d}"
     try:
+        # Write internal machine name (with underscore)
         ensure_dir_exists(path)
         with open(path, "w") as f:
             f.write(machine_name)
         logging.warning(f"Wrote new information in file: {path}")
 
-        with open("/etc/hostname", "w") as f:
-            f.write(machine_name)
-        logging.warning(f"Changed the machine hostname to: {machine_name}")
+        # Use raspi-config to set hostname (updates /etc/hostname, /etc/hosts, and running hostname)
+        subprocess.run(
+            ["raspi-config", "nonint", "do_hostname", hostname],
+            check=True,
+            capture_output=True,
+        )
+        logging.warning(f"Changed the machine hostname to: {hostname}")
+
+        # Prevent cloud-init from reverting hostname on reboot
+        _disable_cloud_init_hostname()
+
+        # Update cloud-init user-data so it stays consistent
+        _update_cloud_init_hostname(hostname)
 
     except Exception:
         raise
+
+
+def _disable_cloud_init_hostname(cloud_cfg="/etc/cloud/cloud.cfg"):
+    """
+    Sets preserve_hostname to true in cloud.cfg so cloud-init
+    stops overriding the hostname on every boot.
+    """
+    try:
+        with open(cloud_cfg) as f:
+            content = f.read()
+        if "preserve_hostname: false" in content:
+            content = content.replace(
+                "preserve_hostname: false", "preserve_hostname: true"
+            )
+            with open(cloud_cfg, "w") as f:
+                f.write(content)
+            logging.warning("Set preserve_hostname to true in cloud.cfg")
+    except FileNotFoundError:
+        pass  # Not a cloud-init system
+    except Exception as e:
+        logging.error(f"Failed to update cloud.cfg: {e}")
+
+
+def _update_cloud_init_hostname(hostname, user_data="/boot/firmware/user-data"):
+    """
+    Updates the hostname line in cloud-init's user-data file
+    so it stays consistent with the actual hostname.
+    """
+    try:
+        with open(user_data) as f:
+            content = f.read()
+        new_content = re.sub(
+            r"^hostname:.*$", f"hostname: {hostname}", content, flags=re.MULTILINE
+        )
+        if new_content != content:
+            with open(user_data, "w") as f:
+                f.write(new_content)
+            logging.warning(f"Updated hostname in {user_data}")
+    except FileNotFoundError:
+        pass  # No user-data file
+    except Exception as e:
+        logging.error(f"Failed to update {user_data}: {e}")
 
 
 def set_machine_id(id, path="/etc/machine-id"):

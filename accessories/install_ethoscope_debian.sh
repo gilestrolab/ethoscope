@@ -368,9 +368,13 @@ step_install_arduino_cli() {
 #===============================================================================
 
 step_configure_system_identity() {
-    print_info "Setting default hostname to ETHOSCOPE_000..."
+    print_info "Setting default hostname to ETHOSCOPE-000..."
     echo "ETHOSCOPE_000" > /etc/machine-name
-    echo "ETHOSCOPE_000" > /etc/hostname
+    # Use raspi-config to properly set hostname (hyphens, not underscores - RFC 952)
+    # This also updates /etc/hosts and notifies systemd
+    raspi-config nonint do_hostname "ETHOSCOPE-000"
+    # Prevent cloud-init from reverting hostname on reboot
+    sed -i 's/preserve_hostname: false/preserve_hostname: true/' /etc/cloud/cloud.cfg 2>/dev/null || true
 
     print_info "Configuring login banner..."
     echo 'Ethoscope Linux \r  (\n) (\l)' > /etc/issue
