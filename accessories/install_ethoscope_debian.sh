@@ -360,9 +360,6 @@ step_install_arduino_cli() {
     arduino-cli core update-index
     arduino-cli core install arduino:avr
 
-    print_info "Installing SerialCommand library..."
-    arduino-cli lib install SerialCommand
-
     print_success "Arduino CLI installed ($(arduino-cli version 2>/dev/null | head -1))"
 }
 
