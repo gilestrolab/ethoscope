@@ -26,7 +26,7 @@
  *       * Designed for CsChrimson activation at 620-630 nm.
  *
  * Hardware Configuration:
- *   - PCB Version: Defined by PCBVERSION (10 for v1.0, 11 for v1.1)
+ *   - PCB Version: Defined by PCBVERSION (10 for v1.0, 11 for v1.1, 12 for v1.2/1.3)
  *   - Module Type: Defined by MODULE (0-4)
  *   - Microcontroller: Arduino Micro
  *   - Power Requirements:
@@ -102,6 +102,7 @@
  *   - Current monitoring (implementation placeholder) for advanced protection.
  *
  * Revision History:
+ *   v1.5 (2026-03-30) - Added PCB V1.2/V1.3 pin mapping (PCBVERSION 12).
  *   v1.4 (2026-03-27) - Removed SerialCommand library dependency; inline serial parser.
  *   v1.3 (2026-02-27) - Added MODULE 3/4 for optogenetic LEDs, pulse train support.
  *   v2.1 (2023-08-20) - Added module flexibility, non-blocking activation, input validation.
@@ -122,7 +123,7 @@
  *   Q: Channels not activating.
  *   A:
  *      1. Verify power supply connections and ratings.
- *      2. Ensure PCBVERSION and MODULE are correctly defined.
+ *      2. Ensure PCBVERSION (10, 11, or 12) and MODULE are correctly defined.
  *      3. Check Darlington array orientation and connections.
  *      4. Confirm serial communication settings.
  *
@@ -146,9 +147,9 @@
 // =============================================================================
 // Version and Configuration
 // =============================================================================
-const float VERSION = 1.4;
-#define PCBVERSION 11    // PCB Version: 10 for v1.0, 11 for v1.1
-#define MODULE 0         // Module Type: 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
+const float VERSION = 1.5;
+#define PCBVERSION 121    // PCB Version: 10 for v1.0, 11 for v1.1, 12 for v1.2/1.3, 121 for 12Horiz, 122 for 12Vert
+#define MODULE 4         // Module Type: 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
 
 // =============================================================================
 // Module-Specific Definitions
@@ -202,8 +203,14 @@ const float VERSION = 1.4;
     static const uint8_t pins[] = {1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, A0, A1, A2, A3, A4, A5};
 #elif (PCBVERSION == 11) // PCB Version 1.1
     static const uint8_t pins[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, A0, A1, A2, A3, A4, A5};
+#elif (PCBVERSION == 12) // PCB Version 1.2 / 1.3 with v1.2 LED PCB (production);
+    static const uint8_t pins[] = {8, 3, 9, 4, 10, 5, 11, 6, 12, 7, 1, A2, 0, A1, A5, A0, A4, 13, A3, 2};
+#elif (PCBVERSION == 122) // PCB Version 1.2 / 1.3 with HORIZONTAL soldering on LED PCB v1.0 (dev only)
+    static const uint8_t pins[] = {8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 1, 2, 0, 13, A5, A0, A4, A1, A3, A2};
+#elif (PCBVERSION == 121) // PCB Version 1.2 / 1.3 with HORIZONTAL soldering on LED PCB v1.0 (dev only)
+    static const uint8_t pins[] = {5, 7, 4, 3, 9, 12, 10, 8, 6, 11, 13,	2, A1, A0, 0, A2,	A5,	1, A3, A4};
 #else
-    #error "Invalid PCBVERSION defined. Use 10 for v1.0 or 11 for v1.1."
+    #error "Invalid PCBVERSION defined. Use 10 for v1.0, 11 for v1.1, or 12 for v1.2/1.3."
 #endif
 
 // Channel mapping arrays — sized at compile time per module
@@ -587,80 +594,18 @@ void pulseTrainAllLeds() {
 // Handles 'D' command to run demo sequence
 void demo() {
     Serial.println(F("Running demo..."));
-    #if (MODULE == 0)
-        // N20 Module: Activate motors sequentially
-        for(uint8_t i = 0; i < MOTOR_COUNT; i++) {
-            activate(MOTOR_CHANNELS[i], 500);
-            unsigned long start = millis();
-            while(millis() - start < 600) {
-                readSerial();
-                updateChannels();
-                delay(50);
-            }
+    // Iterate all 20 channels sequentially (0,1,2,...19)
+    // This fires outputs in logical pair order (V1,M1,V2,M2,...V10,M10)
+    // ensuring a consistent test sequence across all PCB versions
+    for(uint8_t i = 0; i < TOTAL_CHANNELS; i++) {
+        activate(i, 500);
+        unsigned long start = millis();
+        while(millis() - start < 600) {
+            readSerial();
+            updateChannels();
+            delay(50);
         }
-    #elif (MODULE == 1)
-        // AGOSD Module: Motors first then valves
-        for(uint8_t i = 0; i < MOTOR_COUNT; i++) {
-            activate(MOTOR_CHANNELS[i], 500);
-            unsigned long start = millis();
-            while(millis() - start < 600) {
-                readSerial();
-                updateChannels();
-                delay(50);
-            }
-        }
-        for(uint8_t i = 0; i < VALVE_COUNT; i++) {
-            activate(VALVE_CHANNELS[i], 500);
-            unsigned long start = millis();
-            while(millis() - start < 600) {
-                readSerial();
-                updateChannels();
-                delay(50);
-            }
-        }
-    #elif (MODULE == 2)
-        // AGO Module: Activate valves sequentially
-        for(uint8_t i = 0; i < VALVE_COUNT; i++) {
-            activate(VALVE_CHANNELS[i], 200);
-            unsigned long start = millis();
-            while(millis() - start < 300) {
-                readSerial();
-                updateChannels();
-                delay(50);
-            }
-        }
-    #elif (MODULE == 3)
-        // mAGOLED Module: Motors first then LEDs
-        for(uint8_t i = 0; i < MOTOR_COUNT; i++) {
-            activate(MOTOR_CHANNELS[i], 500);
-            unsigned long start = millis();
-            while(millis() - start < 600) {
-                readSerial();
-                updateChannels();
-                delay(50);
-            }
-        }
-        for(uint8_t i = 0; i < LED_COUNT; i++) {
-            activate(LED_CHANNELS[i], 300);
-            unsigned long start = millis();
-            while(millis() - start < 400) {
-                readSerial();
-                updateChannels();
-                delay(50);
-            }
-        }
-    #elif (MODULE == 4)
-        // LED Module: Activate LEDs sequentially
-        for(uint8_t i = 0; i < LED_COUNT; i++) {
-            activate(LED_CHANNELS[i], 300);
-            unsigned long start = millis();
-            while(millis() - start < 400) {
-                readSerial();
-                updateChannels();
-                delay(50);
-            }
-        }
-    #endif
+    }
     Serial.println(F("Demo completed."));
 }
 
