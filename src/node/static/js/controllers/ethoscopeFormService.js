@@ -33,15 +33,15 @@
                         var arg = args[j];
 
                         if (arg.type === 'date_range') {
-                            let startDate = null;
-                            let endDate = null;
-                            let formatted = arg.default || '';
+                            var startDate = null;
+                            var endDate = null;
+                            var formatted = arg.default || '';
 
                             if (formatted) {
-                                const dates = formatted.split(' > ');
+                                var dates = formatted.split(' > ');
                                 if (dates.length === 2) {
-                                    const m1 = moment(dates[0], 'YYYY-MM-DD HH:mm:ss');
-                                    const m2 = moment(dates[1], 'YYYY-MM-DD HH:mm:ss');
+                                    var m1 = moment(dates[0], 'YYYY-MM-DD HH:mm:ss');
+                                    var m2 = moment(dates[1], 'YYYY-MM-DD HH:mm:ss');
                                     if (m1.isValid() && m2.isValid()) {
                                         startDate = m1;
                                         endDate = m2;
@@ -79,7 +79,7 @@
              * @param {Object} $scope - Controller scope
              */
             updateUserOptions: function(optionType, name, selectedOptionName, $scope) {
-                const data = $scope.user_options[optionType];
+                var data = $scope.user_options[optionType];
                 if (!data || !data[name]) return;
 
                 // Use $timeout to ensure proper timing and digest cycle
@@ -96,20 +96,20 @@
                     }
 
                     // If selectedOptionName is provided, use it; otherwise use current selection
-                    const targetOptionName = selectedOptionName || $scope.selected_options[optionType][name].name;
+                    var targetOptionName = selectedOptionName || $scope.selected_options[optionType][name].name;
 
                     // Update the selected option name (to sync with ng-model)
                     $scope.selected_options[optionType][name].name = targetOptionName;
 
                     // Find the selected option
-                    for (let i = 0; i < data[name].length; i++) {
+                    for (var i = 0; i < data[name].length; i++) {
                         if (data[name][i].name === targetOptionName) {
                             // Reset and populate arguments for the selected option
                             $scope.selected_options[optionType][name].arguments = {};
 
-                            const args = data[name][i].arguments || [];
-                            for (let j = 0; j < args.length; j++) {
-                                const argument = args[j];
+                            var args = data[name][i].arguments || [];
+                            for (var j = 0; j < args.length; j++) {
+                                var argument = args[j];
 
                                 if (argument.type === 'datetime') {
                                     // Handle datetime arguments with moment.js formatting
@@ -435,7 +435,10 @@
              * @returns {boolean} True if the argument should be shown
              */
             isArgumentVisible: function(arg, currentArgValues) {
-                if (!arg || !arg.depends_on) return true;
+                if (!arg) return false;
+                // Hide arguments explicitly marked as hidden
+                if (arg.hidden && arg.hidden !== "false" && arg.hidden !== false) return false;
+                if (!arg.depends_on) return true;
                 if (!currentArgValues) return false;
 
                 for (var dep in arg.depends_on) {
@@ -463,7 +466,7 @@
                 var roiBuilderOption = $scope.selected_options.tracking.roi_builder;
 
                 // Check if roi_builder is FileBasedROIBuilder (which requires template selection)
-                if (roiBuilderOption.name && roiBuilderOption.name.includes('FileBasedROIBuilder')) {
+                if (roiBuilderOption.name && roiBuilderOption.name.indexOf('FileBasedROIBuilder') !== -1) {
                     var args = roiBuilderOption.arguments || {};
                     var templateName = args.template_name;
 

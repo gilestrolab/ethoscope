@@ -29,7 +29,13 @@
                 });
 
                 // Auto-select the default file with "room" in its name
-                var defaultFile = $scope.csvFiles.find(file => file.toLowerCase().includes('room'));
+                var defaultFile = null;
+                for (var fi = 0; fi < $scope.csvFiles.length; fi++) {
+                    if ($scope.csvFiles[fi].toLowerCase().indexOf('room') !== -1) {
+                        defaultFile = $scope.csvFiles[fi];
+                        break;
+                    }
+                }
                 if (defaultFile) {
                     $scope.selectedSensors[defaultFile].selected = true;
                     $scope.fetchSensorData(defaultFile);
@@ -138,7 +144,7 @@
 
                 dataToProcess.forEach(function(row) {
                     // Skip header rows and metadata (lines starting with # or containing column names)
-                    if (row && row[0] && !row[0].toString().startsWith('#') &&
+                    if (row && row[0] && row[0].toString().charAt(0) !== '#' &&
                         row[0] !== 'Temperature' &&
                         row.length >= 5 &&
                         !isNaN(Date.parse(row[0]))) {

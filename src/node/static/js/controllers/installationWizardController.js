@@ -135,7 +135,7 @@
 
             // Check for reconfigure parameter in both search and hash
             if ((search.reconfigure && search.reconfigure.toLowerCase() === 'true') ||
-                (hash && hash.includes('reconfigure=true'))) {
+                (hash && hash.indexOf('reconfigure=true') !== -1)) {
                 $scope.isReconfigureMode = true;
                 $scope.totalSteps = 8; // Skip basic info step in reconfigure mode
                 $scope.loadExistingConfig();

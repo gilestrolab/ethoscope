@@ -497,9 +497,9 @@
         $scope.formatFileSize = function(bytes) {
             if (!bytes || bytes === 0) return '0 B';
 
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            var k = 1024;
+            var sizes = ['B', 'KB', 'MB', 'GB'];
+            var i = Math.floor(Math.log(bytes) / Math.log(k));
 
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         };
@@ -510,7 +510,7 @@
         $scope.formatDate = function(timestamp) {
             if (!timestamp) return 'Unknown';
 
-            const date = new Date(timestamp * 1000);
+            var date = new Date(timestamp * 1000);
             return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
         };
 
@@ -552,19 +552,19 @@
         $scope.getTimeSinceBackup = function(timestamp) {
             if (!timestamp) return 'Never';
 
-            const now = Math.floor(Date.now() / 1000);
-            const elapsed = now - timestamp;
+            var now = Math.floor(Date.now() / 1000);
+            var elapsed = now - timestamp;
 
             if (elapsed < 60) {
                 return 'Just now';
             } else if (elapsed < 3600) {
-                const minutes = Math.floor(elapsed / 60);
+                var minutes = Math.floor(elapsed / 60);
                 return minutes + ' minute' + (minutes > 1 ? 's' : '') + ' ago';
             } else if (elapsed < 86400) {
-                const hours = Math.floor(elapsed / 3600);
+                var hours = Math.floor(elapsed / 3600);
                 return hours + ' hour' + (hours > 1 ? 's' : '') + ' ago';
             } else {
-                const days = Math.floor(elapsed / 86400);
+                var days = Math.floor(elapsed / 86400);
                 return days + ' day' + (days > 1 ? 's' : '') + ' ago';
             }
         };
@@ -577,7 +577,7 @@
 
             // If using backup info
             if ($scope.backupSummary && $scope.backupSummary.useBackupInfo && backupType && $scope.device.backup_info) {
-                const backupStatus = $scope.device.backup_info.backup_status[backupType];
+                var backupStatus = $scope.device.backup_info.backup_status[backupType];
                 if (backupStatus) {
                     if (backupStatus.available && backupStatus.database_count > 0) {
                         return 'backed-up';
@@ -607,17 +607,17 @@
                 width: '0%'
             };
 
-            let width = '0%';
+            var width = '0%';
 
             // If using backup info
             if ($scope.backupSummary && $scope.backupSummary.useBackupInfo && $scope.device.backup_info) {
-                const backupTypeMap = {
+                var backupTypeMap = {
                     'mariadb': 'mysql',
                     'sqlite': 'sqlite',
                     'video': 'video'
                 };
-                const mappedType = backupTypeMap[dbType] || dbType;
-                const backupStatus = $scope.device.backup_info.backup_status[mappedType];
+                var mappedType = backupTypeMap[dbType] || dbType;
+                var backupStatus = $scope.device.backup_info.backup_status[mappedType];
 
                 if (backupStatus) {
                     if (backupStatus.available && backupStatus.database_count > 0) {
@@ -673,7 +673,7 @@
                     }
                 }
 
-                const backupStatus = $scope.device.backup_info.backup_status[backupType];
+                var backupStatus = $scope.device.backup_info.backup_status[backupType];
                 if (backupStatus) {
                     if (backupStatus.available && backupStatus.database_count > 0) {
                         return 'Available (' + backupStatus.database_count + ' db' + (backupStatus.database_count > 1 ? 's' : '') + ')';
@@ -705,7 +705,7 @@
 
             // Use backup info if available
             if ($scope.backupSummary.useBackupInfo && $scope.device.backup_info) {
-                const recommendedType = $scope.device.backup_info.recommended_backup_type;
+                var recommendedType = $scope.device.backup_info.recommended_backup_type;
                 if (recommendedType === 'mysql' || recommendedType === 'sqlite') {
                     return 'backup-status-success';
                 } else {
@@ -740,7 +740,7 @@
 
             // Use backup info if available
             if ($scope.backupSummary.useBackupInfo && $scope.device.backup_info) {
-                const recommendedType = $scope.device.backup_info.recommended_backup_type;
+                var recommendedType = $scope.device.backup_info.recommended_backup_type;
                 if (recommendedType === 'mysql' || recommendedType === 'sqlite') {
                     return 'overall-status-success';
                 } else {
@@ -1896,7 +1896,7 @@
                                     size_human: fileInfo.size_human || $scope.formatFileSize(fileInfo.size_bytes || 0),
                                     status: fileInfo.status || 'unknown',
                                     path: fileInfo.path || '',
-                                    is_h264: filename.endsWith('.h264')
+                                    is_h264: filename.indexOf('.h264', filename.length - 5) !== -1
                                 });
                             }
                         }
@@ -1917,7 +1917,7 @@
          * Filter function to show only h264 files
          */
         $scope.filterH264Files = function(videoFile) {
-            return videoFile.is_h264 || videoFile.name.endsWith('.h264');
+            return videoFile.is_h264 || videoFile.name.indexOf('.h264', videoFile.name.length - 5) !== -1;
         };
 
         /**

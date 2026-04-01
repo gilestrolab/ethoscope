@@ -947,7 +947,12 @@ pre.command {
     flex-direction: row !important;
     align-items: center !important;
     width: 100% !important;
-    gap: 15px !important;
+}
+.list-group-item.input .me-auto > * {
+    margin-right: 15px !important;
+}
+.list-group-item.input .me-auto > *:last-child {
+    margin-right: 0 !important;
 }
 
 /* Option buttons container adjustments */
@@ -1259,7 +1264,12 @@ pre.command {
 .list-group.col-12 .input {
     display: flex !important;
     align-items: center !important;
-    gap: 10px !important;
+}
+.list-group.col-12 .input > * {
+    margin-right: 10px !important;
+}
+.list-group.col-12 .input > *:last-child {
+    margin-right: 0 !important;
 }
 
 .list-group.col-12 .input select {

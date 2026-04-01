@@ -189,6 +189,7 @@ class DefaultStimulator(BaseStimulator):
     _description = {
         "overview": "The default 'interactor'. To use when no hardware interface is to be used.",
         "arguments": [],
+        "hidden": True,
     }
     _HardwareInterfaceClass = DefaultInterface
 

@@ -719,10 +719,10 @@
             var successStatuses = ['success', 'completed'];
             var errorStatuses = ['error', 'failed'];
 
-            var mysqlOk = successStatuses.includes(mysqlStatus);
-            var sqliteOk = successStatuses.includes(sqliteStatus);
-            var mysqlError = errorStatuses.includes(mysqlStatus);
-            var sqliteError = errorStatuses.includes(sqliteStatus);
+            var mysqlOk = successStatuses.indexOf(mysqlStatus) !== -1;
+            var sqliteOk = successStatuses.indexOf(sqliteStatus) !== -1;
+            var mysqlError = errorStatuses.indexOf(mysqlStatus) !== -1;
+            var sqliteError = errorStatuses.indexOf(sqliteStatus) !== -1;
 
             // Both available and successful
             if (mysql && mysql.available && sqlite && sqlite.available && mysqlOk && sqliteOk) {
@@ -982,16 +982,18 @@
          *
          * @return Formatted string.
          */
-        $scope.humanFileSize = function(bytes, si = false, dp = 1) {
-            const thresh = si ? 1000 : 1024;
+        $scope.humanFileSize = function(bytes, si, dp) {
+            if (si === undefined) si = false;
+            if (dp === undefined) dp = 1;
+            var thresh = si ? 1000 : 1024;
 
             if (Math.abs(bytes) < thresh) {
                 return bytes + ' B';
             }
 
-            const units = si ? ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'] : ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
-            let u = -1;
-            const r = 10 ** dp;
+            var units = si ? ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'] : ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
+            var u = -1;
+            var r = Math.pow(10, dp);
 
             do {
                 bytes /= thresh;

@@ -64,7 +64,7 @@ function maxLengthCheck(object) {
                     $scope.groups = [];
                     for (var user in $scope.users) {
                         var userGroup = $scope.users[user]['group'];
-                        if (userGroup && userGroup !== "" && !$scope.groups.includes(userGroup)) {
+                        if (userGroup && userGroup !== "" && $scope.groups.indexOf(userGroup) === -1) {
                             $scope.groups.push(userGroup);
                         }
                     }
@@ -133,7 +133,7 @@ function maxLengthCheck(object) {
                     $scope.groups = [];
                     for (var user in $scope.users) {
                         var userGroup = $scope.users[user]['group'];
-                        if (userGroup && userGroup !== "" && !$scope.groups.includes(userGroup)) {
+                        if (userGroup && userGroup !== "" && $scope.groups.indexOf(userGroup) === -1) {
                             $scope.groups.push(userGroup);
                         }
                     }

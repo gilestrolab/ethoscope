@@ -9,39 +9,39 @@
             restrict: 'A',
             link: function(scope, element, attrs) {
                 // Create tooltip element
-                const tooltipElement = angular.element('<div class="custom-tooltip">{{tooltipText}}</div>');
+                var tooltipElement = angular.element('<div class="custom-tooltip">{{tooltipText}}</div>');
                 tooltipElement.addClass('tooltip-hidden');
                 element.after(tooltipElement);
 
                 // Set tooltip text from the `tooltip` attribute
-                let tooltipText = attrs.tooltip || '';
+                var tooltipText = attrs.tooltip || '';
                 scope.tooltipText = tooltipText;
 
                 // Compile the tooltip element to enable Angular binding
                 $compile(tooltipElement)(scope);
 
                 // Tooltip visibility logic
-                const showTooltip = () => {
+                var showTooltip = function() {
                     tooltipElement.removeClass('tooltip-hidden');
                     tooltipElement.addClass('tooltip-visible');
                 };
 
-                const hideTooltip = () => {
+                var hideTooltip = function() {
                     tooltipElement.removeClass('tooltip-visible');
                     tooltipElement.addClass('tooltip-hidden');
                 };
 
                 // Attach mouseover and mouseleave events for tooltip visibility
-                element.on('mouseenter', () => {
+                element.on('mouseenter', function() {
                     scope.$apply(showTooltip);
                 });
 
-                element.on('mouseleave', () => {
+                element.on('mouseleave', function() {
                     scope.$apply(hideTooltip);
                 });
 
                 // Clean up event listeners on destroy
-                scope.$on('$destroy', () => {
+                scope.$on('$destroy', function() {
                     element.off('mouseenter');
                     element.off('mouseleave');
                 });

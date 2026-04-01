@@ -79,9 +79,9 @@
                                 // Local utility function for file size formatting
                                 function formatBytes(bytes) {
                                     if (!bytes || bytes === 0) return '0 B';
-                                    const k = 1024;
-                                    const sizes = ['B', 'KB', 'MB', 'GB'];
-                                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                                    var k = 1024;
+                                    var sizes = ['B', 'KB', 'MB', 'GB'];
+                                    var i = Math.floor(Math.log(bytes) / Math.log(k));
                                     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
                                 }
 
@@ -152,9 +152,9 @@
 
                                             function formatBytes(bytes) {
                                                 if (!bytes || bytes === 0) return '0 B';
-                                                const k = 1024;
-                                                const sizes = ['B', 'KB', 'MB', 'GB'];
-                                                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                                                var k = 1024;
+                                                var sizes = ['B', 'KB', 'MB', 'GB'];
+                                                var i = Math.floor(Math.log(bytes) / Math.log(k));
                                                 return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
                                             }
 
@@ -162,7 +162,7 @@
                                                 name: filename,
                                                 size_bytes: fileInfo.size_bytes || 0,
                                                 size_human: fileInfo.size_human || formatBytes(fileInfo.size_bytes || 0),
-                                                is_h264: filename.endsWith('.h264'),
+                                                is_h264: filename.indexOf('.h264', filename.length - 5) !== -1,
                                                 path: fileInfo.path || '',
                                                 enhancement_source: enhancementSource,
                                                 is_enhanced: isRsyncEnhanced || isFilesystemEnhanced
@@ -239,17 +239,17 @@
              * Update backup summary from device backup info endpoint
              */
             updateBackupSummaryFromBackupInfo: function($scope) {
-                const backupStatus = $scope.device.backup_info.backup_status;
+                var backupStatus = $scope.device.backup_info.backup_status;
                 if (!backupStatus) {
                     console.log('DEBUG: No backup_status found in backup_info');
                     $scope.backupSummary = null;
                     return;
                 }
 
-                let total = backupStatus.total_databases || 0;
-                let backedUp = 0;
-                let missing = 0;
-                let processing = 0;
+                var total = backupStatus.total_databases || 0;
+                var backedUp = 0;
+                var missing = 0;
+                var processing = 0;
 
                 // Count available backup types
                 if (backupStatus.mysql && backupStatus.mysql.available) {
@@ -262,7 +262,7 @@
                 // Calculate missing
                 missing = total - backedUp;
 
-                let overallStatus = 'Unknown';
+                var overallStatus = 'Unknown';
                 if (total === 0) {
                     overallStatus = 'No Databases';
                 } else if (backedUp === total) {
@@ -300,17 +300,17 @@
              * Update backup summary from legacy device databases data (fallback)
              */
             updateBackupSummaryFromLegacyData: function($scope) {
-                let total = 0;
-                let backedUp = 0;
-                let missing = 0;
-                let processing = 0;
+                var total = 0;
+                var backedUp = 0;
+                var missing = 0;
+                var processing = 0;
 
                 // Count SQLite databases
                 if ($scope.device.databases.SQLite) {
-                    for (let dbName in $scope.device.databases.SQLite) {
+                    for (var dbName in $scope.device.databases.SQLite) {
                         if ($scope.device.databases.SQLite.hasOwnProperty(dbName)) {
                             total++;
-                            const dbInfo = $scope.device.databases.SQLite[dbName];
+                            var dbInfo = $scope.device.databases.SQLite[dbName];
 
                             if (dbInfo.file_exists === true) {
                                 backedUp++;
@@ -325,10 +325,10 @@
 
                 // Count MariaDB databases
                 if ($scope.device.databases.MariaDB) {
-                    for (let dbName in $scope.device.databases.MariaDB) {
+                    for (var dbName in $scope.device.databases.MariaDB) {
                         if ($scope.device.databases.MariaDB.hasOwnProperty(dbName)) {
                             total++;
-                            const dbInfo = $scope.device.databases.MariaDB[dbName];
+                            var dbInfo = $scope.device.databases.MariaDB[dbName];
 
                             if (dbInfo.file_exists === true) {
                                 backedUp++;
@@ -341,7 +341,7 @@
                     }
                 }
 
-                let overallStatus = 'Unknown';
+                var overallStatus = 'Unknown';
                 if (total === 0) {
                     overallStatus = 'No Databases';
                 } else if (backedUp === total) {
