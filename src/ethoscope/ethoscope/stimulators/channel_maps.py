@@ -100,7 +100,7 @@ def get_channel_map(channel_type, led_count=None):
     if channel_type == "motor":
         return dict(_MOTORS_ODD_10ROI)
     elif channel_type == "led":
-        if led_count is not None and led_count > 10:
+        if isinstance(led_count, (int, float)) and led_count > 10:
             return dict(_LEDS_ALL_20ROI)
         return dict(_EVEN_10ROI)
     elif channel_type == "valve":
