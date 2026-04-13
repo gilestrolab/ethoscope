@@ -205,7 +205,7 @@ const float VERSION = 1.5;
 #elif (PCBVERSION == 11) // PCB Version 1.1
     static const uint8_t pins[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, A0, A1, A2, A3, A4, A5};
 #elif (PCBVERSION == 12) || (PCBVERSION == 13) // PCB Version 1.2 (DEV) or 1.3 (production)
-    static const uint8_t pins[] = {8, 3, 9, 4, 10,	5, 11, 6, 12,	7, 1,	A2,	0,	A1,	A5,	A0,	A4,	13,	A3,	2};
+    static const uint8_t pins[] = {3, 8, 4, 9, 5, 10, 6, 11, 7, 12, A2, 1, A1, 0, A0, A5, 13, A4, 2, A3};
 #else
     #error "Invalid PCBVERSION defined. Use 10 for v1.0, 11 for v1.1, or 12/13 for v1.2/1.3."
 #endif
@@ -346,8 +346,8 @@ void setup() {
         for(int i = 0; i < MOTOR_COUNT; i++) MOTOR_CHANNELS[i] = 2*i + 1;
         for(int i = 0; i < LED_COUNT; i++) LED_CHANNELS[i] = 2*i;
     #elif (MODULE == 4)
-        // LED: All 20 channels are LEDs (0-19), pairs swapped for correct ROI mapping
-        for(int i = 0; i < LED_COUNT; i++) LED_CHANNELS[i] = i ^ 1;
+        // LED: All 20 channels are LEDs (0-19)
+        for(int i = 0; i < LED_COUNT; i++) LED_CHANNELS[i] = i;
     #endif
 
     // Initialize all channels as OUTPUT and set them LOW
