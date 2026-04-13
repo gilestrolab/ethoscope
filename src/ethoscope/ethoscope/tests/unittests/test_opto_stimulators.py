@@ -72,6 +72,60 @@ class TestOptoMotorPulseTrain(unittest.TestCase):
         self.assertEqual(self.motor._n_channels, 20)
 
 
+class TestOptoMotorMissingHardware(unittest.TestCase):
+    """Regression tests for gilestrolab/ethoscope#216.
+
+    Ensure OptoMotor can be instantiated on devices with no attached
+    module (no serial port) without raising, and that send() calls are
+    silently dropped instead of crashing.
+    """
+
+    def test_init_survives_missing_serial_port(self):
+        """OptoMotor() must not raise when no serial port is available."""
+        import serial as pyserial
+
+        with patch.object(OptoMotor, "_find_port", return_value=""):
+            with patch(
+                "ethoscope.hardware.interfaces.optomotor.serial.Serial",
+                side_effect=pyserial.SerialException(
+                    "[Errno 2] could not open port ''"
+                ),
+            ):
+                motor = OptoMotor()
+
+        self.assertIsNone(motor._serial)
+
+    def test_init_survives_file_not_found(self):
+        """FileNotFoundError from os.open must not escape."""
+        with patch.object(OptoMotor, "_find_port", return_value="/dev/ttyACM0"):
+            with patch(
+                "ethoscope.hardware.interfaces.optomotor.serial.Serial",
+                side_effect=FileNotFoundError(2, "No such file or directory"),
+            ):
+                motor = OptoMotor()
+
+        self.assertIsNone(motor._serial)
+
+    def test_activate_is_noop_without_serial(self):
+        """activate() must not raise AttributeError when _serial is None."""
+        with patch.object(OptoMotor, "__init__", lambda self, *a, **kw: None):
+            motor = OptoMotor()
+            motor._serial = None
+
+        # Should not raise; returns 0 to indicate no bytes written.
+        self.assertEqual(motor.activate(channel=3, duration=1000, intensity=800), 0)
+
+    def test_pulse_train_is_noop_without_serial(self):
+        """pulse_train() must not raise AttributeError when _serial is None."""
+        with patch.object(OptoMotor, "__init__", lambda self, *a, **kw: None):
+            motor = OptoMotor()
+            motor._serial = None
+
+        self.assertEqual(
+            motor.pulse_train(channel=4, on_ms=100, off_ms=200, cycles=5), 0
+        )
+
+
 def _make_mock_tracker(roi_id=1, last_time_point=200000, positions=None, times=None):
     """Helper to create a mock tracker for stimulator tests."""
     tracker = Mock()

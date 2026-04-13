@@ -36,10 +36,36 @@ class OptoMotor(SimpleSerialInterface):
         else:
             self._port = port
 
-        self._serial = serial.Serial(self._port, self._baud, timeout=2)
-        time.sleep(2)
-        self._test_serial_connection()
+        # Reason: ethoscopes without an attached Arduino/mAGO module must
+        # still be able to start tracking when the default stimulator
+        # (ComposedStimulator) binds this class. Without the guard, a
+        # missing port propagates a SerialException up through
+        # HardwareConnection → _set_tracking_from_scratch and crashes the
+        # tracking start. See gilestrolab/ethoscope#216.
+        try:
+            self._serial = serial.Serial(self._port, self._baud, timeout=2)
+            time.sleep(2)
+            self._test_serial_connection()
+        except (serial.SerialException, FileNotFoundError, OSError) as e:
+            logging.warning(
+                "Could not open OptoMotor serial port %r: %s. "
+                "No module detected — stimulator commands will be dropped.",
+                self._port,
+                e,
+            )
+            self._serial = None
+            return
+
         super().__init__(*args, **kwargs)
+
+    def _ensure_serial(self):
+        """Return True if a serial connection is available.
+
+        Used by activate/pulse_train to silently drop commands when the
+        device has no module attached, instead of raising AttributeError
+        on every instruction.
+        """
+        return self._serial is not None
 
     def activate(self, channel, duration, intensity):
         """
@@ -56,6 +82,9 @@ class OptoMotor(SimpleSerialInterface):
 
         if channel < 0:
             raise Exception("chanel must be greater or equal to zero")
+
+        if not self._ensure_serial():
+            return 0
 
         duration = int(duration)
         intensity = int(intensity)
@@ -75,6 +104,9 @@ class OptoMotor(SimpleSerialInterface):
         """
         if channel < 0:
             raise Exception("channel must be greater or equal to zero")
+
+        if not self._ensure_serial():
+            return 0
 
         on_ms = int(on_ms)
         off_ms = int(off_ms)
