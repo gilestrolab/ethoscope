@@ -148,7 +148,7 @@
 // Version and Configuration
 // =============================================================================
 const float VERSION = 1.5;
-#define PCBVERSION 121    // PCB Version: 10 for v1.0, 11 for v1.1, 12 for v1.2/1.3, 121 for 12Horiz, 122 for 12Vert
+#define PCBVERSION 12    // PCB Version: 10 for v1.0, 11 for v1.1, 12 for v1.2/1.3
 #define MODULE 4         // Module Type: 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
 
 // =============================================================================
@@ -199,18 +199,15 @@ const float VERSION = 1.5;
 // =============================================================================
 // Pin Configuration based on PCB Version
 // =============================================================================
+
 #if (PCBVERSION == 10) // PCB Version 1.0
     static const uint8_t pins[] = {1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, A0, A1, A2, A3, A4, A5};
 #elif (PCBVERSION == 11) // PCB Version 1.1
     static const uint8_t pins[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, A0, A1, A2, A3, A4, A5};
-#elif (PCBVERSION == 12) // PCB Version 1.2 / 1.3 with v1.2 LED PCB (production);
-    static const uint8_t pins[] = {8, 3, 9, 4, 10, 5, 11, 6, 12, 7, 1, A2, 0, A1, A5, A0, A4, 13, A3, 2};
-#elif (PCBVERSION == 122) // PCB Version 1.2 / 1.3 with HORIZONTAL soldering on LED PCB v1.0 (dev only)
-    static const uint8_t pins[] = {8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 1, 2, 0, 13, A5, A0, A4, A1, A3, A2};
-#elif (PCBVERSION == 121) // PCB Version 1.2 / 1.3 with HORIZONTAL soldering on LED PCB v1.0 (dev only)
-    static const uint8_t pins[] = {5, 7, 4, 3, 9, 12, 10, 8, 6, 11, 13,	2, A1, A0, 0, A2,	A5,	1, A3, A4};
+#elif (PCBVERSION == 12) || (PCBVERSION == 13) // PCB Version 1.2 (DEV) or 1.3 (production)
+    static const uint8_t pins[] = {8, 3, 9, 4, 10,	5, 11, 6, 12,	7, 1,	A2,	0,	A1,	A5,	A0,	A4,	13,	A3,	2};
 #else
-    #error "Invalid PCBVERSION defined. Use 10 for v1.0, 11 for v1.1, or 12 for v1.2/1.3."
+    #error "Invalid PCBVERSION defined. Use 10 for v1.0, 11 for v1.1, or 12/13 for v1.2/1.3."
 #endif
 
 // Channel mapping arrays — sized at compile time per module
@@ -349,8 +346,8 @@ void setup() {
         for(int i = 0; i < MOTOR_COUNT; i++) MOTOR_CHANNELS[i] = 2*i + 1;
         for(int i = 0; i < LED_COUNT; i++) LED_CHANNELS[i] = 2*i;
     #elif (MODULE == 4)
-        // LED: All 20 channels are LEDs (0-19)
-        for(int i = 0; i < LED_COUNT; i++) LED_CHANNELS[i] = i;
+        // LED: All 20 channels are LEDs (0-19), pairs swapped for correct ROI mapping
+        for(int i = 0; i < LED_COUNT; i++) LED_CHANNELS[i] = i ^ 1;
     #endif
 
     // Initialize all channels as OUTPUT and set them LOW
