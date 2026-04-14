@@ -583,7 +583,11 @@ class EthoscopeNodeServer:
 
 def setup_logging(debug: bool = False):
     """Setup logging configuration."""
-    level = logging.INFO if debug else logging.ERROR
+    # Reason: ERROR-only in production silently masked the temperature alert
+    # pipeline failure during the April 2026 incident. INFO is the minimum
+    # needed to see "Temperature HIGH alert sent" / "Email sent successfully"
+    # and to diagnose notification failures without redeploying with --debug.
+    level = logging.DEBUG if debug else logging.INFO
     format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
     # Force configure logging even if already initialized

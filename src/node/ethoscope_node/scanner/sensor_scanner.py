@@ -261,6 +261,15 @@ class SensorScanner(DeviceScanner):
 
             self._temperature_monitor = TemperatureAlertMonitor(self._config)
             self._logger.info("Temperature alert monitor initialized")
+
+            # Retroactively attach callback to sensors discovered before init.
+            # Reason: device discovery can race ahead of monitor construction.
+            callback = self._get_temperature_callback()
+            if callback:
+                with self._lock:
+                    for device in self.devices:
+                        if hasattr(device, "set_temperature_callback"):
+                            device.set_temperature_callback(callback)
         except Exception as e:
             self._logger.error(f"Failed to initialize temperature monitor: {e}")
             self._temperature_monitor = None
@@ -288,27 +297,33 @@ class SensorScanner(DeviceScanner):
 
         return callback
 
-    def _add_or_update_device(
-        self, ip: str, port: int, name: str = None, device_id: str = None
+    def add(
+        self,
+        ip: str,
+        port: int,
+        name: Optional[str] = None,
+        device_id: Optional[str] = None,
+        zcinfo: Optional[Dict] = None,
     ):
+        """Add a sensor device and attach the temperature callback if present.
+
+        Overrides DeviceScanner.add() — the actual entry point used by both
+        direct adds and zeroconf service discovery — so newly-created sensors
+        receive the temperature monitoring callback.
         """
-        Add or update a sensor device with temperature monitoring callback.
+        devices_before_ids = {id(d) for d in self.devices}
+        super().add(ip, port, name, device_id, zcinfo)
 
-        Overrides parent to set temperature callback on newly created sensors.
-        """
-        # Track current device count to detect new additions
-        devices_before = len(self.devices)
+        callback = self._get_temperature_callback()
+        if callback is None:
+            return
 
-        # Call parent implementation
-        super()._add_or_update_device(ip, port, name, device_id)
-
-        # If a new device was added, set up temperature callback
-        if len(self.devices) > devices_before:
-            new_device = self.devices[-1]
-            if hasattr(new_device, "set_temperature_callback"):
-                callback = self._get_temperature_callback()
-                if callback:
-                    new_device.set_temperature_callback(callback)
+        with self._lock:
+            for device in self.devices:
+                if id(device) in devices_before_ids:
+                    continue
+                if hasattr(device, "set_temperature_callback"):
+                    device.set_temperature_callback(callback)
                     self._logger.debug(
                         f"Temperature monitoring enabled for sensor: {name or device_id}"
                     )

@@ -337,3 +337,121 @@ class TestSensorScanner:
         scanner = SensorScanner()
         # Sensors should have longer refresh period (300s)
         assert scanner.device_refresh_period == 300
+
+
+class _FakeSensor:
+    """Lightweight stand-in for Sensor used in scanner add() tests.
+
+    Avoids spawning background threads and network I/O while preserving the
+    subset of the Sensor API that DeviceScanner.add() and SensorScanner.add()
+    touch.
+    """
+
+    _next_id = 0
+
+    def __init__(
+        self,
+        ip,
+        port=80,
+        refresh_period=300,
+        results_dir="",
+        **kwargs,
+    ):
+        self._ip = ip
+        self._port = port
+        _FakeSensor._next_id += 1
+        self._id = f"fake_sensor_{_FakeSensor._next_id}"
+        self._skip_scanning = False
+        self.zeroconf_name = None
+        self._temperature_callback = None
+        self._started = False
+        self._stopped = False
+
+        from ethoscope_node.scanner.base_scanner import DeviceStatus
+
+        self._device_status = DeviceStatus("offline")
+        self._info = {"last_seen": 0}
+
+        import threading
+
+        self._lock = threading.RLock()
+
+    def ip(self):
+        return self._ip
+
+    def id(self):
+        return self._id
+
+    def start(self):
+        self._started = True
+
+    def stop(self):
+        self._stopped = True
+
+    def set_temperature_callback(self, callback):
+        self._temperature_callback = callback
+
+    def reset_error_state(self):
+        pass
+
+    def skip_scanning(self, value):
+        self._skip_scanning = value
+
+
+class TestSensorScannerTemperatureCallback:
+    """Tests for temperature callback attachment during device discovery."""
+
+    def _make_scanner_with_monitor(self):
+        scanner = SensorScanner(device_class=_FakeSensor)
+        scanner._is_running = True
+        scanner._temperature_monitor = MagicMock()
+        return scanner
+
+    def test_add_attaches_callback_to_new_sensor(self):
+        """Newly added sensors must receive the temperature callback."""
+        scanner = self._make_scanner_with_monitor()
+
+        scanner.add("192.168.1.210", 80, name="sensor-a", device_id="dev-a")
+
+        assert len(scanner.devices) == 1
+        device = scanner.devices[0]
+        assert device._temperature_callback is not None
+
+        # Invoking the attached callback must forward to the monitor.
+        device._temperature_callback("sid", "sname", "loc", 42.0)
+        scanner._temperature_monitor.check_temperature.assert_called_once_with(
+            sensor_id="sid",
+            sensor_name="sname",
+            location="loc",
+            temperature=42.0,
+        )
+
+    def test_add_without_monitor_leaves_callback_none(self):
+        """If no temperature monitor is configured, no callback is attached."""
+        scanner = SensorScanner(device_class=_FakeSensor)
+        scanner._is_running = True
+        # No monitor configured (no config passed in)
+        assert scanner._temperature_monitor is None
+
+        scanner.add("192.168.1.211", 80, name="sensor-b", device_id="dev-b")
+
+        assert scanner.devices[0]._temperature_callback is None
+
+    def test_init_temperature_monitor_retroactively_attaches_callback(self):
+        """Sensors added before monitor init must receive the callback on init."""
+        scanner = SensorScanner(device_class=_FakeSensor)
+        scanner._is_running = True
+
+        # Simulate sensor discovered before temperature monitor is ready.
+        scanner.add("192.168.1.212", 80, name="sensor-c", device_id="dev-c")
+        assert scanner.devices[0]._temperature_callback is None
+
+        # Now attach config and initialize the monitor as the server would.
+        scanner._config = MagicMock()
+        with patch(
+            "ethoscope_node.notifications.temperature_monitor.TemperatureAlertMonitor"
+        ) as mock_monitor_cls:
+            mock_monitor_cls.return_value = MagicMock()
+            scanner._init_temperature_monitor()
+
+        assert scanner.devices[0]._temperature_callback is not None
