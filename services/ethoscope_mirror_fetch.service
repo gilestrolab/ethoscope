@@ -1,0 +1,10 @@
+[Unit]
+Description=Fetch upstream into the local Ethoscope bare mirror
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Explicit refspec so we always update refs/heads/* in place regardless of
+# whatever remote.origin.fetch the bare repo was configured with.
+ExecStart=/usr/bin/git -C /srv/git/ethoscope.git fetch --prune origin +refs/heads/*:refs/heads/* +refs/tags/*:refs/tags/*

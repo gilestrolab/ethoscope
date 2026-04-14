@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically refresh the Ethoscope bare mirror from upstream
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+AccuracySec=30s
+Persistent=true
+Unit=ethoscope_mirror_fetch.service
+
+[Install]
+WantedBy=timers.target

@@ -154,6 +154,8 @@ case "$1" in
             "ethoscope_virtuascope.service"
             "ethoscope_sensor_virtual.service"
             "ethoscope_tunnel.service"
+            "ethoscope_mirror_fetch.service"
+            "ethoscope_mirror_fetch.timer"
         )
 
         # Define node services to enable
@@ -163,6 +165,7 @@ case "$1" in
             # "ethoscope_backup_mysql"  # Not enabled by default (only needed if using MySQL result writer)
             "ethoscope_update_node"
             "ethoscope_sensor_virtual"
+            "ethoscope_mirror_fetch.timer"
         )
 
         # Link new services
