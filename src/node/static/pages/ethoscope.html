@@ -1105,9 +1105,7 @@
                     </div>
                     <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                         <div ng-if="!isRoiTemplateSelected() || !isUserSelected() || !isLocationSelected()" class="alert alert-warning" style="margin-bottom: 0; margin-right: 15px; flex: 1; max-width: 60%;">
-                            {{ [!isRoiTemplateSelected() ? 'a ROI mask' : '',
-                                !isUserSelected() ? 'a user' : '',
-                                !isLocationSelected() ? 'a location' : ''].filter(Boolean).join(', ') + ' must be selected.' }}
+                            <span ng-if="!isRoiTemplateSelected()">A ROI mask</span><span ng-if="!isRoiTemplateSelected() && (!isUserSelected() || !isLocationSelected())">, </span><span ng-if="!isUserSelected()">a user</span><span ng-if="!isUserSelected() && !isLocationSelected()">, </span><span ng-if="!isLocationSelected()">a location</span> must be selected.
                         </div>
                         <div ng-if="isRoiTemplateSelected() && isUserSelected() && isLocationSelected()" style="flex: 1;"></div>
                         <div style="display: flex; gap: 10px;">
