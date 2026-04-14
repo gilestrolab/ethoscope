@@ -238,6 +238,7 @@ class TestNodeAPI(unittest.TestCase):
         """Test getting node config successfully."""
         mock_db = Mock()
         mock_db.getAllUsers.return_value = [{"username": "user1"}]
+        mock_db.getAllIncubators.return_value = {"Inc1": {"name": "Inc1", "active": 1}}
         mock_db_class.return_value = mock_db
 
         self.api.sensor_scanner.get_all_devices_info.return_value = {
@@ -252,7 +253,9 @@ class TestNodeAPI(unittest.TestCase):
             result = self.api._get_node_config()
 
             self.assertEqual(len(result["users"]), 1)
-            self.assertEqual(result["incubators"], [{"name": "incubator1"}])
+            self.assertEqual(
+                result["incubators"], {"Inc1": {"name": "Inc1", "active": 1}}
+            )
             self.assertEqual(result["sensors"], {"sensor1": {"status": "active"}})
             self.assertEqual(result["timestamp"], 1234567890.0)
 
@@ -264,8 +267,9 @@ class TestNodeAPI(unittest.TestCase):
         with patch.object(self.api.logger, "error") as mock_log:
             result = self.api._get_node_config()
 
-            # Should return empty users dict on error
+            # Should return empty dicts on error
             self.assertEqual(result["users"], {})
+            self.assertEqual(result["incubators"], {})
             mock_log.assert_called_once()
 
     @patch("os.path.exists")
@@ -595,19 +599,16 @@ class TestNodeAPI(unittest.TestCase):
         self.api.config.add_user.assert_called_once_with(user_data)
 
     @patch("ethoscope_node.api.node_api.BaseAPI.get_request_json")
-    def test_node_actions_addincubator(self, mock_get_json):
-        """Test adding an incubator."""
-        incubator_data = {"name": "new_incubator", "location": "Lab B"}
+    def test_node_actions_addincubator_deprecated(self, mock_get_json):
+        """Test that addincubator action returns deprecation message."""
         mock_get_json.return_value = {
             "action": "addincubator",
-            "incubatordata": incubator_data,
+            "incubatordata": {"name": "new_incubator"},
         }
-        self.api.config.add_incubator = Mock(return_value={"success": True})
 
         result = self.api._node_actions()
 
-        self.assertTrue(result["success"])
-        self.api.config.add_incubator.assert_called_once_with(incubator_data)
+        self.assertIn("error", result)
 
     @patch("ethoscope_node.api.node_api.BaseAPI.get_request_json")
     def test_node_actions_addsensor(self, mock_get_json):

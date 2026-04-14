@@ -198,7 +198,9 @@ class ExperimentalDB(multiprocessing.Process):
                                 owner TEXT,
                                 description TEXT,
                                 created TIMESTAMP NOT NULL,
-                                active INTEGER DEFAULT 1
+                                active INTEGER DEFAULT 1,
+                                lights_on TEXT DEFAULT '',
+                                lights_off TEXT DEFAULT ''
                             );"""
 
         self.executeSQL(sql_create_runs_table)
@@ -228,6 +230,8 @@ class ExperimentalDB(multiprocessing.Process):
             self._migrate_users_from_config()
             # Migration 6: Migrate incubators from configuration file to database
             self._migrate_incubators_from_config()
+            # Migration 7: Add light schedule columns to incubators table
+            self._migrate_incubators_add_light_schedule()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
 
@@ -581,6 +585,42 @@ class ExperimentalDB(multiprocessing.Process):
 
         except Exception as e:
             logging.error(f"Error during incubator migration from config: {e}")
+
+    def _migrate_incubators_add_light_schedule(self):
+        """
+        Add lights_on and lights_off columns to incubators table if they don't exist.
+        """
+        try:
+            check_columns = f"PRAGMA table_info({self._incubators_table_name})"
+            table_info = self.executeSQL(check_columns)
+
+            if not isinstance(table_info, list):
+                return
+
+            has_lights_on = any(col[1] == "lights_on" for col in table_info)
+
+            if not has_lights_on:
+                logging.info("Adding light schedule columns to incubators table")
+
+                sql_add_lights_on = (
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN lights_on TEXT DEFAULT ''"
+                )
+                sql_add_lights_off = (
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN lights_off TEXT DEFAULT ''"
+                )
+                self.executeSQL(sql_add_lights_on)
+                self.executeSQL(sql_add_lights_off)
+
+                logging.info(
+                    "Successfully added light schedule columns to incubators table"
+                )
+
+        except Exception as e:
+            logging.error(
+                f"Error migrating incubators table (adding light schedule): {e}"
+            )
 
     def getRun(self, run_id, asdict=False):
         """
@@ -1248,6 +1288,8 @@ class ExperimentalDB(multiprocessing.Process):
         description: str = "",
         created: float = None,
         active: int = 1,
+        lights_on: str = "",
+        lights_off: str = "",
     ):
         """
         Add a new incubator to the database.
@@ -1282,12 +1324,15 @@ class ExperimentalDB(multiprocessing.Process):
             escaped_location = location.replace("'", "''")
             escaped_owner = owner.replace("'", "''")
             escaped_description = description.replace("'", "''")
+            escaped_lights_on = lights_on.replace("'", "''")
+            escaped_lights_off = lights_off.replace("'", "''")
 
             sql_add_incubator = f"""
             INSERT INTO {self._incubators_table_name}
-            (name, location, owner, description, created, active)
+            (name, location, owner, description, created, active, lights_on, lights_off)
             VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}',
-                    '{escaped_description}', '{created}', {active})
+                    '{escaped_description}', '{created}', {active},
+                    '{escaped_lights_on}', '{escaped_lights_off}')
             """
 
             result = self.executeSQL(sql_add_incubator)
@@ -1334,7 +1379,14 @@ class ExperimentalDB(multiprocessing.Process):
             # Build SET clause
             set_clauses = []
             for field, value in updates.items():
-                if field in ["name", "location", "owner", "description"]:
+                if field in [
+                    "name",
+                    "location",
+                    "owner",
+                    "description",
+                    "lights_on",
+                    "lights_off",
+                ]:
                     escaped_value = str(value).replace("'", "''")
                     set_clauses.append(f"{field} = '{escaped_value}'")
                 elif field in ["active"]:

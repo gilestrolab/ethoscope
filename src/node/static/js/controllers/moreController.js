@@ -269,14 +269,7 @@ function maxLengthCheck(object) {
         };
 
 
-        $scope.nodeManagement.addincubator = function(){
-            var spinner = new Spinner(opts).spin();
-            $http.post('/node-actions', data = {'action': 'addincubator', 'incubatordata' : $scope.selected['incubators']} )
-                .then(function(response) { var data = response.data;
-                    if ( data['result'] == 'success' ) { $scope.incubators = data['data'] };
-            });
-            spinner.stop();
-        };
+        // Incubators are now managed via the dedicated Incubators tab
 
         $scope.nodeManagement.addsensor = function(){
             var spinner = new Spinner(opts).spin();

@@ -880,10 +880,30 @@
                 }
             }
 
-            // Add sensor IP based on selected incubator name
+            // Add sensor IP and light schedule based on selected incubator name
+            var hasLightSchedule = false;
             if (option.experimental_info && option.experimental_info.arguments && option.experimental_info.arguments.location) {
                 var selectedIncubatorName = option.experimental_info.arguments.location;
                 option.experimental_info.arguments.sensor = $scope.get_ip_of_sensor(selectedIncubatorName);
+
+                // Inject light schedule from incubator configuration
+                if ($scope.node.incubators && $scope.node.incubators[selectedIncubatorName]) {
+                    var incubator = $scope.node.incubators[selectedIncubatorName];
+                    if (incubator.lights_on && incubator.lights_off) {
+                        option.experimental_info.arguments.lights_on = incubator.lights_on;
+                        option.experimental_info.arguments.lights_off = incubator.lights_off;
+                        hasLightSchedule = true;
+                    }
+                }
+            }
+
+            // Block start if light schedule is active but device clock is out of sync
+            if (hasLightSchedule && $scope.delta_t_min > 3) {
+                manageSpinner('stop');
+                alert('Cannot start experiment with light schedule: device clock is ' +
+                      Math.round($scope.delta_t_min) + ' minutes out of sync with the node. ' +
+                      'Please wait for time synchronization or reload this page to trigger a sync.');
+                return;
             }
 
             // Include stimulator sequence in the data sent to backend
@@ -1200,6 +1220,20 @@
                         Array.isArray(option[opt].arguments[arg]) &&
                         option[opt].arguments[arg][0] instanceof Date) {
                         option[opt].arguments[arg] = option[opt].arguments[arg][1]; // Use timestamp
+                    }
+                }
+            }
+
+            // Add sensor IP and light schedule based on selected incubator name
+            if (option.experimental_info && option.experimental_info.arguments && option.experimental_info.arguments.location) {
+                var selectedIncubatorName = option.experimental_info.arguments.location;
+                option.experimental_info.arguments.sensor = $scope.get_ip_of_sensor(selectedIncubatorName);
+
+                if ($scope.node.incubators && $scope.node.incubators[selectedIncubatorName]) {
+                    var incubator = $scope.node.incubators[selectedIncubatorName];
+                    if (incubator.lights_on && incubator.lights_off) {
+                        option.experimental_info.arguments.lights_on = incubator.lights_on;
+                        option.experimental_info.arguments.lights_off = incubator.lights_off;
                     }
                 }
             }

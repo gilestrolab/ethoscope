@@ -1,0 +1,15 @@
+[Unit]
+Description=Ethoscope LED daylight controller
+After=network.target
+
+[Service]
+Type=simple
+RuntimeDirectory=ethoscope
+WorkingDirectory=/opt/ethoscope/src/ethoscope/ethoscope/hardware/interfaces/
+ExecStart=/usr/bin/python3 /opt/ethoscope/src/ethoscope/ethoscope/hardware/interfaces/light_daemon.py
+ExecStopPost=/usr/bin/pinctrl set 17 op dl
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

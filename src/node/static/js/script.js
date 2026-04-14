@@ -91,6 +91,12 @@
                 controller: 'usersController',
             })
 
+            // route for the incubators management page
+            .when('/incubators', {
+                templateUrl: '/static/pages/incubators.html',
+                controller: 'incubatorsController',
+            })
+
             // route for the installation wizard
             .when('/installation-wizard', {
                 templateUrl: '/static/pages/wizard/installation-wizard.html',

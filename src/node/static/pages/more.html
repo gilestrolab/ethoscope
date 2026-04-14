@@ -443,11 +443,9 @@
         <ul class="list-group col-12">
             <h3>Incubators</h3>
             <div class="input">
-                <select ng-model="selected['incubators'].name" ng-change="nodeManagement.loadData('incubators')">
-                  <option ng-repeat="(key, entry) in incubators" value="{{key}}" >{{key}}</option>
-                </select>
-                    <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal"><i class="fa fa-lg fa-edit"></i></button>
-                    <button class="btn btn-info" data-toggle="modal" data-target="#addIncubatorModal" ng-click="selected['incubators'] = {}; "><i class="fa fa-lg fa-plus"></i></button>
+                <a href="#!/incubators" class="btn btn-info">
+                    <i class="fa fa-thermometer-half"></i> Manage Incubators
+                </a>
             </div>
         </ul>
         <ul class="list-group col-12">
@@ -468,35 +466,6 @@
 
 
 
-<!-- Modal ADD or EDIT Incubator -->
-<div class="modal fade" id="addIncubatorModal" tabindex="-1" role="dialog" aria-labelledby="addIncubatorLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-        <h4 class="modal-title" id="myModalLabel">Incubator Editor</h4>
-      </div>
-      <div class="modal-body">
-        <form name="addIncubatorForm">
-            <div class="form-group" hidden>
-                <label class="input"><span>ID</span><input type="number" min="1" name='id' readonly="readonly" ng-model="selected['incubators'].id" style="display:inline"></label>
-            </div>
-            <div class="alert alert-warning" ng-if="!adduserForm.$valid">The fields labeled by a red bar are required.</div>
-
-            <label class="input"><span ng-hide="selected['incubators'].name != null">Incubator Name</span><input type="text" name="name" ng-model="selected['incubators'].name" required ng-required="true" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['incubators'].location != null">Location</span><input type="text" name="location" ng-model="selected['incubators'].location" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['incubators'].owner != null">The lab or team owning</span><input type="text" name="owner" ng-model="selected['incubators'].owner" style="width: 240px;"></label>
-            <label class="input"><span ng-hide="selected['incubators'].description != null">Description</span><textarea name="description" ng-model="selected['incubators'].description" style="width: 240px;"></textarea></label>
-            <label><input type="checkbox" name="active" ng-model="selected['incubators'].active"><span> is Active?</span></label>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-        <button class="btn btn-danger" ng-click="nodeManagement.addincubator()"  data-dismiss="modal" ng-disabled="addIncubatorForm.$invalid">Save</button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Modal ADD or EDIT Sensors -->
 <div class="modal fade" id="addSensorModal" tabindex="-1" role="dialog" aria-labelledby="addSensorLabel" aria-hidden="true">

@@ -77,6 +77,7 @@ class ExperimentalInformation(DescribedObject):
                 "description": "Where is your device",
                 "default": "",
                 "asknode": "incubators",
+                "required": "required",
             },
             {
                 "type": "str",
@@ -92,16 +93,34 @@ class ExperimentalInformation(DescribedObject):
                 "asknode": "sensors",
                 "hidden": "true",
             },
+            {
+                "type": "str",
+                "name": "lights_on",
+                "description": "Light schedule: lights on time (HH:MM)",
+                "default": "",
+                "hidden": "true",
+            },
+            {
+                "type": "str",
+                "name": "lights_off",
+                "description": "Light schedule: lights off time (HH:MM)",
+                "default": "",
+                "hidden": "true",
+            },
         ],
     }
 
-    def __init__(self, name="", location="", code="", sensor=""):
+    def __init__(
+        self, name="", location="", code="", sensor="", lights_on="", lights_off=""
+    ):
         self._check_code(code)
         self._info_dic = {
             "name": name,
             "location": location,
             "code": code,
             "sensor": sensor,
+            "lights_on": lights_on,
+            "lights_off": lights_off,
         }
 
     def _check_code(self, code):
@@ -126,6 +145,7 @@ class ControlThread(Thread):
     """
 
     _auto_SQL_backup_at_stop = False
+    LIGHT_SCHEDULE_FILE = "/run/ethoscope/light_schedule.json"
 
     _option_dict = OrderedDict(
         [
@@ -807,6 +827,9 @@ class ControlThread(Thread):
             f"DEBUG: Final experimental_info created: {self._info['experimental_info']}"
         )
 
+        # Write light schedule config for the light daemon service
+        self._write_light_schedule()
+
         # here the hardwareconnection call the interface class without passing any argument!
         hardware_connection = HardwareConnection(HardWareInterfaceClass)
 
@@ -1336,6 +1359,59 @@ class ControlThread(Thread):
                 logging.warning("Could not close hardware connection properly")
                 pass
 
+    def _write_light_schedule(self):
+        """Write light schedule config file for the light daemon."""
+        try:
+            schedule_dir = os.path.dirname(self.LIGHT_SCHEDULE_FILE)
+            os.makedirs(schedule_dir, exist_ok=True)
+
+            exp_info = self._info.get("experimental_info", {})
+            lights_on = exp_info.get("lights_on", "")
+            lights_off = exp_info.get("lights_off", "")
+
+            schedule = {
+                "lights_on": lights_on,
+                "lights_off": lights_off,
+                "active": bool(lights_on and lights_off),
+                "updated_at": time.time(),
+            }
+
+            # Atomic write: write to temp file then rename
+            tmp_file = self.LIGHT_SCHEDULE_FILE + ".tmp"
+            with open(tmp_file, "w") as f:
+                json.dump(schedule, f)
+            os.replace(tmp_file, self.LIGHT_SCHEDULE_FILE)
+
+            if lights_on and lights_off:
+                logging.info(
+                    "Light schedule written: on=%s, off=%s", lights_on, lights_off
+                )
+            else:
+                logging.info("No light schedule configured for this experiment")
+        except Exception as e:
+            logging.warning("Failed to write light schedule: %s", e)
+
+    def _clear_light_schedule(self):
+        """Clear the light schedule config file so daemon turns lights off."""
+        try:
+            schedule_dir = os.path.dirname(self.LIGHT_SCHEDULE_FILE)
+            os.makedirs(schedule_dir, exist_ok=True)
+
+            schedule = {
+                "lights_on": "",
+                "lights_off": "",
+                "active": False,
+                "updated_at": time.time(),
+            }
+
+            tmp_file = self.LIGHT_SCHEDULE_FILE + ".tmp"
+            with open(tmp_file, "w") as f:
+                json.dump(schedule, f)
+            os.replace(tmp_file, self.LIGHT_SCHEDULE_FILE)
+            logging.info("Light schedule cleared")
+        except Exception as e:
+            logging.warning("Failed to clear light schedule: %s", e)
+
     def stop(self, error=None):
         """ """
         # We stop only if we are actually running - not when the thread simply dies
@@ -1343,6 +1419,9 @@ class ControlThread(Thread):
 
             self._info["status"] = "stopping"
             self._info["time"] = time.time()
+
+            # Clear light schedule so the daemon turns off the LED
+            self._clear_light_schedule()
 
             # we reset all the user data of the latest experiment except the run_id
             # a new run_id will be created when we start another experiment

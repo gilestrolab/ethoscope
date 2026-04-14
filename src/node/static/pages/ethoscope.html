@@ -37,6 +37,23 @@
             <span ng-if="device.ssh_key_installed === false" class="fa fa-key fa-3x" title="Passwordless SSH not configured" style="color: #ff9966; transform: scale(0.9);">
             </span>
 
+            <!-- Light Schedule Icons -->
+            <span ng-if="device.light_schedule.hardware && device.light_schedule.led_on"
+                  class="fa fa-sun fa-3x"
+                  title="LED ON ({{device.light_schedule.lights_on}} – {{device.light_schedule.lights_off}})"
+                  style="color: #f0ad4e; transform: scale(0.9);">
+            </span>
+            <span ng-if="device.light_schedule.hardware && device.light_schedule.active && !device.light_schedule.led_on"
+                  class="fa fa-moon fa-3x"
+                  title="LED OFF ({{device.light_schedule.lights_on}} – {{device.light_schedule.lights_off}})"
+                  style="color: #888; transform: scale(0.9);">
+            </span>
+            <span ng-if="device.light_schedule.hardware && !device.light_schedule.active"
+                  class="fa fa-lightbulb fa-3x"
+                  title="Light daemon running, no schedule active"
+                  style="color: #ccc; transform: scale(0.9);">
+            </span>
+
             <!-- Response Time Icon -->
             <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 500.0, 'fa fa-face-dizzy': device.response_time >= 500.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="color: var(--medium-gray); transform: scale(0.9);">
             </span>
@@ -1209,12 +1226,15 @@
 
                                         <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
                                         <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
-                                        <input ng-if="(arg.type == 'str' && arg.asknode == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
-                                        <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
-                                            <option value="">-- choose {{arg.name}} --</option>
+                                        <input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
+                                        <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
+                                            <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
                                             <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
                                             <option ng-if="!(node[arg.asknode] | toArray).length" value="" disabled>No {{arg.name}} available</option>
                                         </select>
+                                        <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.required == 'required')" class="text-danger" ng-show="recordingoptionsform[arg.name].$invalid && recordingoptionsform[arg.name].$touched">
+                                            <small>{{arg.name}} is required</small>
+                                        </div>
 
                                         <div ng-if="arg.type == 'date_range'" class="form-group">
                                             <label for="input-{{arg.name}}">{{arg.description}}</label>
@@ -1248,7 +1268,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-                <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_recording(selected_options.recording)" data-toggle="modal">Start recording</button>
+                <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_recording(selected_options.recording)" ng-disabled="recordingoptionsform.$invalid" data-toggle="modal">Start recording</button>
             </div>
         </div>
     </div>

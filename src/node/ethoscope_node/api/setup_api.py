@@ -439,6 +439,8 @@ class SetupAPI(BaseAPI):
                 "owner": data.get("owner", "").strip(),
                 "description": data.get("description", "").strip(),
                 "active": 1,
+                "lights_on": data.get("lights_on", "").strip(),
+                "lights_off": data.get("lights_off", "").strip(),
             }
 
             # Validate required fields
@@ -489,6 +491,12 @@ class SetupAPI(BaseAPI):
                 update_data["owner"] = data["owner"].strip()
             if "description" in data:
                 update_data["description"] = data["description"].strip()
+            if "lights_on" in data:
+                update_data["lights_on"] = data["lights_on"].strip()
+            if "lights_off" in data:
+                update_data["lights_off"] = data["lights_off"].strip()
+            if "active" in data:
+                update_data["active"] = int(data["active"])
 
             # Validate required fields
             if new_name and not new_name:

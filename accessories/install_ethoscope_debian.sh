@@ -330,8 +330,8 @@ EOF
     pip3 install picamera2 --break-system-packages 2>/dev/null || true
 
     print_info "Installing systemd service files..."
-    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service 2>/dev/null
-    ln -sf /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_update}.service /usr/lib/systemd/system/
+    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update}.service 2>/dev/null
+    ln -sf /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update}.service /usr/lib/systemd/system/
 
     print_info "Creating ethoclient command line tool..."
     echo $'#!/bin/env bash\npython /opt/ethoscope/src/ethoscope/scripts/ethoclient.py $@' > /usr/bin/ethoclient
@@ -426,7 +426,8 @@ driftfile /var/lib/ntp/ntp.drift"
 step_enable_system_services() {
     print_info "Enabling ethoscope services..."
     systemctl enable ethoscope_device.service ethoscope_listener.service \
-        ethoscope_update.service ethoscope_GPIO_listener.service
+        ethoscope_update.service ethoscope_GPIO_listener.service \
+        ethoscope_light.service
 
     # NTP service
     print_info "Enabling NTP service..."

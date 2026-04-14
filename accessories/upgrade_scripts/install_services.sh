@@ -188,6 +188,7 @@ case "$1" in
             "ethoscope_device.service"
             "ethoscope_listener.service"
             "ethoscope_GPIO_listener.service"
+            "ethoscope_light.service"
             "ethoscope_update.service"
         )
 
@@ -197,6 +198,7 @@ case "$1" in
             "ethoscope_device"
             "ethoscope_update"
             "ethoscope_GPIO_listener"
+            "ethoscope_light"
         )
 
         # Link new services

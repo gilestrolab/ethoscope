@@ -148,19 +148,21 @@ class NodeAPI(BaseAPI):
     @error_decorator
     def _get_node_config(self):
         """Batched endpoint that returns all node configuration data in one request."""
-        # Get users from database
+        # Get users and incubators from database
         try:
             from ethoscope_node.utils.etho_db import ExperimentalDB
 
             db = ExperimentalDB()
             users_data = db.getAllUsers(active_only=False, asdict=True)
+            incubators_data = db.getAllIncubators(active_only=False, asdict=True)
         except Exception as e:
-            self.logger.error(f"Error getting users from database: {e}")
+            self.logger.error(f"Error getting data from database: {e}")
             users_data = {}
+            incubators_data = {}
 
         return {
             "users": users_data,
-            "incubators": self.config.content["incubators"],
+            "incubators": incubators_data,
             "sensors": (
                 self.sensor_scanner.get_all_devices_info()
                 if self.sensor_scanner
@@ -339,7 +341,9 @@ class NodeAPI(BaseAPI):
             return self.config.add_user(action["userdata"])
 
         elif action_type == "addincubator":
-            return self.config.add_incubator(action["incubatordata"])
+            # Deprecated: incubators are now managed via /setup/add-incubator
+            # and the dedicated Incubators tab
+            return {"error": "Use the Incubators tab to manage incubators"}
 
         elif action_type == "addsensor":
             return self.config.add_sensor(action["sensordata"])

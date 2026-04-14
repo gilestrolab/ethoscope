@@ -592,6 +592,9 @@ class ControlThreadVideoRecording(ControlThread):
             self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
             self._info["time"] = time.time()
 
+            # Write light schedule config for the light daemon service
+            self._write_light_schedule()
+
             date_time = datetime.datetime.fromtimestamp(self._info["time"])
             formatted_time = date_time.strftime("%Y-%m-%d_%H-%M-%S")
 
@@ -661,6 +664,10 @@ class ControlThreadVideoRecording(ControlThread):
         """ """
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
+
+        # Clear light schedule so the daemon turns off the LED
+        self._clear_light_schedule()
+
         self._info["experimental_info"] = {}
 
         if self._recorder is not None:

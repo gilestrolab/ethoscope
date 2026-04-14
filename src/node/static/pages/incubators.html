@@ -1,0 +1,248 @@
+<form>
+    <!-- Interface to quickly filter incubators -->
+    <div class="form-group" id="incubatorInputs">
+        <div class="input-group">
+            <div class="input-group-prepend">
+                <span class="input-group-text"><i class="fa fa-search"></i></span>
+            </div>
+            <input type="text" class="form-control" placeholder="Filter incubators" ng-model="searchText" title="Filter incubators in the table below">
+        </div>
+    </div>
+
+    <!-- Interface to add incubator -->
+    <div class="input-group">
+        <div class="input-group-prepend">
+            <span class="input-group-text"><i class="fa fa-plus" ng-click="clearSelectedIncubator()" data-toggle="modal" data-target="#incubatorModal"></i></span>
+        </div>
+        <input type="text" class="form-control" placeholder="Add new incubator" ng-click="clearSelectedIncubator()" data-toggle="modal" data-target="#incubatorModal" title="Add a new incubator" readonly>
+    </div>
+</form>
+
+<!-- Toggle active/inactive filter -->
+<div class="alert alert-neutral" style="background-color:#f2f2f2; margin-top: 15px;">
+    <label class="toggle-check">Show all incubators, including inactive ones
+        <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false">
+        <span class="toggle-check-text"></span>
+    </label>
+</div>
+
+<!-- INCUBATORS TABLE -->
+<table class="table table-striped" ng-cloak>
+    <thead>
+        <th>
+            <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
+                Name
+                <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'location'; sortReverse = !sortReverse">
+                Location
+                <span ng-show="sortType == 'location' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'location' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'owner'; sortReverse = !sortReverse">
+                Owner
+                <span ng-show="sortType == 'owner' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'owner' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'lights_on'; sortReverse = !sortReverse">
+                Light Regime
+                <span ng-show="sortType == 'lights_on' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'lights_on' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'active'; sortReverse = !sortReverse">
+                Status
+                <span ng-show="sortType == 'active' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'active' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>Actions</th>
+    </thead>
+    <tbody>
+        <tr ng-repeat="incubator in incubatorFilter(incubators, searchText, showAll) | orderBy:sortType:sortReverse">
+            <td>
+                <span ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
+                    <i class="fa fa-thermometer-half"></i>
+                    {{incubator.name}}
+                </span>
+            </td>
+            <td>
+                <span ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
+                    {{incubator.location || '—'}}
+                </span>
+            </td>
+            <td>
+                <span ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
+                    {{incubator.owner || '—'}}
+                </span>
+            </td>
+            <td>
+                <span ng-if="incubator.lights_on && incubator.lights_off"
+                      ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
+                    <i class="fa fa-sun"></i>
+                    {{formatTime(incubator.lights_on)}} &ndash; {{formatTime(incubator.lights_off)}}
+                </span>
+                <span ng-if="!incubator.lights_on || !incubator.lights_off" style="color: grey;">
+                    —
+                </span>
+            </td>
+            <td>
+                <span ng-if="incubator.active" class="fa fa-check-circle color-green" title="Active"></span>
+                <span ng-if="!incubator.active" class="fa fa-times-circle" title="Inactive"></span>
+            </td>
+            <td>
+                <a data-toggle="modal" data-target="#incubatorModal" ng-click="editIncubator(incubator)" href="" title="Edit Incubator">
+                    <span class="fa fa-edit"></span>
+                </a>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- Add/Edit Incubator Modal -->
+<div class="modal fade" id="incubatorModal" tabindex="-1" role="dialog" aria-labelledby="incubatorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="incubatorModalLabel">
+                    <i class="fa fa-plus" ng-if="!selectedIncubator._editing"></i>
+                    <i class="fa fa-edit" ng-if="selectedIncubator._editing"></i>
+                    {{selectedIncubator._editing ? 'Edit Incubator' : 'Add New Incubator'}}
+                </h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form name="incubatorForm" novalidate>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text"
+                                       class="form-control"
+                                       name="name"
+                                       ng-model="selectedIncubator.name"
+                                       placeholder="Incubator 1"
+                                       required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Location</label>
+                                <input type="text"
+                                       class="form-control"
+                                       name="location"
+                                       ng-model="selectedIncubator.location"
+                                       placeholder="Room 101">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Owner</label>
+                                <select class="form-control"
+                                        name="owner"
+                                        ng-model="selectedIncubator.owner">
+                                    <option value="">— None —</option>
+                                    <option ng-repeat="user in activeUsers" value="{{user}}">{{user}}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control"
+                                          name="description"
+                                          ng-model="selectedIncubator.description"
+                                          placeholder="25C constant temperature incubator"
+                                          rows="2"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Light Regime Section -->
+                    <div class="row" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
+                        <div class="col-12">
+                            <label class="form-label" style="font-weight: bold;">
+                                <i class="fa fa-sun"></i> Light Regime (LD Cycle)
+                            </label>
+                            <small class="form-text text-muted" style="margin-top: -5px; margin-bottom: 10px;">
+                                Set the daily light on/off times for this incubator (node/device UTC time). Experiments will not start if the device clock is out of sync. Leave empty for no light control.
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Lights On</label>
+                                <input type="time"
+                                       class="form-control"
+                                       name="lights_on"
+                                       ng-model="selectedIncubator.lights_on"
+                                       placeholder="07:00">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Lights Off</label>
+                                <input type="time"
+                                       class="form-control"
+                                       name="lights_off"
+                                       ng-model="selectedIncubator.lights_off"
+                                       placeholder="19:00">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label">Preview</label>
+                                <div class="form-control-plaintext" style="padding-top: 7px;">
+                                    <span ng-if="selectedIncubator.lights_on && selectedIncubator.lights_off">
+                                        <i class="fa fa-sun" style="color: #f0ad4e;"></i>
+                                        {{formatTime(selectedIncubator.lights_on)}} &ndash; {{formatTime(selectedIncubator.lights_off)}}
+                                    </span>
+                                    <span ng-if="!selectedIncubator.lights_on || !selectedIncubator.lights_off" style="color: grey;">
+                                        No light regime set
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="toggle-check">Incubator is Active
+                                    <input type="checkbox"
+                                           class="toggle-check-input"
+                                           name="active"
+                                           ng-model="selectedIncubator.active">
+                                    <span class="toggle-check-text"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fa fa-times"></i> Cancel
+                </button>
+                <button type="button"
+                        class="btn btn-primary"
+                        ng-click="saveIncubator()"
+                        ng-disabled="incubatorForm.$invalid">
+                    <i class="fa fa-save"></i> {{selectedIncubator._editing ? 'Update Incubator' : 'Add Incubator'}}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

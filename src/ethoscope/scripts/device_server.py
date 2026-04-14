@@ -614,12 +614,50 @@ def info(id):
 
     _, response_time = send_command(action="status", return_timing=True)
 
+    # Read light schedule state
+    light_info = {
+        "hardware": False,
+        "active": False,
+        "lights_on": "",
+        "lights_off": "",
+        "led_on": False,
+    }
+    try:
+        # Check if the light daemon service is running
+        result = subprocess.run(
+            ["systemctl", "is-active", "--quiet", "ethoscope_light.service"],
+            capture_output=True,
+            timeout=3,
+        )
+        light_info["hardware"] = result.returncode == 0
+
+        light_config = "/run/ethoscope/light_schedule.json"
+        if os.path.exists(light_config):
+            with open(light_config) as f:
+                light_data = json.load(f)
+            light_info["active"] = light_data.get("active", False)
+            light_info["lights_on"] = light_data.get("lights_on", "")
+            light_info["lights_off"] = light_data.get("lights_off", "")
+            if (
+                light_info["active"]
+                and light_info["lights_on"]
+                and light_info["lights_off"]
+            ):
+                from ethoscope.hardware.interfaces.light_daemon import LightController
+
+                light_info["led_on"] = LightController.should_light_be_on(
+                    light_info["lights_on"], light_info["lights_off"]
+                )
+    except Exception as e:
+        logging.debug("Could not read light schedule: %s", e)
+
     runninginfo.update(
         {
             "CPU_temp": pi.get_core_temperature(),
             "underpowered": pi.underPowered(),
             "current_timestamp": bottle.time.time(),
             "response_time": "%.2f" % response_time,
+            "light_schedule": light_info,
         }
     )
 
