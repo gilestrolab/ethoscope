@@ -21,6 +21,7 @@
 
         // Initialize scope variables
         $scope.device = {}; // Device information and status
+        $scope.errorState = { dismissed: false }; // Error dismissal state (object for child scope inheritance)
         $scope.ethoscope = {}; // Device control functions
         $scope.machine_info = {}; // Hardware and system information
         $scope.module_info = {}; // Full module capabilities from serial interrogation
@@ -1680,11 +1681,11 @@
                     var prevError = $scope.device ? $scope.device.error : null;
                     var newError = response.data.error;
                     if (newError && newError !== prevError) {
-                        $scope.dismissedError = false;
+                        $scope.errorState.dismissed = false;
                     }
                     // Auto-clear dismissed flag when error clears
                     if (!newError) {
-                        $scope.dismissedError = false;
+                        $scope.errorState.dismissed = false;
                     }
 
                     $scope.device = response.data;
