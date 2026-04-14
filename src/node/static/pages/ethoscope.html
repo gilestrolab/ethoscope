@@ -522,9 +522,9 @@
     </div>
 </div>
 
-<div id="error" class="alert alert-danger text-center" ng-if="device.error">
+<div id="error" class="alert alert-danger text-center" ng-if="device.error && !dismissedError" style="position: relative;">
+    <button type="button" class="close" ng-click="dismissedError = true" style="position: absolute; top: 8px; right: 12px;" title="Dismiss">&times;</button>
     <p>Sorry there has been an error: {{device.error}}</p>
-    <!--<img  ng-src="{{device.ip}}:9000/static{{device.dbg_img}}?{{device.time}}" alt="No Debug Image" ng-if="device.dbg_img != null" width="480">-->
     <img ng-src="/device/{{device.id}}/dbg_img?{{device.time}}" alt="No Debug Image" ng-if="device.dbg_img != null" width="480">
 </div>
 

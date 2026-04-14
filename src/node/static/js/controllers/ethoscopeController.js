@@ -1672,6 +1672,17 @@
                     var existingBackupInfo = $scope.device ? $scope.device.backup_info : null;
                     var existingBackupStatusDetailed = $scope.device ? $scope.device.backup_status_detailed : null;
 
+                    // Reset dismissed error if a new error appeared
+                    var prevError = $scope.device ? $scope.device.error : null;
+                    var newError = response.data.error;
+                    if (newError && newError !== prevError) {
+                        $scope.dismissedError = false;
+                    }
+                    // Auto-clear dismissed flag when error clears
+                    if (!newError) {
+                        $scope.dismissedError = false;
+                    }
+
                     $scope.device = response.data;
 
                     // Restore preserved backup info
