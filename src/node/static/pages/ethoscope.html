@@ -1104,15 +1104,15 @@
                         <hr>
                     </div>
                     <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-                        <div ng-if="!isRoiTemplateSelected() || !isUserSelected()" class="alert alert-warning" style="margin-bottom: 0; margin-right: 15px; flex: 1; max-width: 60%;">
-                            {{ (!isRoiTemplateSelected() && !isUserSelected()) ? 'A ROI mask and user must be selected.' :
-                               (!isRoiTemplateSelected() && isUserSelected()) ? 'A ROI mask must be selected.' :
-                               (isRoiTemplateSelected() && !isUserSelected()) ? 'A user must be selected.' : '' }}
+                        <div ng-if="!isRoiTemplateSelected() || !isUserSelected() || !isLocationSelected()" class="alert alert-warning" style="margin-bottom: 0; margin-right: 15px; flex: 1; max-width: 60%;">
+                            {{ [!isRoiTemplateSelected() ? 'a ROI mask' : '',
+                                !isUserSelected() ? 'a user' : '',
+                                !isLocationSelected() ? 'a location' : ''].filter(Boolean).join(', ') + ' must be selected.' }}
                         </div>
-                        <div ng-if="isRoiTemplateSelected() && isUserSelected()" style="flex: 1;"></div>
+                        <div ng-if="isRoiTemplateSelected() && isUserSelected() && isLocationSelected()" style="flex: 1;"></div>
                         <div style="display: flex; gap: 10px;">
                             <button type="button" class="btn btn-default" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-                            <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" ng-disabled="!isRoiTemplateSelected() || !isUserSelected()" data-toggle="modal">Start Tracking</button>
+                            <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_tracking(selected_options.tracking)" ng-disabled="!isRoiTemplateSelected() || !isUserSelected() || !isLocationSelected()" data-toggle="modal">Start Tracking</button>
                         </div>
                     </div>
 
@@ -1266,9 +1266,15 @@
                     </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-                <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_recording(selected_options.recording)" ng-disabled="recordingoptionsform.$invalid" data-toggle="modal">Start recording</button>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div ng-if="recordingoptionsform.$invalid" class="alert alert-warning" style="margin-bottom: 0; margin-right: 15px; flex: 1; max-width: 60%;">
+                    Please fill in all required fields (marked with *).
+                </div>
+                <div ng-if="!recordingoptionsform.$invalid" style="flex: 1;"></div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
+                    <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.start_recording(selected_options.recording)" ng-disabled="recordingoptionsform.$invalid" data-toggle="modal">Start recording</button>
+                </div>
             </div>
         </div>
     </div>

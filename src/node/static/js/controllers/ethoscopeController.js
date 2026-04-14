@@ -472,6 +472,10 @@
             return ethoscopeFormService.isUserSelected($scope);
         };
 
+        $scope.isLocationSelected = function() {
+            return ethoscopeFormService.isLocationSelected($scope);
+        };
+
         // ===========================
         // BACKUP STATUS FUNCTIONS (Using Service)
         // ===========================

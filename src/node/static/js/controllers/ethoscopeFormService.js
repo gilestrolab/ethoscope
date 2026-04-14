@@ -498,6 +498,23 @@
 
                 // Valid if we have a non-empty user name
                 return userName && userName !== '' && userName !== 'None' && userName !== 'null' && userName !== undefined;
+            },
+
+            /**
+             * Check if location/incubator is properly selected for tracking
+             * @param {Object} $scope - Controller scope
+             * @returns {boolean} True if location is properly selected
+             */
+            isLocationSelected: function($scope) {
+                if (!$scope.selected_options || !$scope.selected_options.tracking || !$scope.selected_options.tracking.experimental_info) {
+                    return false;
+                }
+
+                var experimentalInfo = $scope.selected_options.tracking.experimental_info;
+                var args = experimentalInfo.arguments || {};
+                var location = args.location;
+
+                return location && location !== '' && location !== 'None' && location !== 'null' && location !== undefined;
             }
         };
     });
