@@ -21,7 +21,7 @@ from ethoscope.io.cache import DatabasesInfo
 from ethoscope.utils import pi
 
 try:
-    from cheroot.wsgi import Server as WSGIServer
+    from cheroot.wsgi import Server as WSGIServer  # noqa: F401
 except ImportError:
     pass
 
@@ -210,7 +210,7 @@ def server_static(filepath):
 
 
 @api.route("/download/<filepath:path>")
-def server_static(filepath):
+def server_download(filepath):
     return bottle.static_file(filepath, root="/", download=filepath)
 
 
@@ -382,7 +382,7 @@ def controls(id, action):
 
     elif action == "test_module":
         logging.info("Sending a test command to the connected module.")
-        module_info = interfaces.getModuleCapabilities(test=True)
+        interfaces.getModuleCapabilities(test=True)
         return info(id)
 
     elif action == "firmware_status":
@@ -407,7 +407,7 @@ def controls(id, action):
         return update_firmware()
 
     else:
-        raise Exception("No such action: %s" % action)
+        raise Exception(f"No such action: {action}")
 
 
 @api.get("/data/listfiles/<category>/<id>")
@@ -435,11 +435,6 @@ def list_data_files(category, id):
         }
 
     if category == "video":
-        converted_mp4s = [
-            f
-            for f in [x[0] for x in os.walk(_ETHOSCOPE_VIDEOS_DIR)]
-            if glob.glob(os.path.join(f, "*.mp4"))
-        ]
         filelist["filelist"] = filelist["filelist"] + [
             {"filename": os.path.basename(i), "fullpath": i}
             for i in glob.glob(_ETHOSCOPE_VIDEOS_DIR + "/**/*.mp4", recursive=True)
@@ -465,8 +460,8 @@ def get_machine_info(id):
     ) or bottle.request.environ.get("REMOTE_ADDR")
 
     try:
-        machine_info["etc_node_ip"] = pi.get_etc_hostnames()[NODE]
-    except:
+        machine_info["etc_node_ip"] = pi.get_etc_hostnames().get("node", "not set")
+    except Exception:
         machine_info["etc_node_ip"] = "not set"
 
     machine_info["knows_node_ip"] = (
@@ -479,7 +474,7 @@ def get_machine_info(id):
 
     try:
         machine_info["machine-number"] = int(machine_info["machine-name"].split("_")[1])
-    except:
+    except Exception:
         machine_info["machine-number"] = 0
 
     machine_info["machine-id"] = _MACHINE_ID
@@ -489,37 +484,37 @@ def get_machine_info(id):
 
     try:
         machine_info["WIFI_SSID"] = pi.get_WIFI()["ESSID"]
-    except:
+    except Exception:
         machine_info["WIFI_SSID"] = "not set"
 
     try:
         machine_info["WIFI_PASSWORD"] = pi.get_WIFI()["Key"]
-    except:
+    except Exception:
         machine_info["WIFI_PASSWORD"] = "not set"
 
     try:
         machine_info["useSTATIC"] = pi.get_WIFI()["IP"].strip().upper() == "STATIC"
-    except:
+    except Exception:
         machine_info["useSTATIC"] = False
 
     try:
         machine_info["remoteLogging"] = pi.loggingStatus()
-    except:
+    except Exception:
         machine_info["remoteLogging"] = False
 
     try:
         machine_info["use_noir_tuning"] = pi.get_noir_setting()
-    except:
+    except Exception:
         machine_info["use_noir_tuning"] = False
 
     try:
         machine_info["maxfps_setting"] = pi.get_maxfps_setting()
-    except:
+    except Exception:
         machine_info["maxfps_setting"] = 15
 
     try:
         machine_info["gain_setting"] = pi.get_gain_setting()
-    except:
+    except Exception:
         machine_info["gain_setting"] = 1.0
 
     machine_info["SD_CARD_AGE"] = pi.get_SD_CARD_AGE()
@@ -656,7 +651,7 @@ def info(id):
             "CPU_temp": pi.get_core_temperature(),
             "underpowered": pi.underPowered(),
             "current_timestamp": bottle.time.time(),
-            "response_time": "%.2f" % response_time,
+            "response_time": f"{response_time:.2f}",
             "light_schedule": light_info,
         }
     )
@@ -1094,7 +1089,7 @@ if __name__ == "__main__":
     try:
         # Register the ethoscope using zeroconf so that the node knows about it.
         hostname = socket.gethostname()
-        uid = "%s-%s" % (hostname, _MACHINE_ID)
+        uid = f"{hostname}-{_MACHINE_ID}"
 
         ip_attempts = 0
         ip_address = None
@@ -1105,13 +1100,13 @@ if __name__ == "__main__":
 
             try:
                 ip_address = get_ip_address()
-            except:
+            except Exception:
                 pass
 
             ip_attempts += 1
             time.sleep(0.1)
 
-        logging.info("Registering device on zeroconf with IP: %s" % ip_address)
+        logging.info("Registering device on zeroconf with IP: %s", ip_address)
 
         serviceInfo = ServiceInfo(
             "_ethoscope._tcp.local.",
@@ -1122,11 +1117,13 @@ if __name__ == "__main__":
         )
 
         try:
-            zeroconf = Zeroconf(zeroconf.IPVersion.V4Only)
-        except:
-            zeroconf = Zeroconf()
+            from zeroconf import IPVersion
 
-        zeroconf.register_service(serviceInfo)
+            zc = Zeroconf(IPVersion.V4Only)
+        except Exception:
+            zc = Zeroconf()
+
+        zc.register_service(serviceInfo)
 
         DB_INFO = DatabasesInfo(device_name=_MACHINE_NAME)
 
@@ -1137,15 +1134,15 @@ if __name__ == "__main__":
     except Exception:
         logging.error(traceback.format_exc())
         try:
-            zeroconf.unregister_service(serviceInfo)
-        except:
+            zc.unregister_service(serviceInfo)
+        except Exception:
             pass
         close(1)
 
     finally:
         try:
-            zeroconf.unregister_service(serviceInfo)
-            zeroconf.close()
-        except:
+            zc.unregister_service(serviceInfo)
+            zc.close()
+        except Exception:
             pass
         close()
