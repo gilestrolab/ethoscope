@@ -148,8 +148,7 @@
 // Version and Configuration
 // =============================================================================
 const float VERSION = 1.5;
-#define PCBVERSION 12    // PCB Version: 10 for v1.0, 11 for v1.1, 12 for v1.2/1.3
-#define MODULE 4         // Module Type: 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
+#include "versions.h"    // PCBVERSION and MODULE — copy versions.h.example to versions.h
 
 // =============================================================================
 // Module-Specific Definitions

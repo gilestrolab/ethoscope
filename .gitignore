@@ -86,3 +86,6 @@ sync_from_node.sh
 CLAUDE.local.md
 start_dev_node.sh
 .venv
+
+# Arduino user-specific config (use versions.h.example as template)
+accessories/hardware/ethoscope_multimodule/versions.h

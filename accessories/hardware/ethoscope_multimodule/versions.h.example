@@ -1,0 +1,12 @@
+/*
+ * versions.h - User-specific hardware configuration
+ *
+ * Copy this file to versions.h and modify the values below
+ * to match your hardware setup. versions.h is gitignored
+ * so your local configuration won't be tracked.
+ *
+ *   cp versions.h.example versions.h
+ */
+
+#define PCBVERSION 10    // PCB Version: 10 for v1.0, 11 for v1.1, 12 for v1.2/1.3
+#define MODULE 0         // Module Type: 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
