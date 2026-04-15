@@ -690,6 +690,49 @@ def isExperimental(new_value=None):
         logging.warning(f"Removed file {filename}. The machine is not experimental.")
 
 
+def has_light_hardware(new_value=None):
+    """
+    Get or set whether this ethoscope has LED light hardware connected.
+
+    When set to True, enables and starts ethoscope_light.service.
+    When set to False, stops and disables the service.
+
+    Args:
+        new_value: None to query, True/False to set.
+
+    Returns:
+        bool: Whether the light service is currently enabled.
+    """
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-enabled", "--quiet", "ethoscope_light.service"],
+            capture_output=True,
+            timeout=5,
+        )
+        current_value = result.returncode == 0
+    except Exception:
+        current_value = False
+
+    if new_value is None:
+        return current_value
+
+    if new_value and not current_value:
+        subprocess.run(
+            ["systemctl", "enable", "--now", "ethoscope_light.service"],
+            capture_output=True,
+            timeout=10,
+        )
+        logging.info("Enabled ethoscope_light.service")
+
+    elif not new_value and current_value:
+        subprocess.run(
+            ["systemctl", "disable", "--now", "ethoscope_light.service"],
+            capture_output=True,
+            timeout=10,
+        )
+        logging.info("Disabled ethoscope_light.service")
+
+
 def was_interrupted():
     return os.path.exists(PERSISTENT_STATE)
 

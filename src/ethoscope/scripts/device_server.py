@@ -301,6 +301,12 @@ def update_machine_info(id):
         pi.set_noir_setting(update_machine_json_data["use_noir_tuning"])
         haschanged = True
 
+    if "has_light_hardware" in update_machine_json_data and update_machine_json_data[
+        "has_light_hardware"
+    ] != machine_info.get("has_light_hardware", False):
+        pi.has_light_hardware(update_machine_json_data["has_light_hardware"])
+        haschanged = True
+
     if "maxfps_setting" in update_machine_json_data and update_machine_json_data[
         "maxfps_setting"
     ] != machine_info.get("maxfps_setting", 15):
@@ -522,6 +528,11 @@ def get_machine_info(id):
     machine_info["SD_CARD_NAME"] = pi.get_SD_CARD_NAME()
 
     machine_info["Module"] = interfaces.getModuleCapabilities(shallow=True)
+
+    try:
+        machine_info["has_light_hardware"] = pi.has_light_hardware()
+    except Exception:
+        machine_info["has_light_hardware"] = False
 
     return machine_info
 
@@ -904,6 +915,13 @@ def user_options(id):
                             "name": "use_noir_tuning",
                             "description": "Use NoIR tuning for cameras with IR pass-through filters",
                             "default": machine_info.get("use_noir_tuning", False),
+                            "requires_reboot": False,
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "has_light_hardware",
+                            "description": "This ethoscope has an LED light module connected for LD cycle control",
+                            "default": machine_info.get("has_light_hardware", False),
                             "requires_reboot": False,
                         },
                         {
