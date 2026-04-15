@@ -297,7 +297,7 @@ def update_machine_info(id):
 
     if "use_noir_tuning" in update_machine_json_data and update_machine_json_data[
         "use_noir_tuning"
-    ] != machine_info.get("use_noir_tuning", False):
+    ] != machine_info.get("use_noir_tuning", True):
         pi.set_noir_setting(update_machine_json_data["use_noir_tuning"])
         haschanged = True
 
@@ -309,13 +309,13 @@ def update_machine_info(id):
 
     if "maxfps_setting" in update_machine_json_data and update_machine_json_data[
         "maxfps_setting"
-    ] != machine_info.get("maxfps_setting", 15):
+    ] != machine_info.get("maxfps_setting", 5):
         pi.set_maxfps_setting(int(update_machine_json_data["maxfps_setting"]))
         haschanged = True
 
     if "gain_setting" in update_machine_json_data and update_machine_json_data[
         "gain_setting"
-    ] != machine_info.get("gain_setting", 1.0):
+    ] != machine_info.get("gain_setting", 5.0):
         pi.set_gain_setting(float(update_machine_json_data["gain_setting"]))
         haschanged = True
 
@@ -511,17 +511,17 @@ def get_machine_info(id):
     try:
         machine_info["use_noir_tuning"] = pi.get_noir_setting()
     except Exception:
-        machine_info["use_noir_tuning"] = False
+        machine_info["use_noir_tuning"] = True
 
     try:
         machine_info["maxfps_setting"] = pi.get_maxfps_setting()
     except Exception:
-        machine_info["maxfps_setting"] = 15
+        machine_info["maxfps_setting"] = 5
 
     try:
         machine_info["gain_setting"] = pi.get_gain_setting()
     except Exception:
-        machine_info["gain_setting"] = 1.0
+        machine_info["gain_setting"] = 5.0
 
     machine_info["SD_CARD_AGE"] = pi.get_SD_CARD_AGE()
     machine_info["partitions"] = pi.get_partition_info()
@@ -894,7 +894,7 @@ def user_options(id):
                             "type": "number",
                             "name": "maxfps_setting",
                             "description": "Maximum camera FPS (frames per second)",
-                            "default": machine_info.get("maxfps_setting", 15),
+                            "default": machine_info.get("maxfps_setting", 5),
                             "min": 1,
                             "max": 30,
                             "step": 1,
@@ -904,7 +904,7 @@ def user_options(id):
                             "type": "number",
                             "name": "gain_setting",
                             "description": "Camera gain (lower values reduce noise artifacts for better tracking)",
-                            "default": machine_info.get("gain_setting", 1.0),
+                            "default": machine_info.get("gain_setting", 5.0),
                             "min": 1.0,
                             "max": 16.0,
                             "step": 0.1,
@@ -914,7 +914,7 @@ def user_options(id):
                             "type": "boolean",
                             "name": "use_noir_tuning",
                             "description": "Use NoIR tuning for cameras with IR pass-through filters",
-                            "default": machine_info.get("use_noir_tuning", False),
+                            "default": machine_info.get("use_noir_tuning", True),
                             "requires_reboot": False,
                         },
                         {
