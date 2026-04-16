@@ -3,8 +3,10 @@
 
         // Initialize scope variables
         $scope.incubators = {};
+        $scope.sensors = {};
         $scope.activeUsers = [];
         $scope.selectedIncubator = {};
+        $scope.incubatorToDelete = null;
         $scope.searchText = '';
         $scope.showAll = false;
         $scope.sortType = 'name';
@@ -67,6 +69,55 @@
                 .catch(function(error) {
                     console.error('Error loading users:', error);
                 });
+        };
+
+        // Load sensors to show association with incubators
+        var loadSensors = function() {
+            $http.get('/node/sensors')
+                .then(function(response) {
+                    $scope.sensors = response.data;
+                })
+                .catch(function(error) {
+                    console.error('Error loading sensors:', error);
+                });
+        };
+
+        // Get sensor associated with an incubator (matched by location field)
+        $scope.getSensorForIncubator = function(incubatorName) {
+            if (!incubatorName || !$scope.sensors) return null;
+            var normalized = incubatorName.replace(/\s+/g, '_');
+            for (var key in $scope.sensors) {
+                if ($scope.sensors[key].location === normalized) {
+                    return $scope.sensors[key];
+                }
+            }
+            return null;
+        };
+
+        // Confirm delete incubator
+        $scope.confirmDeleteIncubator = function(incubator) {
+            $scope.incubatorToDelete = incubator;
+        };
+
+        // Delete incubator permanently
+        $scope.deleteIncubator = function() {
+            if (!$scope.incubatorToDelete) return;
+
+            $http.post('/setup/delete-incubator', { name: $scope.incubatorToDelete.name })
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        $('#deleteIncubatorModal').modal('hide');
+                        loadIncubators();
+                    } else {
+                        alert('Error deleting incubator: ' + (response.data.message || 'Unknown error'));
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error deleting incubator:', error);
+                    alert('Error deleting incubator. Please try again.');
+                });
+
+            $scope.incubatorToDelete = null;
         };
 
         // Clear selected incubator (for add new)
@@ -215,6 +266,7 @@
         // Initial load
         loadIncubators();
         loadUsers();
+        loadSensors();
     };
 
     angular.module('flyApp').controller('incubatorsController', incubatorsController);

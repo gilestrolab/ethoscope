@@ -57,6 +57,7 @@
                 <span ng-show="sortType == 'lights_on' && sortReverse" class="fa fa-caret-up"></span>
             </a>
         </th>
+        <th>Sensor</th>
         <th>
             <a href="#" ng-click="sortType = 'active'; sortReverse = !sortReverse">
                 Status
@@ -95,12 +96,24 @@
                 </span>
             </td>
             <td>
+                <span ng-if="getSensorForIncubator(incubator.name)" ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
+                    <i class="fa fa-temperature-quarter"></i>
+                    {{getSensorForIncubator(incubator.name).name || getSensorForIncubator(incubator.name).ip}}
+                </span>
+                <span ng-if="!getSensorForIncubator(incubator.name)" style="color: grey;">
+                    —
+                </span>
+            </td>
+            <td>
                 <span ng-if="incubator.active" class="fa fa-check-circle color-green" title="Active"></span>
                 <span ng-if="!incubator.active" class="fa fa-times-circle" title="Inactive"></span>
             </td>
             <td>
                 <a data-toggle="modal" data-target="#incubatorModal" ng-click="editIncubator(incubator)" href="" title="Edit Incubator">
                     <span class="fa fa-edit"></span>
+                </a>
+                <a data-toggle="modal" data-target="#deleteIncubatorModal" ng-click="confirmDeleteIncubator(incubator)" href="" title="Delete Incubator" style="margin-left: 10px; color: #d9534f;">
+                    <span class="fa fa-trash"></span>
                 </a>
             </td>
         </tr>
@@ -241,6 +254,34 @@
                         ng-click="saveIncubator()"
                         ng-disabled="incubatorForm.$invalid">
                     <i class="fa fa-save"></i> {{selectedIncubator._editing ? 'Update Incubator' : 'Add Incubator'}}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Incubator Confirmation Modal -->
+<div class="modal fade" id="deleteIncubatorModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title text-danger">
+                    <i class="fa fa-exclamation-triangle"></i> Delete Incubator
+                </h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to permanently delete incubator <strong>{{incubatorToDelete.name}}</strong>?</p>
+                <p class="text-muted">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fa fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" ng-click="deleteIncubator()">
+                    <i class="fa fa-trash"></i> Delete
                 </button>
             </div>
         </div>

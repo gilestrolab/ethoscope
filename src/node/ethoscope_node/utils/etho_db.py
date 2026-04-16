@@ -1434,6 +1434,45 @@ class ExperimentalDB(multiprocessing.Process):
         """
         return self.updateIncubator(incubator_id=incubator_id, name=name, active=0)
 
+    def deleteIncubator(self, incubator_id: int = None, name: str = None):
+        """
+        Permanently delete an incubator from the database.
+
+        Args:
+            incubator_id: Database ID of incubator to delete
+            name: Name of incubator to delete
+
+        Returns:
+            Number of rows affected or -1 if error
+        """
+        if not incubator_id and not name:
+            logging.error(
+                "Either incubator_id or name must be provided for deleting incubator"
+            )
+            return -1
+
+        try:
+            if incubator_id:
+                where_clause = f"id = {incubator_id}"
+            else:
+                escaped_name = name.replace("'", "''")
+                where_clause = f"name = '{escaped_name}'"
+
+            sql_delete = (
+                f"DELETE FROM {self._incubators_table_name} WHERE {where_clause}"
+            )
+            result = self.executeSQL(sql_delete)
+
+            identifier = f"ID {incubator_id}" if incubator_id else f"name {name}"
+            if result >= 0:
+                logging.info(f"Deleted incubator {identifier}")
+            return result
+
+        except Exception as e:
+            identifier = f"ID {incubator_id}" if incubator_id else f"name {name}"
+            logging.error(f"Error deleting incubator {identifier}: {e}")
+            return -1
+
     def getIncubatorById(self, incubator_id: int, asdict: bool = False):
         """
         Get incubator information by database ID.

@@ -54,6 +54,8 @@ class SetupAPI(BaseAPI):
             return self._setup_add_incubator()
         elif action == "update-incubator":
             return self._setup_update_incubator()
+        elif action == "delete-incubator":
+            return self._setup_delete_incubator()
         elif action == "notifications":
             return self._setup_notifications()
         elif action == "test-notifications":
@@ -517,6 +519,31 @@ class SetupAPI(BaseAPI):
 
         except Exception as e:
             self.logger.error(f"Error updating incubator: {e}")
+            return {"result": "error", "message": str(e)}
+
+    def _setup_delete_incubator(self):
+        """Delete incubator permanently."""
+        data = self.get_request_json()
+
+        try:
+            db = ExperimentalDB()
+
+            name = data.get("name", "").strip()
+            if not name:
+                return {"result": "error", "message": "Incubator name is required"}
+
+            result = db.deleteIncubator(name=name)
+
+            if result >= 0:
+                return {
+                    "result": "success",
+                    "message": f"Incubator {name} deleted successfully",
+                }
+            else:
+                return {"result": "error", "message": "Failed to delete incubator"}
+
+        except Exception as e:
+            self.logger.error(f"Error deleting incubator: {e}")
             return {"result": "error", "message": str(e)}
 
     def _setup_notifications(self):
