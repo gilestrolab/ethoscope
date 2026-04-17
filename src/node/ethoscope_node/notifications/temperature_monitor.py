@@ -83,14 +83,26 @@ class TemperatureAlertMonitor:
         Returns:
             True if an alert was sent, False otherwise
         """
-        alert_config = self.config.get_temperature_alert_config()
-
-        # Check if temperature alerts are enabled
-        if not alert_config.get("enabled", True):
+        # Skip alerts for virtual sensors (weather data, not incubator conditions)
+        if sensor_id and sensor_id.startswith("virtual_sensor_"):
             return False
 
-        min_threshold = alert_config.get("min_threshold", 18.0)
-        max_threshold = alert_config.get("max_threshold", 28.0)
+        # Check per-sensor alert config first, fall back to global
+        try:
+            all_sensors = self.config.get_all_sensors()
+            per_sensor_alerts = all_sensors.get(sensor_name, {}).get("alerts", {})
+        except (AttributeError, TypeError):
+            per_sensor_alerts = {}
+
+        if isinstance(per_sensor_alerts, dict) and per_sensor_alerts.get("enabled"):
+            min_threshold = per_sensor_alerts.get("min_threshold", 18.0)
+            max_threshold = per_sensor_alerts.get("max_threshold", 28.0)
+        else:
+            alert_config = self.config.get_temperature_alert_config()
+            if not alert_config.get("enabled", True):
+                return False
+            min_threshold = alert_config.get("min_threshold", 18.0)
+            max_threshold = alert_config.get("max_threshold", 28.0)
 
         # Get current state for this sensor
         current_state = self._alert_states.get(sensor_id, AlertState.NORMAL)

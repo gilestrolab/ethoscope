@@ -608,6 +608,27 @@ class EthoscopeConfiguration:
             self._logger.error(error_msg)
             raise ValueError(error_msg) from e
 
+    def get_all_sensors(self) -> Dict[str, Any]:
+        """
+        Get all configured sensors.
+
+        Returns:
+            Dictionary of sensor configurations keyed by name
+        """
+        return self._settings.get("sensors", {})
+
+    def get_sensor(self, name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a single sensor's configuration.
+
+        Args:
+            name: Sensor name
+
+        Returns:
+            Sensor config dict, or None if not found
+        """
+        return self._settings.get("sensors", {}).get(name)
+
     def add_sensor(self, sensordata: Dict[str, Any]) -> Dict[str, Any]:
         """
         Add a new sensor to configuration.
@@ -627,7 +648,6 @@ class EthoscopeConfiguration:
         name = sensordata["name"]
 
         try:
-            # Add sensor
             if "sensors" not in self._settings:
                 self._settings["sensors"] = {}
 
@@ -639,6 +659,77 @@ class EthoscopeConfiguration:
 
         except Exception as e:
             error_msg = f"Failed to add sensor '{name}': {e}"
+            self._logger.error(error_msg)
+            raise ValueError(error_msg) from e
+
+    def update_sensor(
+        self, original_name: str, sensordata: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Update an existing sensor in configuration.
+
+        Handles name changes by re-keying the entry.
+
+        Args:
+            original_name: Current sensor name (used as key)
+            sensordata: Updated sensor data dictionary
+
+        Returns:
+            Result dictionary with success/failure status
+
+        Raises:
+            ValueError: If sensor not found or data is invalid
+        """
+        sensors = self._settings.get("sensors", {})
+        if original_name not in sensors:
+            raise ValueError(f"Sensor '{original_name}' not found")
+
+        new_name = sensordata.get("name", original_name)
+
+        try:
+            # If name changed, remove old key
+            if new_name != original_name:
+                del sensors[original_name]
+
+            sensors[new_name] = sensordata
+            self._settings["sensors"] = sensors
+            self.save()
+
+            self._logger.info(f"Updated sensor: {original_name} -> {new_name}")
+            return {"result": "success", "data": self._settings["sensors"]}
+
+        except Exception as e:
+            error_msg = f"Failed to update sensor '{original_name}': {e}"
+            self._logger.error(error_msg)
+            raise ValueError(error_msg) from e
+
+    def delete_sensor(self, name: str) -> Dict[str, Any]:
+        """
+        Remove a sensor from configuration.
+
+        Args:
+            name: Sensor name to remove
+
+        Returns:
+            Result dictionary with success/failure status
+
+        Raises:
+            ValueError: If sensor not found
+        """
+        sensors = self._settings.get("sensors", {})
+        if name not in sensors:
+            raise ValueError(f"Sensor '{name}' not found")
+
+        try:
+            del sensors[name]
+            self._settings["sensors"] = sensors
+            self.save()
+
+            self._logger.info(f"Deleted sensor: {name}")
+            return {"result": "success", "data": self._settings["sensors"]}
+
+        except Exception as e:
+            error_msg = f"Failed to delete sensor '{name}': {e}"
             self._logger.error(error_msg)
             raise ValueError(error_msg) from e
 

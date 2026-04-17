@@ -39,9 +39,10 @@
     <script src="static/js/controllers/moreController.js"></script>
     <script src="static/js/controllers/experimentsController.js"></script>
     <script src="static/js/controllers/resourcesController.js"></script>
-    <script src="static/js/controllers/sensorsController.js"></script>
+    <!-- sensorsController.js replaced by sensorsManagementController.js -->
     <script src="static/js/controllers/usersController.js"></script>
     <script src="static/js/controllers/incubatorsController.js"></script>
+    <script src="static/js/controllers/sensorsManagementController.js"></script>
     <script src="static/js/controllers/installationWizardController.js"></script>
     <script src="static/js/controllers/footerController.js"></script>
     <script src="static/js/controllers/authService.js"></script>
@@ -69,7 +70,7 @@
                     <li ng-show="isAuthenticated"><a href="/update" target="_blank"><i class="fa fa-refresh"></i> Update System</a></li>
                     <li ng-show="isAuthenticated"><a href="#!/more/all"><i class="fa fa-cog"></i> Management</a></li>
                     <li ng-show="isAuthenticated"><a href="#!/users"><i class="fa fa-users"></i> Users</a></li>
-                    <li ng-show="isAuthenticated"><a href="#!/sensors_data"><i class="fa fa-temperature-quarter"></i> Sensors</a></li>
+                    <li ng-show="isAuthenticated"><a href="#!/sensors"><i class="fa fa-temperature-quarter"></i> Sensors</a></li>
                     <li ng-show="isAuthenticated"><a href="#!/incubators"><i class="fa fa-thermometer-half"></i> Incubators</a></li>
                     <li ng-show="isAuthenticated"><a href="#!/experiments"><i class="fa fa-clipboard-list"></i> Experiments</a></li>
                     <li ng-show="isAuthenticated"><a href="#!/resources"><i class="fa fa-book"></i> Resources<span id="notification-badge" class="notification-badge" title="">{{notifications.length}}</span></a></li>

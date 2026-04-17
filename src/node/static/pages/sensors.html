@@ -1,0 +1,391 @@
+<form>
+    <!-- Interface to quickly filter sensors -->
+    <div class="form-group" id="sensorInputs">
+        <div class="input-group">
+            <div class="input-group-prepend">
+                <span class="input-group-text"><i class="fa fa-search"></i></span>
+            </div>
+            <input type="text" class="form-control" placeholder="Filter sensors" ng-model="searchText" title="Filter sensors in the table below">
+        </div>
+    </div>
+
+    <!-- Interface to add sensor -->
+    <div class="input-group">
+        <div class="input-group-prepend">
+            <span class="input-group-text"><i class="fa fa-plus" ng-click="clearSelectedSensor()" data-toggle="modal" data-target="#sensorModal"></i></span>
+        </div>
+        <input type="text" class="form-control" placeholder="Add new sensor" ng-click="clearSelectedSensor()" data-toggle="modal" data-target="#sensorModal" title="Add a new sensor" readonly>
+    </div>
+</form>
+
+<!-- Toggle active/inactive filter -->
+<div class="alert alert-neutral" style="background-color:#f2f2f2; margin-top: 15px;">
+    <label class="toggle-check">Show all sensors, including inactive ones
+        <input name="showAll" type="checkbox" class="toggle-check-input" ng-model="showAll" ng-checked="false">
+        <span class="toggle-check-text"></span>
+    </label>
+</div>
+
+<!-- SENSORS TABLE -->
+<table class="table table-striped" ng-cloak>
+    <thead>
+        <th style="width: 50px;" title="Check to plot historical data">
+            <i class="fa fa-chart-line"></i>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
+                Name
+                <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'location'; sortReverse = !sortReverse">
+                Location
+                <span ng-show="sortType == 'location' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'location' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>Temperature</th>
+        <th>Humidity</th>
+        <th>Light</th>
+        <th>Alert Thresholds</th>
+        <th>Source</th>
+        <th>
+            <a href="#" ng-click="sortType = 'active'; sortReverse = !sortReverse">
+                Status
+                <span ng-show="sortType == 'active' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'active' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>Actions</th>
+    </thead>
+    <tbody>
+        <tr ng-repeat="sensor in sensorFilter(sensors, searchText, showAll) | orderBy:sortType:sortReverse">
+            <!-- Plot checkbox -->
+            <td>
+                <div ng-if="getCsvKeyForSensor(sensor)" class="d-flex align-items-center">
+                    <input type="checkbox"
+                           ng-model="csvSensors[getCsvKeyForSensor(sensor)].selected"
+                           ng-change="updatePlot()"
+                           style="margin-right: 4px;">
+                    <span style="width: 12px; height: 12px; display: inline-block; border-radius: 50; border: 1px solid #ccc;
+                                 background-color: {{csvSensors[getCsvKeyForSensor(sensor)].color}};"
+                          ng-if="csvSensors[getCsvKeyForSensor(sensor)].selected"></span>
+                </div>
+                <span ng-if="!getCsvKeyForSensor(sensor)" style="color: #ccc;">&mdash;</span>
+            </td>
+            <td>
+                <span ng-class="getStatusIcon(sensor)">
+                    <i class="fa fa-circle" style="font-size: 0.6em; vertical-align: middle;"></i>
+                </span>
+                <span ng-style="{'color': sensor.active !== false ? 'inherit' : 'grey'}">
+                    {{sensor.name}}
+                </span>
+            </td>
+            <td>
+                <span ng-style="{'color': sensor.active !== false ? 'inherit' : 'grey'}">
+                    {{sensor.location || '\u2014'}}
+                </span>
+            </td>
+            <td>
+                <span ng-if="sensor.temperature !== '' && sensor.temperature != null">
+                    {{sensor.temperature}}&deg;C
+                </span>
+                <span ng-if="sensor.temperature === '' || sensor.temperature == null" style="color: grey;">&mdash;</span>
+            </td>
+            <td>
+                <span ng-if="sensor.humidity !== '' && sensor.humidity != null">
+                    {{sensor.humidity}}%
+                </span>
+                <span ng-if="sensor.humidity === '' || sensor.humidity == null" style="color: grey;">&mdash;</span>
+            </td>
+            <td>
+                <span ng-if="sensor.light !== '' && sensor.light != null">
+                    {{sensor.light}}
+                </span>
+                <span ng-if="sensor.light === '' || sensor.light == null" style="color: grey;">&mdash;</span>
+            </td>
+            <td>
+                <span ng-if="isVirtualSensor(sensor)" style="color: #aaa;" title="Virtual sensors provide weather data and do not trigger alerts">
+                    <i class="fa fa-bell-slash"></i> N/A
+                </span>
+                <span ng-if="!isVirtualSensor(sensor) && sensor.alerts.enabled" class="text-info" title="Custom: {{sensor.alerts.min_threshold}} - {{sensor.alerts.max_threshold}}&deg;C">
+                    <i class="fa fa-bell"></i> {{sensor.alerts.min_threshold}} - {{sensor.alerts.max_threshold}}&deg;C
+                </span>
+                <span ng-if="!isVirtualSensor(sensor) && (!sensor.alerts || !sensor.alerts.enabled)" style="color: grey;" title="Using global defaults: {{globalAlerts.min_threshold}} - {{globalAlerts.max_threshold}}&deg;C">
+                    Global
+                </span>
+            </td>
+            <td>
+                <span class="badge" ng-class="getSourceClass(sensor.source)">
+                    {{sensor.source}}
+                </span>
+            </td>
+            <td>
+                <span ng-if="sensor.active !== false" class="fa fa-check-circle color-green" title="Active"></span>
+                <span ng-if="sensor.active === false" class="fa fa-times-circle" title="Inactive"></span>
+            </td>
+            <td>
+                <a data-toggle="modal" data-target="#sensorModal" ng-click="editSensor(sensor)" href="" title="Edit Sensor">
+                    <span class="fa fa-edit"></span>
+                </a>
+                <a ng-if="sensor.source !== 'discovered'" data-toggle="modal" data-target="#deleteSensorModal" ng-click="confirmDeleteSensor(sensor)" href="" title="Delete Sensor" style="margin-left: 10px; color: #d9534f;">
+                    <span class="fa fa-trash"></span>
+                </a>
+            </td>
+        </tr>
+    </tbody>
+</table>
+
+<div ng-if="!sensors || (sensors | json) === '{}'" class="text-center text-muted" style="padding: 40px;">
+    <i class="fa fa-temperature-quarter fa-3x" style="color: #ccc;"></i>
+    <p style="margin-top: 15px;">No sensors found. Add a sensor manually or wait for auto-discovery.</p>
+</div>
+
+<!-- Global alerts info -->
+<div class="alert alert-light mt-3" ng-if="globalAlerts.min_threshold != null">
+    <small>
+        <i class="fa fa-info-circle"></i>
+        Global alert thresholds: <strong>{{globalAlerts.min_threshold}} - {{globalAlerts.max_threshold}}&deg;C</strong>.
+        Sensors without custom thresholds use these defaults.
+        Configure global thresholds in <a href="#!/more/all">Management</a> &gt; Setup.
+    </small>
+</div>
+
+<!-- Additional CSV data sources (not matched to a live sensor) -->
+<div ng-if="getUnmatchedCsvKeys().length > 0" ng-cloak class="mt-3">
+    <small class="text-muted d-block mb-2">
+        <i class="fa fa-archive"></i> Historical data also available for:
+    </small>
+    <div class="d-flex flex-wrap">
+        <div ng-repeat="file in getUnmatchedCsvKeys()" class="mr-3 mb-1">
+            <label class="form-check-label d-flex align-items-center mb-0" style="cursor: pointer;">
+                <input type="checkbox"
+                       ng-model="csvSensors[file].selected"
+                       ng-change="updatePlot()"
+                       style="margin-right: 4px;">
+                <span style="width: 12px; height: 12px; display: inline-block; border-radius: 50%; border: 1px solid #ccc; margin-right: 4px;
+                             background-color: {{csvSensors[file].color}};"></span>
+                <small>{{file}}</small>
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Chart controls and plot container -->
+<div ng-cloak style="margin-top: 20px; border-top: 2px solid #eee; padding-top: 15px;" ng-show="getPlotCount() > 0">
+    <div class="d-flex align-items-center flex-wrap mb-2">
+        <h5 class="mb-0 mr-3"><i class="fa fa-chart-line"></i> Sensor Data</h5>
+        <button class="btn btn-sm btn-outline-secondary mr-2" ng-click="clearAllPlots()">
+            <i class="fa fa-times"></i> Clear All
+        </button>
+        <div class="form-check form-check-inline mr-3">
+            <input class="form-check-input" type="checkbox"
+                   ng-model="showPressure" ng-change="updatePlot()" id="pressureToggle">
+            <label class="form-check-label" for="pressureToggle">
+                <i class="fa fa-tachometer"></i> Pressure
+            </label>
+        </div>
+        <small class="text-muted">
+            {{getPlotCount()}} sensor(s) selected &mdash; use range buttons (1d, 7d, 15d, 30d, All) to navigate
+        </small>
+    </div>
+    <div id="plotContainer" style="width:100%;"></div>
+</div>
+
+<!-- Add/Edit Sensor Modal -->
+<div class="modal fade" id="sensorModal" tabindex="-1" role="dialog" aria-labelledby="sensorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="sensorModalLabel">
+                    <i class="fa fa-plus" ng-if="!selectedSensor._editing"></i>
+                    <i class="fa fa-edit" ng-if="selectedSensor._editing"></i>
+                    {{selectedSensor._editing ? 'Edit Sensor' : 'Add New Sensor'}}
+                </h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form name="sensorForm" novalidate>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text"
+                                       class="form-control"
+                                       name="name"
+                                       ng-model="selectedSensor.name"
+                                       placeholder="Lab Sensor 1"
+                                       required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">URL</label>
+                                <input type="text"
+                                       class="form-control"
+                                       name="URL"
+                                       ng-model="selectedSensor.URL"
+                                       placeholder="http://192.168.1.100">
+                                <small class="form-text text-muted" ng-if="selectedSensor.ip">Current IP: {{selectedSensor.ip}}</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Location (Incubator)</label>
+                                <select class="form-control"
+                                        name="location"
+                                        ng-model="selectedSensor.location">
+                                    <option value="">&#8212; None &#8212;</option>
+                                    <option ng-repeat="(key, inc) in incubators" value="{{key}}">{{inc.name || key}}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control"
+                                          name="description"
+                                          ng-model="selectedSensor.description"
+                                          placeholder="Temperature and humidity sensor in Incubator 1"
+                                          rows="2"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="toggle-check">Sensor is Active
+                                    <input type="checkbox"
+                                           class="toggle-check-input"
+                                           name="active"
+                                           ng-model="selectedSensor.active">
+                                    <span class="toggle-check-text"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alert Settings Section -->
+                    <div class="row" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
+                        <div class="col-12">
+                            <label class="form-label" style="font-weight: bold;">
+                                <i class="fa fa-bell"></i> Temperature Alert Thresholds
+                            </label>
+                        </div>
+
+                        <!-- Virtual sensor: alerts not applicable -->
+                        <div class="col-12" ng-if="isVirtualSensor(selectedSensor)">
+                            <div class="alert alert-secondary mb-0" style="padding: 10px 15px;">
+                                <i class="fa fa-bell-slash"></i>
+                                Alerts are disabled for virtual sensors. This sensor provides external weather data and is not monitored for temperature violations.
+                            </div>
+                        </div>
+
+                        <!-- Real sensor: alert configuration -->
+                        <div ng-if="!isVirtualSensor(selectedSensor)">
+                            <div class="col-12">
+                                <small class="form-text text-muted" style="margin-top: -5px; margin-bottom: 10px;">
+                                    Set custom temperature alert thresholds for this sensor. When disabled, global defaults
+                                    ({{globalAlerts.min_threshold || 18}} - {{globalAlerts.max_threshold || 28}}&deg;C) are used.
+                                </small>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="toggle-check">Use custom thresholds
+                                        <input type="checkbox"
+                                               class="toggle-check-input"
+                                               ng-model="selectedSensor.alerts.enabled">
+                                        <span class="toggle-check-text"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="form-label">Min Temperature (&deg;C)</label>
+                                    <input type="number"
+                                           class="form-control"
+                                           step="0.5"
+                                           ng-model="selectedSensor.alerts.min_threshold"
+                                           ng-disabled="!selectedSensor.alerts.enabled"
+                                           placeholder="18.0">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label class="form-label">Max Temperature (&deg;C)</label>
+                                    <input type="number"
+                                           class="form-control"
+                                           step="0.5"
+                                           ng-model="selectedSensor.alerts.max_threshold"
+                                           ng-disabled="!selectedSensor.alerts.enabled"
+                                           placeholder="28.0">
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-control-plaintext" style="padding-top: 0;">
+                                    <span ng-if="selectedSensor.alerts.enabled" class="text-info">
+                                        <i class="fa fa-bell"></i>
+                                        Alert when temperature is below {{selectedSensor.alerts.min_threshold}}&deg;C or above {{selectedSensor.alerts.max_threshold}}&deg;C
+                                    </span>
+                                    <span ng-if="!selectedSensor.alerts.enabled" style="color: grey;">
+                                        Using global defaults ({{globalAlerts.min_threshold || 18}} - {{globalAlerts.max_threshold || 28}}&deg;C)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fa fa-times"></i> Cancel
+                </button>
+                <button type="button"
+                        class="btn btn-primary"
+                        ng-click="saveSensor()"
+                        ng-disabled="sensorForm.$invalid">
+                    <i class="fa fa-save"></i> {{selectedSensor._editing ? 'Update Sensor' : 'Add Sensor'}}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Sensor Confirmation Modal -->
+<div class="modal fade" id="deleteSensorModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title text-danger">
+                    <i class="fa fa-exclamation-triangle"></i> Delete Sensor
+                </h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove sensor <strong>{{sensorToDelete.name}}</strong> from the configuration?</p>
+                <p class="text-muted" ng-if="sensorToDelete.source === 'both'">
+                    <small>This sensor is also auto-discovered on the network. It will reappear as a discovered-only sensor.</small>
+                </p>
+                <p class="text-muted">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                    <i class="fa fa-times"></i> Cancel
+                </button>
+                <button type="button" class="btn btn-danger" ng-click="deleteSensor()">
+                    <i class="fa fa-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

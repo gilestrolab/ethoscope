@@ -271,14 +271,7 @@ function maxLengthCheck(object) {
 
         // Incubators are now managed via the dedicated Incubators tab
 
-        $scope.nodeManagement.addsensor = function(){
-            var spinner = new Spinner(opts).spin();
-            $http.post('/node-actions', data = {'action': 'addsensor', 'sensordata' : $scope.selected['sensors']} )
-                .then(function(response) { var data = response.data;
-                    if ( data['result'] == 'success' ) { $scope.sensors = data['data'] };
-            });
-            spinner.stop();
-        };
+        // Sensor management moved to dedicated #!/sensors page
 
 ///  View Server Logs
         var viewLog = function(){

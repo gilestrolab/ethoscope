@@ -56,6 +56,12 @@ class SetupAPI(BaseAPI):
             return self._setup_update_incubator()
         elif action == "delete-incubator":
             return self._setup_delete_incubator()
+        elif action == "add-sensor":
+            return self._setup_add_sensor()
+        elif action == "update-sensor":
+            return self._setup_update_sensor()
+        elif action == "delete-sensor":
+            return self._setup_delete_sensor()
         elif action == "notifications":
             return self._setup_notifications()
         elif action == "test-notifications":
@@ -544,6 +550,92 @@ class SetupAPI(BaseAPI):
 
         except Exception as e:
             self.logger.error(f"Error deleting incubator: {e}")
+            return {"result": "error", "message": str(e)}
+
+    def _setup_add_sensor(self):
+        """Add a new sensor to configuration."""
+        data = self.get_request_json()
+
+        try:
+            name = data.get("name", "").strip()
+            if not name:
+                return {"result": "error", "message": "Sensor name is required"}
+
+            sensordata = {
+                "name": name,
+                "URL": data.get("URL", "").strip(),
+                "location": data.get("location", "").strip(),
+                "description": data.get("description", "").strip(),
+                "active": bool(data.get("active", True)),
+            }
+
+            # Per-sensor alert settings
+            if "alerts" in data and isinstance(data["alerts"], dict):
+                sensordata["alerts"] = {
+                    "enabled": bool(data["alerts"].get("enabled", False)),
+                    "min_threshold": float(data["alerts"].get("min_threshold", 18.0)),
+                    "max_threshold": float(data["alerts"].get("max_threshold", 28.0)),
+                }
+
+            result = self.config.add_sensor(sensordata)
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Error adding sensor: {e}")
+            return {"result": "error", "message": str(e)}
+
+    def _setup_update_sensor(self):
+        """Update an existing sensor in configuration."""
+        data = self.get_request_json()
+
+        try:
+            original_name = data.get("original_name", "").strip()
+            if not original_name:
+                return {
+                    "result": "error",
+                    "message": "Original sensor name is required for update",
+                }
+
+            name = data.get("name", original_name).strip()
+            if not name:
+                return {"result": "error", "message": "Sensor name cannot be empty"}
+
+            sensordata = {
+                "name": name,
+                "URL": data.get("URL", "").strip(),
+                "location": data.get("location", "").strip(),
+                "description": data.get("description", "").strip(),
+                "active": bool(data.get("active", True)),
+            }
+
+            if "alerts" in data and isinstance(data["alerts"], dict):
+                sensordata["alerts"] = {
+                    "enabled": bool(data["alerts"].get("enabled", False)),
+                    "min_threshold": float(data["alerts"].get("min_threshold", 18.0)),
+                    "max_threshold": float(data["alerts"].get("max_threshold", 28.0)),
+                }
+
+            result = self.config.update_sensor(original_name, sensordata)
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Error updating sensor: {e}")
+            return {"result": "error", "message": str(e)}
+
+    def _setup_delete_sensor(self):
+        """Delete a sensor from configuration."""
+        data = self.get_request_json()
+
+        try:
+            name = data.get("name", "").strip()
+            if not name:
+                return {"result": "error", "message": "Sensor name is required"}
+
+            result = self.config.delete_sensor(name)
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Error deleting sensor: {e}")
             return {"result": "error", "message": str(e)}
 
     def _setup_notifications(self):

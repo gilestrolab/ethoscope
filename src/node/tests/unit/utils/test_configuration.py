@@ -789,6 +789,104 @@ class TestEthoscopeConfigurationSensors:
             assert "Failed to add sensor" in str(exc_info.value)
 
 
+class TestEthoscopeConfigurationSensorCRUD:
+    """Test sensor CRUD operations (get, update, delete)."""
+
+    def _make_config(self, sensors=None):
+        """Helper to create a config with sensor data."""
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._config_file = Path("/tmp/test.conf")
+        config._settings = {"sensors": sensors or {}}
+        config._logger = MagicMock()
+        return config
+
+    def test_get_all_sensors_empty(self):
+        """Test get_all_sensors returns empty dict when no sensors."""
+        config = self._make_config()
+        assert config.get_all_sensors() == {}
+
+    def test_get_all_sensors_returns_data(self):
+        """Test get_all_sensors returns configured sensors."""
+        sensors = {"s1": {"name": "s1", "location": "lab"}}
+        config = self._make_config(sensors)
+        assert config.get_all_sensors() == sensors
+
+    def test_get_sensor_found(self):
+        """Test get_sensor returns sensor config when found."""
+        sensors = {"s1": {"name": "s1", "URL": "http://1.2.3.4"}}
+        config = self._make_config(sensors)
+        result = config.get_sensor("s1")
+        assert result["name"] == "s1"
+
+    def test_get_sensor_not_found(self):
+        """Test get_sensor returns None when not found."""
+        config = self._make_config()
+        assert config.get_sensor("nonexistent") is None
+
+    def test_update_sensor_success(self):
+        """Test successful sensor update."""
+        sensors = {"s1": {"name": "s1", "location": "old"}}
+        config = self._make_config(sensors)
+        with patch.object(config, "save"):
+            result = config.update_sensor("s1", {"name": "s1", "location": "new"})
+        assert result["result"] == "success"
+        assert config._settings["sensors"]["s1"]["location"] == "new"
+
+    def test_update_sensor_name_change(self):
+        """Test sensor update with name change re-keys the entry."""
+        sensors = {"old_name": {"name": "old_name", "location": "lab"}}
+        config = self._make_config(sensors)
+        with patch.object(config, "save"):
+            result = config.update_sensor(
+                "old_name", {"name": "new_name", "location": "lab"}
+            )
+        assert result["result"] == "success"
+        assert "new_name" in config._settings["sensors"]
+        assert "old_name" not in config._settings["sensors"]
+
+    def test_update_sensor_not_found(self):
+        """Test update_sensor raises error for missing sensor."""
+        config = self._make_config()
+        with pytest.raises(ValueError) as exc_info:
+            config.update_sensor("nonexistent", {"name": "x"})
+        assert "not found" in str(exc_info.value)
+
+    def test_update_sensor_with_alerts(self):
+        """Test sensor update preserves per-sensor alert config."""
+        sensors = {"s1": {"name": "s1"}}
+        config = self._make_config(sensors)
+        with patch.object(config, "save"):
+            config.update_sensor(
+                "s1",
+                {
+                    "name": "s1",
+                    "alerts": {
+                        "enabled": True,
+                        "min_threshold": 20.0,
+                        "max_threshold": 26.0,
+                    },
+                },
+            )
+        assert config._settings["sensors"]["s1"]["alerts"]["enabled"] is True
+        assert config._settings["sensors"]["s1"]["alerts"]["min_threshold"] == 20.0
+
+    def test_delete_sensor_success(self):
+        """Test successful sensor deletion."""
+        sensors = {"s1": {"name": "s1"}}
+        config = self._make_config(sensors)
+        with patch.object(config, "save"):
+            result = config.delete_sensor("s1")
+        assert result["result"] == "success"
+        assert "s1" not in config._settings["sensors"]
+
+    def test_delete_sensor_not_found(self):
+        """Test delete_sensor raises error for missing sensor."""
+        config = self._make_config()
+        with pytest.raises(ValueError) as exc_info:
+            config.delete_sensor("nonexistent")
+        assert "not found" in str(exc_info.value)
+
+
 class TestEthoscopeConfigurationCustom:
     """Test custom configuration value management."""
 

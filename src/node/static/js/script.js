@@ -79,10 +79,10 @@
                 controller: 'resourcesController',
             })
 
-            // route for the sensors plotting
-            .when('/sensors_data', {
-                templateUrl: '/static/pages/sensors_data.html',
-                controller: 'sensorsController',
+            // route for sensors management
+            .when('/sensors', {
+                templateUrl: '/static/pages/sensors.html',
+                controller: 'sensorsManagementController',
             })
 
             // route for the users management page
@@ -1019,30 +1019,7 @@
         // MODAL & EVENT HANDLING
         // ===========================
 
-        $('#editSensorModal').on('show.bs.modal', function(e) {
-            // Clear previous sensor data to show loading state
-            $scope.sensoredit = null;
-            $scope.$apply();
-
-            // Set sensor data after a brief delay to ensure loading state is visible
-            setTimeout(function() {
-                $scope.sensoredit = $(e.relatedTarget).data('sensor');
-                $scope.$apply();
-            }, 100);
-        });
-
-        $('#editSensorModal').on('hidden.bs.modal', function() {
-            // Clear sensor data when modal is closed
-            $scope.sensoredit = null;
-            $scope.$apply();
-        });
-
-        $scope.editSensor = function() {
-            $http.post('/sensor/set', $scope.sensoredit)
-                .then(function() {
-                    refresh_platform();
-                })
-        };
+        // Sensor editing moved to dedicated #!/sensors page
 
         $scope.manuallyAdd = function() {
 

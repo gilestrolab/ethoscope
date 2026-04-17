@@ -462,3 +462,166 @@ class TestTemperatureAlertMonitor:
         """Test getting alert state for unknown sensor returns NORMAL."""
         state = monitor.get_alert_state("unknown_sensor")
         assert state == AlertState.NORMAL
+
+
+class TestPerSensorAlertThresholds:
+    """Tests for per-sensor alert threshold overrides."""
+
+    @pytest.fixture
+    def mock_notification_manager(self):
+        """Create a mock notification manager."""
+        manager = Mock()
+        manager.send_temperature_alert.return_value = True
+        return manager
+
+    @pytest.fixture
+    def mock_config_with_per_sensor(self):
+        """Config with per-sensor alert thresholds."""
+        config = Mock()
+        config.get_temperature_alert_config.return_value = {
+            "enabled": True,
+            "min_threshold": 18.0,
+            "max_threshold": 28.0,
+        }
+        config.get_all_sensors.return_value = {
+            "Tight Sensor": {
+                "name": "Tight Sensor",
+                "alerts": {
+                    "enabled": True,
+                    "min_threshold": 24.0,
+                    "max_threshold": 26.0,
+                },
+            }
+        }
+        return config
+
+    @pytest.fixture
+    def monitor_per_sensor(
+        self, mock_config_with_per_sensor, mock_notification_manager
+    ):
+        """Monitor with per-sensor config."""
+        return TemperatureAlertMonitor(
+            config=mock_config_with_per_sensor,
+            notification_manager=mock_notification_manager,
+        )
+
+    def test_per_sensor_high_threshold_triggers(
+        self, monitor_per_sensor, mock_notification_manager
+    ):
+        """Test that per-sensor high threshold triggers alert at sensor-specific value."""
+        result = monitor_per_sensor.check_temperature(
+            sensor_id="s1",
+            sensor_name="Tight Sensor",
+            location="Lab",
+            temperature=27.0,  # Above per-sensor max (26) but below global max (28)
+        )
+        assert result is True
+        mock_notification_manager.send_temperature_alert.assert_called_once()
+
+    def test_per_sensor_low_threshold_triggers(
+        self, monitor_per_sensor, mock_notification_manager
+    ):
+        """Test that per-sensor low threshold triggers alert at sensor-specific value."""
+        result = monitor_per_sensor.check_temperature(
+            sensor_id="s1",
+            sensor_name="Tight Sensor",
+            location="Lab",
+            temperature=23.0,  # Below per-sensor min (24) but above global min (18)
+        )
+        assert result is True
+        mock_notification_manager.send_temperature_alert.assert_called_once()
+
+    def test_unknown_sensor_uses_global_thresholds(
+        self, monitor_per_sensor, mock_notification_manager
+    ):
+        """Test that sensors without per-sensor config fall back to global thresholds."""
+        # 20C is below per-sensor min (24) but above global min (18) - should NOT alert
+        result = monitor_per_sensor.check_temperature(
+            sensor_id="s2",
+            sensor_name="Unknown Sensor",
+            location="Other",
+            temperature=20.0,
+        )
+        assert result is False
+        mock_notification_manager.send_temperature_alert.assert_not_called()
+
+    def test_per_sensor_disabled_falls_back_to_global(self):
+        """Test that per-sensor alerts disabled falls back to global."""
+        config = Mock()
+        config.get_temperature_alert_config.return_value = {
+            "enabled": True,
+            "min_threshold": 18.0,
+            "max_threshold": 28.0,
+        }
+        config.get_all_sensors.return_value = {
+            "Sensor A": {
+                "name": "Sensor A",
+                "alerts": {
+                    "enabled": False,
+                    "min_threshold": 24.0,
+                    "max_threshold": 26.0,
+                },
+            }
+        }
+        manager = Mock()
+        manager.send_temperature_alert.return_value = True
+        monitor = TemperatureAlertMonitor(config=config, notification_manager=manager)
+
+        # 27C is above per-sensor max (26) but below global max (28) - should NOT alert
+        result = monitor.check_temperature(
+            sensor_id="s1",
+            sensor_name="Sensor A",
+            location="Lab",
+            temperature=27.0,
+        )
+        assert result is False
+        manager.send_temperature_alert.assert_not_called()
+
+
+class TestVirtualSensorAlertSuppression:
+    """Tests that virtual sensors never trigger temperature alerts."""
+
+    def test_virtual_sensor_never_alerts(self):
+        """Virtual sensors (weather data) should never trigger alerts."""
+        config = Mock()
+        config.get_temperature_alert_config.return_value = {
+            "enabled": True,
+            "min_threshold": 18.0,
+            "max_threshold": 28.0,
+        }
+        config.get_all_sensors.return_value = {}
+        manager = Mock()
+        manager.send_temperature_alert.return_value = True
+        monitor = TemperatureAlertMonitor(config=config, notification_manager=manager)
+
+        # 50C would normally trigger a high alert
+        result = monitor.check_temperature(
+            sensor_id="virtual_sensor_aa:bb:cc:dd:ee:ff",
+            sensor_name="Outside",
+            location="Outside",
+            temperature=50.0,
+        )
+        assert result is False
+        manager.send_temperature_alert.assert_not_called()
+
+    def test_non_virtual_sensor_still_alerts(self):
+        """Regular sensors should still alert normally."""
+        config = Mock()
+        config.get_temperature_alert_config.return_value = {
+            "enabled": True,
+            "min_threshold": 18.0,
+            "max_threshold": 28.0,
+        }
+        config.get_all_sensors.return_value = {}
+        manager = Mock()
+        manager.send_temperature_alert.return_value = True
+        monitor = TemperatureAlertMonitor(config=config, notification_manager=manager)
+
+        result = monitor.check_temperature(
+            sensor_id="real_sensor_01:02:03:04:05:06",
+            sensor_name="Lab Sensor",
+            location="Incubator_1",
+            temperature=50.0,
+        )
+        assert result is True
+        manager.send_temperature_alert.assert_called_once()

@@ -83,7 +83,7 @@
             <tr ng-repeat="sensor in sensors |  orderObjectBy:sortType:sortReverse:orderSensors">
                 <td>
                     <div ng-if="sensor.status != 'offline'">
-                        <a data-target="#editSensorModal" data-toggle="modal" data-sensor={{sensor}} href="">
+                        <a href="#!/sensors">
                             <span class="fa fa-circle-o"></span><span> {{sensor.name}}</span>
                         </a>
                     </div>
@@ -101,38 +101,6 @@
     </table>
 </div>
 
-<!-- Modal EDIT Sensor -->
-<div class="modal fade" id="editSensorModal" tabindex="-1" role="dialog" aria-labelledby="editSensorLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                <h4 class="modal-title" id="myModalLabel">Sensor settings</h4>
-            </div>
-            <div class="modal-body">
-                <!-- Loading spinner while sensor data is being loaded -->
-                <div ng-if="!sensoredit || !sensoredit.id" class="text-center" style="padding: 20px;">
-                    <div class="spinner-border" role="status">
-                        <span class="sr-only">Loading sensor data...</span>
-                    </div>
-                    <p style="margin-top: 10px;">Loading sensor data...</p>
-                </div>
-
-                <!-- Sensor form - only shown when data is loaded -->
-                <form name="editSensorForm" ng-if="sensoredit && sensoredit.id">
-                    <div class="alert alert-warning" ng-if="!editSensorForm.$valid">The fields labeled by a red bar are required.</div>
-                    <label class="input" id="sensor_details">{{sensoredit.id}} at {{sensoredit.ip}}</label>
-                    <label class="input"><span ng-hide="sensoredit.name != null">Name</span><input type="text" ng-model="sensoredit.name" name="sensor-name" required ng-required="true" style="width: 240px;"></label>
-                    <label class="input"><span ng-hide="sensoredit.location != null">Location</span><input type="text" ng-model="sensoredit.location" name="sensor-location" required ng-required="true" style="width: 240px;"></label>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                <button class="btn btn-danger" ng-click="editSensor()" data-dismiss="modal" ng-disabled="!sensoredit || !sensoredit.id || editSensorForm.$invalid">Save</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <form>
     <!-- Interface to quickly filter machines in the table -->

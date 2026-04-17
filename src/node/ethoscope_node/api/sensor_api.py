@@ -16,6 +16,7 @@ class SensorAPI(BaseAPI):
     def register_routes(self):
         """Register sensor-related routes."""
         self.app.route("/sensors", method="GET")(self._get_sensors)
+        self.app.route("/sensors/merged", method="GET")(self._get_sensors_merged)
         self.app.route("/sensor/set", method="POST")(self._edit_sensor)
         self.app.route("/list_sensor_csv_files", method="GET")(self._list_csv_files)
         self.app.route("/get_sensor_csv_data/<filename>", method="GET")(
@@ -26,6 +27,88 @@ class SensorAPI(BaseAPI):
     def _get_sensors(self):
         """Get all sensor information."""
         return self.sensor_scanner.get_all_devices_info() if self.sensor_scanner else {}
+
+    @error_decorator
+    def _get_sensors_merged(self):
+        """Get merged view of discovered and configured sensors.
+
+        Combines live discovered sensors (from mDNS) with configured sensors
+        (from ethoscope.conf). Reconciles by matching sensor name.
+        Each sensor gets a 'source' field: 'discovered', 'configured', or 'both'.
+        """
+        # Get discovered sensors (keyed by MAC-based ID)
+        discovered = {}
+        if self.sensor_scanner:
+            discovered = self.sensor_scanner.get_all_devices_info() or {}
+
+        # Get configured sensors (keyed by name)
+        configured = self.config.get_all_sensors() if self.config else {}
+
+        # Get global alert config for reference
+        global_alerts = (
+            self.config.get_temperature_alert_config() if self.config else {}
+        )
+
+        # Build name-indexed map of discovered sensors
+        discovered_by_name = {}
+        for dev_id, dev_info in discovered.items():
+            name = dev_info.get("name", "")
+            if name:
+                discovered_by_name[name] = {**dev_info, "_discovered_id": dev_id}
+
+        merged = {}
+
+        # Add all configured sensors first
+        for name, cfg in configured.items():
+            entry = dict(cfg)
+            if name in discovered_by_name:
+                # Merge live data from discovered sensor
+                live = discovered_by_name.pop(name)
+                entry.update(
+                    {
+                        "id": live.get("_discovered_id", ""),
+                        "ip": live.get("ip", ""),
+                        "status": live.get("status", "offline"),
+                        "temperature": live.get("temperature", ""),
+                        "humidity": live.get("humidity", ""),
+                        "pressure": live.get("pressure", ""),
+                        "light": live.get("light", ""),
+                        "last_seen": live.get("last_seen", ""),
+                        "source": "both",
+                    }
+                )
+            else:
+                entry.update(
+                    {
+                        "status": "configured",
+                        "source": "configured",
+                    }
+                )
+            entry["global_alerts"] = global_alerts
+            merged[name] = entry
+
+        # Add remaining discovered-only sensors
+        for name, live in discovered_by_name.items():
+            entry = {
+                "name": name,
+                "id": live.get("_discovered_id", ""),
+                "ip": live.get("ip", ""),
+                "URL": f"http://{live.get('ip', '')}",
+                "location": live.get("location", ""),
+                "description": "",
+                "active": True,
+                "status": live.get("status", "online"),
+                "temperature": live.get("temperature", ""),
+                "humidity": live.get("humidity", ""),
+                "pressure": live.get("pressure", ""),
+                "light": live.get("light", ""),
+                "last_seen": live.get("last_seen", ""),
+                "source": "discovered",
+                "global_alerts": global_alerts,
+            }
+            merged[name] = entry
+
+        return merged
 
     def _edit_sensor(self):
         """Edit sensor settings."""
