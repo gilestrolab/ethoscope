@@ -68,8 +68,9 @@
                 });
         };
 
-        $scope.isVirtualSensor = function(sensor) {
-            return sensor.id && sensor.id.indexOf('virtual_sensor_') === 0;
+        // Sensor explicitly declares no alerts (e.g. virtual weather sensor)
+        $scope.hasNoAlerts = function(sensor) {
+            return sensor.no_alerts === true;
         };
 
         $scope.getAlertDisplay = function(sensor) {

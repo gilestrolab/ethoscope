@@ -75,6 +75,7 @@ class SensorAPI(BaseAPI):
                         "light": live.get("light", ""),
                         "last_seen": live.get("last_seen", ""),
                         "source": "both",
+                        "no_alerts": live.get("alerts") is False,
                     }
                 )
             else:
@@ -89,6 +90,8 @@ class SensorAPI(BaseAPI):
 
         # Add remaining discovered-only sensors
         for name, live in discovered_by_name.items():
+            # Sensor declares alerts=False means no alerting (e.g. virtual sensor)
+            sensor_alerts = live.get("alerts")
             entry = {
                 "name": name,
                 "id": live.get("_discovered_id", ""),
@@ -97,6 +100,7 @@ class SensorAPI(BaseAPI):
                 "location": live.get("location", ""),
                 "description": "",
                 "active": True,
+                "no_alerts": sensor_alerts is False,
                 "status": live.get("status", "online"),
                 "temperature": live.get("temperature", ""),
                 "humidity": live.get("humidity", ""),

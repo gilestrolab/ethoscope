@@ -83,10 +83,6 @@ class TemperatureAlertMonitor:
         Returns:
             True if an alert was sent, False otherwise
         """
-        # Skip alerts for virtual sensors (weather data, not incubator conditions)
-        if sensor_id and sensor_id.startswith("virtual_sensor_"):
-            return False
-
         # Check per-sensor alert config first, fall back to global
         try:
             all_sensors = self.config.get_all_sensors()

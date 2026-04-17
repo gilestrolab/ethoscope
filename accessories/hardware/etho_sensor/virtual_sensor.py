@@ -337,7 +337,8 @@ class SensorHTTPHandler(BaseHTTPRequestHandler):
             "temperature": hws.getTemperature,
             "humidity": hws.getHumidity,
             "pressure": hws.getPressure,
-            "light": hws.getLight
+            "light": hws.getLight,
+            "alerts": False
         }
         self.send_json_response(data)
 

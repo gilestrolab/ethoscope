@@ -132,6 +132,10 @@ class Sensor(BaseDevice):
 
         try:
             with self._lock:
+                # Sensor explicitly declares it doesn't want alerts (e.g. virtual sensor)
+                if self._info.get("alerts") is False:
+                    return
+
                 temperature = self._info.get("temperature")
                 if temperature is None:
                     return

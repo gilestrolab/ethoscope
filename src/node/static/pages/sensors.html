@@ -107,13 +107,13 @@
                 <span ng-if="sensor.light === '' || sensor.light == null" style="color: grey;">&mdash;</span>
             </td>
             <td>
-                <span ng-if="isVirtualSensor(sensor)" style="color: #aaa;" title="Virtual sensors provide weather data and do not trigger alerts">
+                <span ng-if="hasNoAlerts(sensor)" style="color: #aaa;" title="Virtual sensors provide weather data and do not trigger alerts">
                     <i class="fa fa-bell-slash"></i> N/A
                 </span>
-                <span ng-if="!isVirtualSensor(sensor) && sensor.alerts.enabled" class="text-info" title="Custom: {{sensor.alerts.min_threshold}} - {{sensor.alerts.max_threshold}}&deg;C">
+                <span ng-if="!hasNoAlerts(sensor) && sensor.alerts.enabled" class="text-info" title="Custom: {{sensor.alerts.min_threshold}} - {{sensor.alerts.max_threshold}}&deg;C">
                     <i class="fa fa-bell"></i> {{sensor.alerts.min_threshold}} - {{sensor.alerts.max_threshold}}&deg;C
                 </span>
-                <span ng-if="!isVirtualSensor(sensor) && (!sensor.alerts || !sensor.alerts.enabled)" style="color: grey;" title="Using global defaults: {{globalAlerts.min_threshold}} - {{globalAlerts.max_threshold}}&deg;C">
+                <span ng-if="!hasNoAlerts(sensor) && (!sensor.alerts || !sensor.alerts.enabled)" style="color: grey;" title="Using global defaults: {{globalAlerts.min_threshold}} - {{globalAlerts.max_threshold}}&deg;C">
                     Global
                 </span>
             </td>
@@ -282,7 +282,7 @@
                         </div>
 
                         <!-- Virtual sensor: alerts not applicable -->
-                        <div class="col-12" ng-if="isVirtualSensor(selectedSensor)">
+                        <div class="col-12" ng-if="hasNoAlerts(selectedSensor)">
                             <div class="alert alert-secondary mb-0" style="padding: 10px 15px;">
                                 <i class="fa fa-bell-slash"></i>
                                 Alerts are disabled for virtual sensors. This sensor provides external weather data and is not monitored for temperature violations.
@@ -290,7 +290,7 @@
                         </div>
 
                         <!-- Real sensor: alert configuration -->
-                        <div ng-if="!isVirtualSensor(selectedSensor)">
+                        <div ng-if="!hasNoAlerts(selectedSensor)">
                             <div class="col-12">
                                 <small class="form-text text-muted" style="margin-top: -5px; margin-bottom: 10px;">
                                     Set custom temperature alert thresholds for this sensor. When disabled, global defaults

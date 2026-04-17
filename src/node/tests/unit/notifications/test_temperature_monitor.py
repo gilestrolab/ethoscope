@@ -577,51 +577,6 @@ class TestPerSensorAlertThresholds:
         assert result is False
         manager.send_temperature_alert.assert_not_called()
 
-
-class TestVirtualSensorAlertSuppression:
-    """Tests that virtual sensors never trigger temperature alerts."""
-
-    def test_virtual_sensor_never_alerts(self):
-        """Virtual sensors (weather data) should never trigger alerts."""
-        config = Mock()
-        config.get_temperature_alert_config.return_value = {
-            "enabled": True,
-            "min_threshold": 18.0,
-            "max_threshold": 28.0,
-        }
-        config.get_all_sensors.return_value = {}
-        manager = Mock()
-        manager.send_temperature_alert.return_value = True
-        monitor = TemperatureAlertMonitor(config=config, notification_manager=manager)
-
-        # 50C would normally trigger a high alert
-        result = monitor.check_temperature(
-            sensor_id="virtual_sensor_aa:bb:cc:dd:ee:ff",
-            sensor_name="Outside",
-            location="Outside",
-            temperature=50.0,
-        )
-        assert result is False
-        manager.send_temperature_alert.assert_not_called()
-
-    def test_non_virtual_sensor_still_alerts(self):
-        """Regular sensors should still alert normally."""
-        config = Mock()
-        config.get_temperature_alert_config.return_value = {
-            "enabled": True,
-            "min_threshold": 18.0,
-            "max_threshold": 28.0,
-        }
-        config.get_all_sensors.return_value = {}
-        manager = Mock()
-        manager.send_temperature_alert.return_value = True
-        monitor = TemperatureAlertMonitor(config=config, notification_manager=manager)
-
-        result = monitor.check_temperature(
-            sensor_id="real_sensor_01:02:03:04:05:06",
-            sensor_name="Lab Sensor",
-            location="Incubator_1",
-            temperature=50.0,
-        )
-        assert result is True
-        manager.send_temperature_alert.assert_called_once()
+    # Note: Virtual sensor alert suppression is now handled at the scanner
+    # level (Sensor._check_temperature checks self._info["alerts"] is False)
+    # rather than in the monitor. See sensor_scanner.py tests.
