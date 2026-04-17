@@ -62,9 +62,9 @@
 
         <h1>{{device.name}}</h1>
         <ul>
-            <li title="Device IP address"><a href="ssh://alarm@{{device.ip}}">{{device.ip}}</a></li>
-            <!--                The default SSH password for ethoscopes is alarm
-                    The default root password is root
+            <li title="Device IP address"><a href="ssh://ethoscope@{{device.ip}}">{{device.ip}}</a></li>
+            <!--                The default SSH password for ethoscopes is ethoscope
+                    The default root password is ethoscope
                     To associate the xdg protocol to SSH run the following in a terminal on the client computer:
 
                     xdg-mime default ssh.desktop x-scheme-handler/ssh
