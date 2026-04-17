@@ -81,10 +81,14 @@ def handle_node_branch_change(new_branch):
 
 
 def handle_node_daemon_restart():
-    """Handle local node daemon restart operation"""
+    """Handle local node daemon restart operation.
+
+    Schedules the restart with a delay so the HTTP response can be sent
+    before the update server process is killed.
+    """
     try:
-        reload_node_daemon()
-        return {"status": "daemon_restarted", "device_id": "node"}
+        _schedule_restart()
+        return {"status": "daemon_restart_scheduled", "device_id": "node"}
     except Exception as e:
         return {"status": "error", "device_id": "node", "error": str(e)}
 
