@@ -293,10 +293,7 @@ The project uses pre-commit hooks to enforce code quality standards locally befo
 # Activate your venv first
 source .venv/bin/activate
 
-# Run the setup script
-./scripts/setup_pre_commit.sh
-
-# Or manually
+# Install and configure
 pip install pre-commit
 pre-commit install
 ```

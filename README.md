@@ -105,7 +105,7 @@ The project uses pre-commit hooks to maintain code quality:
 
 ```bash
 # Install pre-commit hooks
-./scripts/setup_pre_commit.sh
+pip install pre-commit && pre-commit install
 
 # Run hooks manually
 pre-commit run --all-files
