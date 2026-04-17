@@ -214,8 +214,7 @@ def main():
         "--config-file",
         dest="config_file",
         default=DEFAULT_CONFIG_FILE,
-        help="Path to light schedule JSON config file (default: %s)"
-        % DEFAULT_CONFIG_FILE,
+        help=f"Path to light schedule JSON config file (default: {DEFAULT_CONFIG_FILE})",
     )
     parser.add_option(
         "-p",
@@ -223,7 +222,7 @@ def main():
         dest="poll_interval",
         type="int",
         default=DEFAULT_POLL_INTERVAL,
-        help="Seconds between schedule checks (default: %d)" % DEFAULT_POLL_INTERVAL,
+        help=f"Seconds between schedule checks (default: {DEFAULT_POLL_INTERVAL})",
     )
     parser.add_option(
         "-g",
@@ -231,7 +230,7 @@ def main():
         dest="gpio_pin",
         type="int",
         default=DEFAULT_GPIO_PIN,
-        help="BCM GPIO pin number (default: %d)" % DEFAULT_GPIO_PIN,
+        help=f"BCM GPIO pin number (default: {DEFAULT_GPIO_PIN})",
     )
     parser.add_option(
         "-D",
