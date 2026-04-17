@@ -256,11 +256,36 @@ class virtualSensor():
 
     __net_suffix = "local"
 
+    def _resolve_address(self):
+        """Resolve the local IP address, trying multiple methods."""
+        # Try hostname.local (mDNS)
+        try:
+            return socket.gethostbyname(self.hostname + "." + self.__net_suffix)
+        except socket.gaierror:
+            pass
+
+        # Try just the hostname
+        try:
+            return socket.gethostbyname(self.hostname)
+        except socket.gaierror:
+            pass
+
+        # Fallback: connect to external address to determine local IP
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            addr = s.getsockname()[0]
+            s.close()
+            return addr
+        except Exception:
+            print("Warning: Could not determine local IP, falling back to 127.0.0.1")
+            return "127.0.0.1"
+
     def __init__(self):
         """
         """
         self.hostname = socket.gethostname()
-        self.address = socket.gethostbyname(self.hostname + "." + self.__net_suffix)
+        self.address = self._resolve_address()
         self.port = PORT
         self.uid = "virtual_sensor_%s" % MAC_ADDRESS
 
