@@ -316,7 +316,7 @@ EOF
     print_info "Configuring git repository..."
     cd /opt/ethoscope/
     git checkout dev
-    git remote set-url origin git://node/ethoscope.git
+    git remote set-url origin git://node.local/ethoscope.git
 
     # Use --system instead of --global to avoid requiring $HOME
     git config --system --add safe.directory /opt/ethoscope
@@ -368,13 +368,14 @@ step_install_arduino_cli() {
 #===============================================================================
 
 step_configure_system_identity() {
-    print_info "Setting default hostname to ETHOSCOPE-000..."
+    print_info "Setting default hostname to ETHOSCOPE000..."
     echo "ETHOSCOPE_000" > /etc/machine-name
-    # Use raspi-config to properly set hostname (hyphens, not underscores - RFC 952)
+    # Use raspi-config to set hostname
     # This also updates /etc/hosts and notifies systemd
-    raspi-config nonint do_hostname "ETHOSCOPE-000"
-    # Prevent cloud-init from reverting hostname on reboot
+    raspi-config nonint do_hostname "ETHOSCOPE000"
+    # Prevent cloud-init from reverting hostname and /etc/hosts on reboot
     sed -i 's/preserve_hostname: false/preserve_hostname: true/' /etc/cloud/cloud.cfg 2>/dev/null || true
+    sed -i 's/manage_etc_hosts: true/manage_etc_hosts: false/' /etc/cloud/cloud.cfg 2>/dev/null || true
 
     print_info "Configuring login banner..."
     echo 'Ethoscope Linux \r  (\n) (\l)' > /etc/issue

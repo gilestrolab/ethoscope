@@ -93,7 +93,7 @@ def set_machine_name(id, path="/etc/machine-name"):
     Takes an id and updates the machine name accordingly in the format
     ETHOSCOPE_id; changes the hostname too.
 
-    The hostname uses hyphens instead of underscores (RFC 952 compliance).
+    The hostname omits the underscore (e.g. ETHOSCOPE010).
     On Raspberry Pi OS with cloud-init, we must also disable cloud-init's
     hostname management and update /boot/firmware/user-data to prevent
     reversion on reboot.
@@ -102,7 +102,7 @@ def set_machine_name(id, path="/etc/machine-name"):
     """
 
     machine_name = f"ETHOSCOPE_{id:03d}"
-    hostname = f"ETHOSCOPE-{id:03d}"
+    hostname = f"ETHOSCOPE{id:03d}"
     try:
         # Write internal machine name (with underscore)
         ensure_dir_exists(path)
@@ -130,19 +130,33 @@ def set_machine_name(id, path="/etc/machine-name"):
 
 def _disable_cloud_init_hostname(cloud_cfg="/etc/cloud/cloud.cfg"):
     """
-    Sets preserve_hostname to true in cloud.cfg so cloud-init
-    stops overriding the hostname on every boot.
+    Sets preserve_hostname to true and manage_etc_hosts to false in cloud.cfg
+    so cloud-init stops overriding the hostname and /etc/hosts on every boot.
     """
     try:
         with open(cloud_cfg) as f:
             content = f.read()
+
+        modified = False
+
         if "preserve_hostname: false" in content:
             content = content.replace(
                 "preserve_hostname: false", "preserve_hostname: true"
             )
+            modified = True
+
+        if "manage_etc_hosts: true" in content:
+            content = content.replace(
+                "manage_etc_hosts: true", "manage_etc_hosts: false"
+            )
+            modified = True
+
+        if modified:
             with open(cloud_cfg, "w") as f:
                 f.write(content)
-            logging.warning("Set preserve_hostname to true in cloud.cfg")
+            logging.warning(
+                "Updated cloud.cfg: preserve_hostname=true, manage_etc_hosts=false"
+            )
     except FileNotFoundError:
         pass  # Not a cloud-init system
     except Exception as e:
@@ -168,6 +182,43 @@ def _update_cloud_init_hostname(hostname, user_data="/boot/firmware/user-data"):
         pass  # No user-data file
     except Exception as e:
         logging.error(f"Failed to update {user_data}: {e}")
+
+
+def _update_cloud_init_hosts_template(
+    ip_address, nodename, template="/etc/cloud/templates/hosts.debian.tmpl"
+):
+    """
+    Adds the node entry to the cloud-init hosts template so it persists
+    even if cloud-init regenerates /etc/hosts.
+    """
+    try:
+        with open(template) as f:
+            content = f.read()
+
+        # Check if nodename already has an entry and update it
+        new_content = re.sub(
+            rf"^.*\t{re.escape(nodename)}\s*$",
+            f"{ip_address}\t{nodename}",
+            content,
+            flags=re.MULTILINE,
+        )
+
+        if new_content == content:
+            # No existing entry found, append it
+            if not content.endswith("\n"):
+                content += "\n"
+            new_content = content + f"{ip_address}\t{nodename}\n"
+
+        if new_content != content:
+            with open(template, "w") as f:
+                f.write(new_content)
+            logging.warning(
+                f"Updated cloud-init hosts template with {nodename} -> {ip_address}"
+            )
+    except FileNotFoundError:
+        pass  # Not a cloud-init system
+    except Exception as e:
+        logging.error(f"Failed to update cloud-init hosts template: {e}")
 
 
 def set_machine_id(id, path="/etc/machine-id"):
@@ -351,14 +402,51 @@ def get_connection_status():
 
 def set_etc_hostname(ip_address, nodename="node", path="/etc/hosts"):
     """
-    Updates the settings in /etc/hosts to match the given IP address
+    Updates or adds the node entry in /etc/hosts to match the given IP address.
+    Preserves all other existing entries (localhost, ethoscope hostname, IPv6, etc.)
+    Also disables cloud-init's manage_etc_hosts to prevent it from overwriting
+    /etc/hosts on reboot.
     """
 
     try:
+        # Prevent cloud-init from regenerating /etc/hosts on reboot
+        _disable_cloud_init_hostname()
+
+        # Read existing content
+        try:
+            with open(path) as f:
+                lines = f.readlines()
+        except FileNotFoundError:
+            lines = ["127.0.0.1\tlocalhost\n"]
+
+        # Update or add the node entry
+        new_lines = []
+        node_found = False
+        for line in lines:
+            stripped = line.strip()
+            # Skip empty lines and comments
+            if stripped == "" or stripped.startswith("#"):
+                new_lines.append(line)
+                continue
+            # Check if this line maps to our nodename
+            parts = stripped.split()
+            if len(parts) >= 2 and nodename in parts[1:]:
+                new_lines.append(f"{ip_address}\t{nodename}\n")
+                node_found = True
+            else:
+                new_lines.append(line)
+
+        if not node_found:
+            new_lines.append(f"{ip_address}\t{nodename}\n")
+
         with open(path, "w") as f:
-            f.write("127.0.0.1\tlocalhost\n")
-            f.write(f"{ip_address}\t{nodename}\n")
-        logging.warning(f"Wrote new information in file: {path}")
+            f.writelines(new_lines)
+        logging.warning(f"Updated {nodename} -> {ip_address} in {path}")
+
+        # Also update cloud-init template so the entry survives if cloud-init
+        # regenerates /etc/hosts despite our manage_etc_hosts=false setting
+        _update_cloud_init_hosts_template(ip_address, nodename)
+
     except Exception:
         raise
 

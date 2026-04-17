@@ -5,7 +5,7 @@ set -euo pipefail  # Exit on error, undefined vars, and pipe failures
 # Constants
 readonly ETHOSCOPE_PATH="/opt/ethoscope"
 readonly GITHUB_REPO="https://github.com/gilestrolab/ethoscope.git"
-readonly LOCAL_REPO="git://node/ethoscope.git"
+readonly LOCAL_REPO="git://node.local/ethoscope.git"
 readonly MACHINE_NAME="ETHOSCOPE_000"
 
 # Colors for output

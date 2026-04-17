@@ -150,7 +150,7 @@ install_node() {
     rm -rf /opt/ethoscope*
 
     log "Cloning fresh repository..."
-    git clone git://node/ethoscope.git /opt/ethoscope
+    git clone git://node.local/ethoscope.git /opt/ethoscope
     cd /opt/ethoscope && git checkout dev
 
     # Install Python packages
@@ -183,7 +183,7 @@ install_device() {
     rm -rf /opt/ethoscope*
 
     log "Cloning fresh repository..."
-    git clone git://node/ethoscope.git /opt/ethoscope
+    git clone git://node.local/ethoscope.git /opt/ethoscope
     cd /opt/ethoscope && git checkout dev
 
     # Install Python package
@@ -274,7 +274,7 @@ perform_installation() {
         log "The script will:"
         echo "  1. Stop running services"
         echo "  2. Remove all existing ethoscope directories"
-        echo "  3. Clone fresh repository from git://node/ethoscope.git"
+        echo "  3. Clone fresh repository from git://node.local/ethoscope.git"
         echo "  4. Install Python packages"
         echo "  5. Link service files and start services"
         echo
@@ -338,7 +338,7 @@ Examples:
 The script will:
 1. Stop running services
 2. Remove all existing ethoscope directories
-3. Clone fresh repository from git://node/ethoscope.git
+3. Clone fresh repository from git://node.local/ethoscope.git
 4. Install Python packages in development mode
 5. Link service files and start services
 EOF
