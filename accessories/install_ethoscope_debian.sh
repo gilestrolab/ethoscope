@@ -376,8 +376,13 @@ step_configure_system_identity() {
     # This also updates /etc/hosts and notifies systemd
     raspi-config nonint do_hostname "ETHOSCOPE000"
     # Prevent cloud-init from reverting hostname and /etc/hosts on reboot
-    sed -i 's/preserve_hostname: false/preserve_hostname: true/' /etc/cloud/cloud.cfg 2>/dev/null || true
-    sed -i 's/manage_etc_hosts: true/manage_etc_hosts: false/' /etc/cloud/cloud.cfg 2>/dev/null || true
+    if [ -f /etc/cloud/cloud.cfg ]; then
+        sed -i 's/preserve_hostname: false/preserve_hostname: true/' /etc/cloud/cloud.cfg
+        sed -i 's/manage_etc_hosts: true/manage_etc_hosts: false/' /etc/cloud/cloud.cfg
+        # Ensure settings exist even if not present in the original file
+        grep -q 'preserve_hostname' /etc/cloud/cloud.cfg || echo 'preserve_hostname: true' >> /etc/cloud/cloud.cfg
+        grep -q 'manage_etc_hosts' /etc/cloud/cloud.cfg || echo 'manage_etc_hosts: false' >> /etc/cloud/cloud.cfg
+    fi
 
     print_info "Configuring login banner..."
     echo 'Ethoscope Linux \r  (\n) (\l)' > /etc/issue
@@ -392,7 +397,7 @@ step_configure_system_identity() {
     echo "en_GB.UTF-8 UTF-8" >> /etc/locale.gen
     locale-gen
 
-    echo $(date +%Y%m%d)_ethoscope_${PI_MODEL}.img > /etc/sdimagename
+    echo $(date +%Y%m%d)_ethoscope000_${PI_MODEL}.img > /etc/sdimagename
 
     print_success "System identity configured as ETHOSCOPE_000"
 }
