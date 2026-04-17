@@ -407,8 +407,8 @@
 
                 // Check backup service availability from summary
                 var summary = data.summary || {};
-                $scope.mysql_backup_available = summary.services && summary.services.mysql_service_available || false;
-                $scope.rsync_backup_available = summary.services && summary.services.rsync_service_available || false;
+                $scope.mysql_backup_available = summary.services && summary.services.mysql_service_available;
+                $scope.rsync_backup_available = summary.services && summary.services.rsync_service_available;
                 $scope.backup_service_available = $scope.mysql_backup_available || $scope.rsync_backup_available;
 
             }).catch(function(error) {
@@ -965,14 +965,15 @@
             // Finally how many seconds left after removing days, hours and minutes.
             var secs = Math.floor((t - (days * 86400) - (hours * 3600) - (minutes * 60)))
 
+            var x = "0 s";
             if (days > 0) {
-                var x = days + " days, " + hours + "h ";
-            } else if (days == 0 && hours > 0) {
-                var x = hours + "h, " + minutes + "min ";
-            } else if (days == 0 && hours == 0 && minutes > 0) {
-                var x = minutes + "min ";
-            } else if (days == 0 && hours == 0 && minutes == 0 && secs > 0) {
-                var x = secs + " s ";
+                x = days + " days, " + hours + "h ";
+            } else if (hours > 0) {
+                x = hours + "h, " + minutes + "min ";
+            } else if (minutes > 0) {
+                x = minutes + "min ";
+            } else if (secs > 0) {
+                x = secs + " s ";
             }
             return x;
 
@@ -1011,55 +1012,14 @@
         };
 
         // ===========================
-        // GROUP ACTIONS & FORM HANDLING
+        // MODAL & FORM HANDLING
         // ===========================
-
-        $scope.groupActions.checkStart = function(selected_devices) {
-            var softwareVersion = "";
-            var device_version = "";
-            checkVersionLoop:
-                for (var i = 0; i < selected_devices.length(); i++) {
-                    $http.get('/device/' + selected_devices[i] + '/data').then(function(response) {
-                        var data = response.data;
-                        device_version = data.version.id
-                    });
-                    if (i == 0) {
-                        softwareVersion = device_version;
-                    }
-                    if (softwareVersion != device_version) {
-                        break checkVersionLoop;
-                    }
-                }
-        };
-
-        $scope.groupActions.start = function() {
-            $("#startModal").modal('hide');
-            var spStart = new Spinner(opts).spin();
-            starting_tracking.appendChild(spStart.el);
-            $http.post('/device/' + device_id + '/controls/start', data = option)
-                .then(function(response) {
-                    var data = response.data;
-                    $scope.device.status = data.status;
-                });
-            $http.get('/devices').then(function() {
-                $http.get('/device/' + device_id + '/data').then(function(response) {
-                    var data = response.data;
-                    $scope.device = data;
-
-                });
-
-                $http.get('/device/' + device_id + '/ip').then(function(response) {
-                    $scope.device.ip = response.data;
-                });
-                $("#startModal").modal('hide');
-            });
-        };
 
         // ===========================
         // MODAL & EVENT HANDLING
         // ===========================
 
-        $('#editSensorModal').on('show.bs.modal', function() {
+        $('#editSensorModal').on('show.bs.modal', function(e) {
             // Clear previous sensor data to show loading state
             $scope.sensoredit = null;
             $scope.$apply();
@@ -1078,7 +1038,7 @@
         });
 
         $scope.editSensor = function() {
-            $http.post('/sensor/set', data = $scope.sensoredit)
+            $http.post('/sensor/set', $scope.sensoredit)
                 .then(function() {
                     refresh_platform();
                 })
@@ -1087,7 +1047,7 @@
         $scope.manuallyAdd = function() {
 
             spin('start');
-            $http.post('/device/add', data = $scope.ip_to_add)
+            $http.post('/device/add', $scope.ip_to_add)
                 .then(function(response) {
                     spin('stop');
                     var res = response.data;
