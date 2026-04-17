@@ -14,6 +14,7 @@
 #   sudo ./install_ethoscope_debian.sh              # Full installation (all steps)
 #   sudo ./install_ethoscope_debian.sh --from 3     # Resume from step 3
 #   sudo ./install_ethoscope_debian.sh --step 5     # Run only step 5
+#   sudo ./install_ethoscope_debian.sh --reset      # Reset device to ETHOSCOPE_000 defaults
 #   sudo ./install_ethoscope_debian.sh --list       # List all steps
 #   sudo ./install_ethoscope_debian.sh --help       # Show this help
 #
@@ -121,6 +122,7 @@ show_help() {
     echo "  (no args)       Run full installation (all ${TOTAL_STEPS} steps)"
     echo "  --from N        Resume installation from step N"
     echo "  --step N        Run only step N"
+    echo "  --reset         Reset device to ETHOSCOPE_000 defaults"
     echo "  --list          List all installation steps"
     echo "  --help          Show this help message"
     echo ""
@@ -675,6 +677,113 @@ step_configure_raspberry_pi_hardware() {
 }
 
 #===============================================================================
+# RESET TO ETHOSCOPE_000
+#===============================================================================
+# Resets a configured ethoscope back to factory defaults (ETHOSCOPE_000).
+# Reuses installation steps where possible, adds update & cleanup utilities.
+
+GITHUB_REPO="https://github.com/gilestrolab/ethoscope.git"
+LOCAL_REPO="git://node.local/ethoscope.git"
+ETHOSCOPE_PATH="/opt/ethoscope"
+
+reset_update_repository() {
+    print_info "Updating repository from GitHub..."
+
+    if [[ ! -d "$ETHOSCOPE_PATH/.git" ]]; then
+        print_error "No git repository at $ETHOSCOPE_PATH"
+        print_info "Use full installation instead: $0"
+        exit 1
+    fi
+
+    cd "$ETHOSCOPE_PATH" || exit 1
+
+    # Ensure safe.directory is set for root operations
+    git config --system --add safe.directory "$ETHOSCOPE_PATH" 2>/dev/null || true
+
+    # Stash any local changes to avoid conflicts
+    if git status --porcelain | grep -q .; then
+        print_warning "Local changes detected. Stashing them..."
+        git stash
+    fi
+
+    git remote set-url origin "$GITHUB_REPO"
+    git fetch origin
+    git checkout dev
+    git pull origin dev
+    git remote set-url origin "$LOCAL_REPO"
+
+    print_success "Repository updated"
+}
+
+reset_set_system_date() {
+    print_info "Setting system date from internet..."
+
+    if ! command -v wget &> /dev/null; then
+        print_warning "wget not found — skipping date sync"
+        return
+    fi
+
+    # Use a subshell to isolate pipeline failures from set -e
+    local date_string
+    date_string=$(wget --method=HEAD -qSO- --max-redirect=0 --timeout=10 google.com 2>&1 | grep "Date:" | cut -d' ' -f5-10) || true
+
+    if [[ -n "$date_string" ]]; then
+        date -s "$date_string"
+        print_success "System date updated"
+    else
+        print_warning "Could not retrieve date from internet"
+    fi
+}
+
+reset_set_timezone() {
+    print_info "Setting timezone to UTC..."
+    if command -v timedatectl &> /dev/null; then
+        timedatectl set-timezone UTC
+        print_success "Timezone set to UTC"
+    else
+        print_warning "timedatectl not found — skipping timezone"
+    fi
+}
+
+reset_clean_package_cache() {
+    print_info "Cleaning package cache..."
+    if command -v apt-get &> /dev/null; then
+        apt-get clean
+        print_success "APT cache cleaned"
+    elif command -v pacman &> /dev/null; then
+        pacman -Scc --noconfirm
+        print_success "Pacman cache cleaned"
+    else
+        print_warning "No recognized package manager found"
+    fi
+}
+
+do_reset() {
+    check_root
+    print_header
+    detect_pi_model
+    determine_config_paths
+
+    echo -e "  ${YELLOW}This will reset the device to ETHOSCOPE_000 defaults.${NC}"
+    echo ""
+
+    reset_update_repository
+    reset_set_system_date
+    step_configure_system_identity    # Reuse install step 5
+    reset_set_timezone
+    step_configure_network            # Reuse install step 8
+    reset_clean_package_cache
+
+    echo ""
+    echo -e "${GREEN}===============================================${NC}"
+    echo -e "${GREEN} Device reset to ETHOSCOPE_000 complete${NC}"
+    echo -e "${GREEN}===============================================${NC}"
+    echo ""
+    echo -e "  ${BOLD}Please reboot now: sudo reboot${NC}"
+    echo ""
+}
+
+#===============================================================================
 # STEP DISPATCHER
 #===============================================================================
 
@@ -743,6 +852,10 @@ main() {
                 start_step=$single_step
                 end_step=$single_step
                 shift 2
+                ;;
+            --reset)
+                do_reset
+                exit 0
                 ;;
             --apt-install)
                 # Legacy flag — equivalent to --step 1
