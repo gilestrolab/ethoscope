@@ -1,10 +1,10 @@
 {
     "images": [{
             "title": "Ethoscope000, rPI2/3",
-            "filename": "20260407_ethoscope000_PI3.img.zip",
-            "url": "https://imperialcollegelondon.box.com/shared/static/6nuom399t11030619fkitd0zc552pw51.zip",
-            "date": "07 Apr 2026",
-            "md5sum": "242d65429ebe8c965ce2bec3224c059c",
+            "filename": "20260417_ethoscope000_PI3.img.zip",
+            "url": "https://imperialcollegelondon.box.com/shared/static/fy6b5fqli3juc2eqyag622fxx3x3cswn.zip",
+            "date": "17 Apr 2026",
+            "md5sum": "8f2ece9c9a71da3ebaf5ad357812ef6c",
             "SDsize": "32Gb",
             "tested_on": "SD"
         },
