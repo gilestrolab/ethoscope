@@ -40,9 +40,9 @@ skip_empty = False
 
 # Minimum coverage thresholds
 # Lowered from 70% to account for hardware-specific code exclusions
-# Progress: 38.45% (baseline) → 42.36% (SQLite tests) → 52.81% (IO/stimulator/core tests)
-# Incremental improvement plan: 52% → 55% → 60% → 65% → 70%
-fail_under = 52
+# Progress: 38.45% (baseline) → 42.36% (SQLite tests) → 52.81% → 54.27% (triggers/cache/drawers)
+# Incremental improvement plan: 54% → 58% → 62% → 65% → 70%
+fail_under = 54
 
 [html]
 directory = htmlcov
