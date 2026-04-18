@@ -482,5 +482,249 @@ class TestSQLiteResultWriter(unittest.TestCase):
             self.assertIn("label TEXT", fields)
 
 
+class TestSQLiteResultWriterCreateAllTables(unittest.TestCase):
+    """Test SQLiteResultWriter._create_all_tables()."""
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.db_fd)
+        self.db_credentials = {"name": self.db_path}
+        self.rois = [
+            ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1),
+        ]
+        self.metadata = {"machine_name": "test", "machine_id": "T001"}
+        self.result_writers = []
+
+    def _create_result_writer(self, **kwargs):
+        args = {
+            "db_credentials": self.db_credentials,
+            "rois": self.rois,
+            "metadata": self.metadata,
+        }
+        args.update(kwargs)
+        writer = SQLiteResultWriter(**args)
+        self.result_writers.append(writer)
+        return writer
+
+    def tearDown(self):
+        for writer in self.result_writers:
+            try:
+                if hasattr(writer, "_queue") and hasattr(writer, "_async_writer"):
+                    writer._queue.put("DONE")
+                    writer._queue.cancel_join_thread()
+                    if writer._async_writer.is_alive():
+                        writer._async_writer.join(timeout=2)
+            except Exception:
+                pass
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def test_create_all_tables_with_erase(self):
+        """Test _create_all_tables creates all standard tables when erase_old_db=True."""
+        import time
+
+        _writer = self._create_result_writer(erase_old_db=True)  # noqa: F841
+        # Wait for async writer to process commands
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = {row[0] for row in cursor.fetchall()}
+        conn.close()
+
+        self.assertIn("ROI_MAP", tables)
+        self.assertIn("VAR_MAP", tables)
+        self.assertIn("METADATA", tables)
+        self.assertIn("START_EVENTS", tables)
+
+    def test_create_all_tables_with_dam(self):
+        """Test DAM activity table created when make_dam_like_table=True."""
+        import time
+
+        _writer = self._create_result_writer(
+            erase_old_db=True, make_dam_like_table=True
+        )  # noqa: F841
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = {row[0] for row in cursor.fetchall()}
+        conn.close()
+
+        self.assertIn("CSV_DAM_ACTIVITY", tables)
+
+    def test_create_all_tables_inserts_roi_map(self):
+        """Test ROI_MAP is populated with ROI data."""
+        import time
+
+        _writer = self._create_result_writer(erase_old_db=True)  # noqa: F841
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM ROI_MAP")
+        count = cursor.fetchone()[0]
+        conn.close()
+
+        self.assertEqual(count, 1)  # We have 1 ROI
+
+    def test_create_all_tables_inserts_metadata(self):
+        """Test METADATA table is populated."""
+        import time
+
+        _writer = self._create_result_writer(erase_old_db=True)  # noqa: F841
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM METADATA")
+        count = cursor.fetchone()[0]
+        conn.close()
+
+        self.assertGreater(count, 0)
+
+    def test_create_all_tables_inserts_start_event(self):
+        """Test START_EVENTS table has graceful_start event."""
+        import time
+
+        _writer = self._create_result_writer(erase_old_db=True)  # noqa: F841
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT event FROM START_EVENTS")
+        events = [row[0] for row in cursor.fetchall()]
+        conn.close()
+
+        self.assertIn("graceful_start", events)
+
+
+class TestSQLiteResultWriterAddAndFlush(unittest.TestCase):
+    """Test SQLiteResultWriter._add() and flush() with type handling."""
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.db_fd)
+        self.db_credentials = {"name": self.db_path}
+        self.rois = [
+            ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1),
+        ]
+        self.metadata = {"machine_name": "test"}
+        self.result_writers = []
+
+    def _create_result_writer(self, **kwargs):
+        args = {
+            "db_credentials": self.db_credentials,
+            "rois": self.rois,
+            "metadata": self.metadata,
+            "erase_old_db": False,
+        }
+        args.update(kwargs)
+        writer = SQLiteResultWriter(**args)
+        self.result_writers.append(writer)
+        return writer
+
+    def tearDown(self):
+        for writer in self.result_writers:
+            try:
+                if hasattr(writer, "_queue") and hasattr(writer, "_async_writer"):
+                    writer._queue.put("DONE")
+                    writer._queue.cancel_join_thread()
+                    if writer._async_writer.is_alive():
+                        writer._async_writer.join(timeout=2)
+            except Exception:
+                pass
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def test_add_converts_null_to_none(self):
+        """Test _add converts Null objects to None."""
+        writer = self._create_result_writer()
+        roi = self.rois[0]
+
+        from ethoscope.io.helpers import Null
+
+        mock_var = Mock()
+        mock_var.__int__ = Mock(return_value=42)
+        data_row = Mock()
+        data_row.values.return_value = [mock_var]
+
+        writer._add(1000, roi, [data_row])
+        # Check the stored tuple has None instead of Null
+        stored = writer._insert_dict[1][0]
+        self.assertIsNone(stored[0])  # First value should be None (was Null)
+
+    def test_add_converts_bool_to_int(self):
+        """Test _add converts boolean values to integers."""
+        writer = self._create_result_writer()
+        roi = self.rois[0]
+
+        data_row = Mock()
+        data_row.values.return_value = [True, False]
+
+        writer._add(1000, roi, [data_row])
+        stored = writer._insert_dict[1][0]
+        # Bool True -> 1, Bool False -> 0
+        self.assertEqual(stored[2], 1)  # index 2 = first data value (after None, t)
+        self.assertEqual(stored[3], 0)
+
+    def test_flush_clears_insert_dict(self):
+        """Test flush empties insert dict for ROIs that exceed threshold."""
+        writer = self._create_result_writer()
+        writer._max_insert_string_len = 1  # Force flush on any data
+
+        roi = self.rois[0]
+        mock_var = Mock()
+        mock_var.__int__ = Mock(return_value=42)
+        data_row = Mock()
+        data_row.values.return_value = [mock_var]
+
+        writer._add(1000, roi, [data_row])
+        writer._add(2000, roi, [data_row])
+
+        with patch.object(writer, "_write_async_command"):
+            writer.flush(3000)
+
+        self.assertEqual(writer._insert_dict[1], [])
+
+    def test_write_async_command_converts_null_args(self):
+        """Test _write_async_command converts Null objects in args to None."""
+        writer = self._create_result_writer()
+
+        from ethoscope.io.helpers import Null
+
+        with patch.object(
+            writer, "_write_async_command_resilient", return_value=True
+        ) as mock_write:
+            writer._write_async_command(
+                "INSERT INTO test VALUES (%s, %s)",
+                (Null(), "value"),
+            )
+            args = mock_write.call_args[0][1]
+            self.assertIsNone(args[0])
+            self.assertEqual(args[1], "value")
+
+    def test_close_flushes_remaining_data(self):
+        """Test close() flushes any remaining buffered data."""
+        writer = self._create_result_writer()
+        roi = self.rois[0]
+
+        mock_var = Mock()
+        mock_var.__int__ = Mock(return_value=42)
+        data_row = Mock()
+        data_row.values.return_value = [mock_var]
+
+        writer._add(1000, roi, [data_row])
+        self.assertTrue(len(writer._insert_dict.get(1, [])) > 0)
+
+        with patch.object(writer, "_write_async_command"):
+            writer.close()
+
+        # After close, insert dict should be empty
+        self.assertEqual(writer._insert_dict[1], [])
+
+
 if __name__ == "__main__":
     unittest.main()

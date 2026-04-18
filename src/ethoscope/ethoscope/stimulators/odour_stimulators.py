@@ -193,9 +193,9 @@ class DynamicOdourSleepDepriver(sleep_depriver_stimulators.SleepDepStimulator):
         super().__init__(
             hardware_connection,
             velocity_correction_coef,
-            min_inactive_time,
-            date_range,
-            roi_template_config,
+            min_inactive_time=min_inactive_time,
+            date_range=date_range,
+            roi_template_config=roi_template_config,
         )
 
     def _decide(self):
@@ -217,7 +217,7 @@ class MiddleCrossingOdourStimulator(
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.01,
-                "name": "p",
+                "name": "stimulus_probability",
                 "description": "the probability to move the tube when a beam cross was detected",
                 "default": 1.0,
             },
@@ -255,7 +255,7 @@ class MiddleCrossingOdourStimulator(
     def __init__(
         self,
         hardware_connection,
-        p=1.0,
+        stimulus_probability=1.0,
         refractory_period=300,
         stimulus_duration=5,
         date_range="",
@@ -264,7 +264,7 @@ class MiddleCrossingOdourStimulator(
 
         super().__init__(
             hardware_connection,
-            p=p,
+            stimulus_probability=stimulus_probability,
             date_range=date_range,
             roi_template_config=roi_template_config,
         )
@@ -288,7 +288,7 @@ class MiddleCrossingOdourStimulatorFlushed(MiddleCrossingOdourStimulator):
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.01,
-                "name": "p",
+                "name": "stimulus_probability",
                 "description": "the probability to move the tube when a beam cross was detected",
                 "default": 1.0,
             },
@@ -334,7 +334,7 @@ class MiddleCrossingOdourStimulatorFlushed(MiddleCrossingOdourStimulator):
     def __init__(
         self,
         hardware_connection,
-        p=1.0,
+        stimulus_probability=1.0,
         refractory_period=300,
         stimulus_duration=5,
         flush_duration=10,
@@ -344,7 +344,7 @@ class MiddleCrossingOdourStimulatorFlushed(MiddleCrossingOdourStimulator):
 
         super(MiddleCrossingOdourStimulator, self).__init__(
             hardware_connection,
-            p=p,
+            stimulus_probability=stimulus_probability,
             date_range=date_range,
             roi_template_config=roi_template_config,
         )

@@ -491,9 +491,9 @@ class ExperimentalSleepDepStimulator(SleepDepStimulator):
         super().__init__(
             hardware_connection,
             velocity_correction_coef,
-            0,
-            date_range,
-            roi_template_config,
+            min_inactive_time=0,
+            date_range=date_range,
+            roi_template_config=roi_template_config,
         )
         self._inactivity_time_threshold_ms = None
 
