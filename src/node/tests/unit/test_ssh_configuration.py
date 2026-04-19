@@ -10,16 +10,15 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock
-from unittest.mock import call
-from unittest.mock import mock_open
-from unittest.mock import patch
+from unittest.mock import Mock, call, mock_open, patch
 
 import pytest
 
-from ethoscope_node.utils.configuration import ConfigurationError
-from ethoscope_node.utils.configuration import _setup_system_ssh_config
-from ethoscope_node.utils.configuration import ensure_ssh_keys
+from ethoscope_node.utils.configuration import (
+    ConfigurationError,
+    _setup_system_ssh_config,
+    ensure_ssh_keys,
+)
 
 
 class TestEnsureSshKeys:
@@ -119,8 +118,8 @@ class TestEnsureSshKeys:
 
                 # Check that chmod was called for private key (600) and public key (644)
                 chmod_calls = mock_chmod.call_args_list
-                private_key_path = os.path.join(keys_dir, "id_rsa")
-                public_key_path = os.path.join(keys_dir, "id_rsa.pub")
+                os.path.join(keys_dir, "id_rsa")
+                os.path.join(keys_dir, "id_rsa.pub")
 
                 # Find the chmod calls for the key files (ignore directory chmod)
                 key_chmod_calls = [
@@ -195,7 +194,7 @@ class TestSetupSystemSshConfig:
         mock_get_pattern.return_value = "192.168.1.*"
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            ssh_config_path = os.path.join(temp_dir, "ssh_config")
+            os.path.join(temp_dir, "ssh_config")
             private_key_path = "/etc/ethoscope/keys/id_rsa"
 
             with patch(
@@ -204,7 +203,7 @@ class TestSetupSystemSshConfig:
                 mock_exists.return_value = False
 
                 with patch("builtins.open", mock_open()) as mock_file:
-                    with patch("os.chmod") as mock_chmod:
+                    with patch("os.chmod"):
                         _setup_system_ssh_config(private_key_path)
 
                         # Should create new file
@@ -227,7 +226,7 @@ class TestSetupSystemSshConfig:
             with patch("os.path.exists") as mock_exists:
                 mock_exists.return_value = True
 
-                with patch("os.chmod") as mock_chmod:
+                with patch("os.chmod"):
                     _setup_system_ssh_config("/test/key/path")
 
                     # Should read existing file first, then append

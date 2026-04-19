@@ -12,7 +12,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import cv2
 import numpy as np
@@ -57,7 +57,7 @@ class TargetDetectionDiagnostics:
             directory.mkdir(parents=True, exist_ok=True)
             self.logger.debug(f"Ensured directory exists: {directory}")
 
-    def analyze_image_quality(self, image: np.ndarray) -> Dict[str, float]:
+    def analyze_image_quality(self, image: np.ndarray) -> dict[str, float]:
         """
         Analyze image quality metrics relevant to target detection.
 
@@ -114,12 +114,12 @@ class TargetDetectionDiagnostics:
     def log_detection_attempt(
         self,
         image: np.ndarray,
-        targets_found: List[Tuple[float, float]],
+        targets_found: list[tuple[float, float]],
         expected_targets: int = 3,
-        threshold_used: Optional[int] = None,
-        circularity_scores: Optional[List[float]] = None,
-        processing_time: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        threshold_used: int | None = None,
+        circularity_scores: list[float] | None = None,
+        processing_time: float | None = None,
+    ) -> dict[str, Any]:
         """
         Log detailed information about a target detection attempt.
 
@@ -193,10 +193,10 @@ class TargetDetectionDiagnostics:
     def save_detection_image(
         self,
         image: np.ndarray,
-        metadata: Dict[str, Any],
+        metadata: dict[str, Any],
         save_success: bool = True,
         save_failed: bool = True,
-    ) -> Optional[str]:
+    ) -> str | None:
         """
         Save detection image with metadata to appropriate directory.
 
@@ -240,8 +240,8 @@ class TargetDetectionDiagnostics:
     def create_annotated_image(
         self,
         image: np.ndarray,
-        targets_found: List[Tuple[float, float]],
-        metadata: Dict[str, Any],
+        targets_found: list[tuple[float, float]],
+        metadata: dict[str, Any],
     ) -> np.ndarray:
         """
         Create an annotated version of the image showing detection results.
@@ -311,7 +311,7 @@ class TargetDetectionDiagnostics:
 
         return annotated
 
-    def get_diagnostics_summary(self) -> Dict[str, int]:
+    def get_diagnostics_summary(self) -> dict[str, int]:
         """
         Get summary statistics of collected diagnostic data.
 

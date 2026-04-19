@@ -13,7 +13,7 @@ import logging
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import numpy as np
 
@@ -42,7 +42,7 @@ class TargetDetectionAnalyzer:
         self.reports_dir = self.base_path / "analysis_reports"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
 
-    def analyze_detection_logs(self, days_back: int = 30) -> Dict[str, Any]:
+    def analyze_detection_logs(self, days_back: int = 30) -> dict[str, Any]:
         """
         Analyze detection logs from the last N days.
 
@@ -83,7 +83,7 @@ class TargetDetectionAnalyzer:
 
     def _load_detection_data(
         self, subdir: str, cutoff_date: datetime
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Load detection metadata from specified subdirectory."""
         data_dir = self.base_path / subdir
         detection_data = []
@@ -110,8 +110,8 @@ class TargetDetectionAnalyzer:
         return detection_data
 
     def _generate_summary_stats(
-        self, failed_data: List[Dict], success_data: List[Dict]
-    ) -> Dict[str, Any]:
+        self, failed_data: list[dict], success_data: list[dict]
+    ) -> dict[str, Any]:
         """Generate overall summary statistics."""
         total_attempts = len(failed_data) + len(success_data)
         success_rate = len(success_data) / total_attempts if total_attempts > 0 else 0
@@ -132,7 +132,7 @@ class TargetDetectionAnalyzer:
             "devices_analyzed": sorted(all_devices),
         }
 
-    def _analyze_failure_patterns(self, failed_data: List[Dict]) -> Dict[str, Any]:
+    def _analyze_failure_patterns(self, failed_data: list[dict]) -> dict[str, Any]:
         """Analyze patterns in detection failures."""
         if not failed_data:
             return {"no_failures": True}
@@ -191,8 +191,8 @@ class TargetDetectionAnalyzer:
         }
 
     def _analyze_device_performance(
-        self, failed_data: List[Dict], success_data: List[Dict]
-    ) -> Dict[str, Any]:
+        self, failed_data: list[dict], success_data: list[dict]
+    ) -> dict[str, Any]:
         """Analyze performance by individual device."""
         device_stats = {}
 
@@ -243,8 +243,8 @@ class TargetDetectionAnalyzer:
         }
 
     def _analyze_lighting_conditions(
-        self, failed_data: List[Dict], success_data: List[Dict]
-    ) -> Dict[str, Any]:
+        self, failed_data: list[dict], success_data: list[dict]
+    ) -> dict[str, Any]:
         """Analyze lighting conditions in successful vs failed detections."""
 
         def extract_lighting_stats(data_list):
@@ -309,8 +309,8 @@ class TargetDetectionAnalyzer:
         }
 
     def _generate_recommendations(
-        self, failed_data: List[Dict], success_data: List[Dict]
-    ) -> List[str]:
+        self, failed_data: list[dict], success_data: list[dict]
+    ) -> list[str]:
         """Generate actionable recommendations based on analysis."""
         recommendations = []
 
@@ -404,7 +404,7 @@ class TargetDetectionAnalyzer:
         self.logger.info(f"Generated failure report: {report_path}")
         return str(report_path)
 
-    def cleanup_old_logs(self, days_to_keep: int = 30) -> Dict[str, int]:
+    def cleanup_old_logs(self, days_to_keep: int = 30) -> dict[str, int]:
         """
         Clean up old diagnostic logs to manage storage space.
 
@@ -442,7 +442,7 @@ class TargetDetectionAnalyzer:
 
     def export_dataset_for_training(
         self, output_dir: str, max_samples_per_class: int = 1000
-    ) -> Dict[str, int]:
+    ) -> dict[str, int]:
         """
         Export a balanced dataset for machine learning analysis.
 

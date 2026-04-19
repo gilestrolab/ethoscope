@@ -10,13 +10,8 @@ import json
 import os
 import sqlite3
 import tempfile
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Tuple
-from unittest.mock import MagicMock
-from unittest.mock import Mock
+from typing import Any, Optional
+from unittest.mock import MagicMock, Mock
 
 
 class MockDatabase:
@@ -39,7 +34,7 @@ class MockDatabase:
         self.connected = False
         return True
 
-    def execute(self, query: str, params: Optional[Tuple] = None) -> bool:
+    def execute(self, query: str, params: tuple | None = None) -> bool:
         """Mock query execution."""
         self.queries.append({"query": query, "params": params})
 
@@ -51,7 +46,7 @@ class MockDatabase:
         # Simulate other operations
         return True
 
-    def fetchone(self) -> Optional[Dict[str, Any]]:
+    def fetchone(self) -> dict[str, Any] | None:
         """Mock fetchone operation."""
         # Return mock data based on query patterns
         if self.queries:
@@ -75,7 +70,7 @@ class MockDatabase:
                     }
         return None
 
-    def fetchall(self) -> List[Dict[str, Any]]:
+    def fetchall(self) -> list[dict[str, Any]]:
         """Mock fetchall operation."""
         # Return mock data based on query patterns
         if self.queries:
@@ -125,7 +120,7 @@ class MockDatabase:
         """Mock rollback operation."""
         return True
 
-    def get_queries(self) -> List[Dict[str, Any]]:
+    def get_queries(self) -> list[dict[str, Any]]:
         """Get list of executed queries."""
         return self.queries.copy()
 
@@ -133,11 +128,11 @@ class MockDatabase:
         """Clear query history."""
         self.queries = []
 
-    def set_mock_data(self, table: str, data: List[Dict[str, Any]]):
+    def set_mock_data(self, table: str, data: list[dict[str, Any]]):
         """Set mock data for a specific table."""
         self.data[table] = data
 
-    def get_mock_data(self, table: str) -> List[Dict[str, Any]]:
+    def get_mock_data(self, table: str) -> list[dict[str, Any]]:
         """Get mock data for a specific table."""
         return self.data.get(table, [])
 
@@ -262,7 +257,6 @@ class MockSQLiteDatabase:
         )
 
         # Insert test tracking data
-        experiment_id = cursor.lastrowid
         cursor.execute(
             """
             INSERT INTO tracking_data (experiment_id, device_id, timestamp, roi_id, x, y, width, height, angle, area)

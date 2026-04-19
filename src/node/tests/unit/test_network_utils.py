@@ -6,15 +6,16 @@ used for SSH configuration setup.
 """
 
 import ipaddress
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from ethoscope_node.utils.network import get_local_ip_addresses
-from ethoscope_node.utils.network import get_primary_private_network
-from ethoscope_node.utils.network import get_private_ip_pattern
-from ethoscope_node.utils.network import is_ip_in_local_network
+from ethoscope_node.utils.network import (
+    get_local_ip_addresses,
+    get_primary_private_network,
+    get_private_ip_pattern,
+    is_ip_in_local_network,
+)
 
 
 class TestGetPrimaryPrivateNetwork:
@@ -271,7 +272,9 @@ class TestNetworkIntegration:
             pattern_parts = pattern.split(".")
             ip_parts = test_ip.split(".")
 
-            for i, (pattern_part, ip_part) in enumerate(zip(pattern_parts, ip_parts)):
+            for _i, (pattern_part, ip_part) in enumerate(
+                zip(pattern_parts, ip_parts, strict=False)
+            ):
                 if pattern_part != "*":
                     assert (
                         pattern_part == ip_part

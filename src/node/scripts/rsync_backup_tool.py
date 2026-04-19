@@ -7,11 +7,9 @@ import sys
 import time
 import traceback
 from dataclasses import asdict
-from http.server import BaseHTTPRequestHandler
-from http.server import HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from ethoscope_node.backup.helpers import GenericBackupWrapper
-from ethoscope_node.backup.helpers import UnifiedRsyncBackupClass
+from ethoscope_node.backup.helpers import GenericBackupWrapper, UnifiedRsyncBackupClass
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
 
 gbw = None  # This will be initialized later
@@ -89,7 +87,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         total_results_files = 0
         total_videos_files = 0
 
-        for device_id, device_status in status_dict.items():
+        for _device_id, device_status in status_dict.items():
             synced_info = device_status.get("synced", {})
 
             # Results data
@@ -368,7 +366,7 @@ def main():
         VIDEOS_DIR = (
             option_dict["videos_dir"] or CFG.content["folders"]["video"]["path"]
         )
-        SAFE_MODE = option_dict["safe"]
+        option_dict["safe"]
         DEBUG = option_dict["debug"]
         ETHO_TO_BACKUP = option_dict["ethoscope"]
         NODE_ADDRESS = option_dict["server"]
@@ -418,11 +416,11 @@ def main():
                 ETHO_TO_BACKUP_LIST = [int(e) for e in ETHO_TO_BACKUP.split(",")]
 
             for ethoscope in ETHO_TO_BACKUP_LIST:
-                print("Forcing unified backup for ethoscope %03d" % ethoscope)
+                print(f"Forcing unified backup for ethoscope {ethoscope:03d}")
 
                 bj = None
                 for device in gbw.find_devices():
-                    if device["name"] == ("ETHOSCOPE_%03d" % ethoscope):
+                    if device["name"] == f"ETHOSCOPE_{ethoscope:03d}":
                         # Validate device has SQLite database before attempting backup
                         # Check both old format (database_info) and new format (databases.SQLite)
                         has_sqlite = False
@@ -451,24 +449,21 @@ def main():
 
                         if not has_sqlite:
                             print(
-                                "Skipping ETHOSCOPE_%03d - no SQLite database found"
-                                % ethoscope
+                                f"Skipping ETHOSCOPE_{ethoscope:03d} - no SQLite database found"
                             )
                             print(
                                 "This device should be backed up by the MariaDB backup service instead"
                             )
                             exit(
-                                "ETHOSCOPE_%03d has no SQLite database for rsync backup"
-                                % ethoscope
+                                f"ETHOSCOPE_{ethoscope:03d} has no SQLite database for rsync backup"
                             )
 
                         print(
-                            "SQLite database validated for ETHOSCOPE_%03d - starting backup..."
-                            % ethoscope
+                            f"SQLite database validated for ETHOSCOPE_{ethoscope:03d} - starting backup..."
                         )
                         bj = gbw.initiate_backup_job(device)
                 if bj is None:
-                    exit("ETHOSCOPE_%03d is not online or not detected" % ethoscope)
+                    exit(f"ETHOSCOPE_{ethoscope:03d} is not online or not detected")
         else:
             # Start the HTTP server
             server_address = (

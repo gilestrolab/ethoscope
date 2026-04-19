@@ -7,7 +7,7 @@ with external template files, allowing users to create and modify ROI configurat
 
 import os
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ethoscope.core.roi import ROI
 from ethoscope.roi_builders.roi_builders import BaseROIBuilder
@@ -26,10 +26,10 @@ class FileBasedROIBuilder(BaseROIBuilder):
 
     def __init__(
         self,
-        template_file: Optional[str] = None,
-        template_name: Optional[str] = "sleep_monitor_20tube",
-        template_data: Optional[Dict[str, Any]] = None,
-        template_id: Optional[str] = None,
+        template_file: str | None = None,
+        template_name: str | None = "sleep_monitor_20tube",
+        template_data: dict[str, Any] | None = None,
+        template_id: str | None = None,
     ):
         """
         Initialize file-based ROI builder.
@@ -171,7 +171,7 @@ class FileBasedROIBuilder(BaseROIBuilder):
 
         return reference_points
 
-    def _validate_generated_rois(self, rois: List[ROI], camera):
+    def _validate_generated_rois(self, rois: list[ROI], camera):
         """
         Validate that generated ROIs are reasonable.
 
@@ -221,7 +221,7 @@ class FileBasedROIBuilder(BaseROIBuilder):
         if max_overlap < 1.0:
             self._check_roi_overlap(rois, max_overlap)
 
-    def _check_roi_overlap(self, rois: List[ROI], max_overlap: float):
+    def _check_roi_overlap(self, rois: list[ROI], max_overlap: float):
         """Check for excessive ROI overlap."""
 
         # Create masks for each ROI
@@ -260,7 +260,7 @@ class FileBasedROIBuilder(BaseROIBuilder):
                             stacklevel=2,
                         )
 
-    def get_template_info(self) -> Dict[str, Any]:
+    def get_template_info(self) -> dict[str, Any]:
         """
         Get information about the loaded template.
 
@@ -277,7 +277,7 @@ class FileBasedROIBuilder(BaseROIBuilder):
             "source": self.template_file or self.template_name or "inline_data",
         }
 
-    def to_legacy_params(self) -> Dict[str, Any]:
+    def to_legacy_params(self) -> dict[str, Any]:
         """
         Convert template to legacy ROI builder parameters.
 

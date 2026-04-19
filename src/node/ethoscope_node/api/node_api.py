@@ -267,7 +267,7 @@ class NodeAPI(BaseAPI):
         try:
             with socket.create_connection((host, port), timeout=timeout):
                 return "active"
-        except (ConnectionRefusedError, socket.timeout, OSError):
+        except (TimeoutError, ConnectionRefusedError, OSError):
             return "inactive"
 
     def _get_daemon_status(self):

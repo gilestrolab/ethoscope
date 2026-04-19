@@ -12,7 +12,7 @@ first crossed, then suppressed until temperature returns to normal.
 import logging
 import time
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ..utils.configuration import EthoscopeConfiguration
 
@@ -35,8 +35,8 @@ class TemperatureAlertMonitor:
 
     def __init__(
         self,
-        config: Optional[EthoscopeConfiguration] = None,
-        notification_manager: Optional[Any] = None,
+        config: EthoscopeConfiguration | None = None,
+        notification_manager: Any | None = None,
     ):
         """
         Initialize temperature alert monitor.
@@ -51,9 +51,9 @@ class TemperatureAlertMonitor:
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Track alert state per sensor: {sensor_id: AlertState}
-        self._alert_states: Dict[str, AlertState] = {}
+        self._alert_states: dict[str, AlertState] = {}
         # Track when alert was sent: {sensor_id: timestamp}
-        self._alert_timestamps: Dict[str, float] = {}
+        self._alert_timestamps: dict[str, float] = {}
 
     @property
     def notification_manager(self):
@@ -169,7 +169,7 @@ class TemperatureAlertMonitor:
         """
         return self._alert_states.get(sensor_id, AlertState.NORMAL)
 
-    def get_all_alert_states(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_alert_states(self) -> dict[str, dict[str, Any]]:
         """
         Get alert states for all monitored sensors.
 

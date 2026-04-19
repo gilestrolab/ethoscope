@@ -82,10 +82,13 @@ def test_mariadb_backup_filename(temp_config_dir):
     """Test MariaDB backup filename extraction."""
     # Mock the configuration to avoid writing to /etc/ethoscope
     from unittest.mock import Mock
+
     mock_config = Mock()
 
     # Test with new format
-    device = Ethoscope("192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config)
+    device = Ethoscope(
+        "192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config
+    )
     device._info = create_test_device_new_format()
 
     filename = device._get_backup_filename_for_db_type("MariaDB")
@@ -100,13 +103,11 @@ def test_mariadb_backup_filename(temp_config_dir):
     mock_databases_info = {
         "mariadb": {
             "exists": True,
-            "current": {
-                "backup_filename": "2024-01-01_12-00-00_test_device_001.db"
-            }
+            "current": {"backup_filename": "2024-01-01_12-00-00_test_device_001.db"},
         }
     }
 
-    with patch.object(device, 'databases_info', return_value=mock_databases_info):
+    with patch.object(device, "databases_info", return_value=mock_databases_info):
         filename = device._get_backup_filename_for_db_type("MariaDB")
         assert (
             filename == expected
@@ -117,6 +118,7 @@ def test_sqlite_backup_filename(temp_config_dir):
     """Test SQLite backup filename extraction."""
     # Mock the configuration to avoid writing to /etc/ethoscope
     from unittest.mock import Mock
+
     mock_config = Mock()
 
     # Create test device with SQLite database
@@ -130,7 +132,9 @@ def test_sqlite_backup_filename(temp_config_dir):
     }
     device_info["databases"]["MariaDB"] = {}  # Empty MariaDB
 
-    device = Ethoscope("192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config)
+    device = Ethoscope(
+        "192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config
+    )
     device._info = device_info
 
     filename = device._get_backup_filename_for_db_type("SQLite")
@@ -143,10 +147,13 @@ def test_appropriate_backup_filename(temp_config_dir):
     """Test appropriate backup filename selection."""
     # Mock the configuration to avoid writing to /etc/ethoscope
     from unittest.mock import Mock
+
     mock_config = Mock()
 
     # Test with MariaDB active
-    device = Ethoscope("192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config)
+    device = Ethoscope(
+        "192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config
+    )
     device._info = create_test_device_new_format()
 
     filename = device._get_appropriate_backup_filename()
@@ -175,9 +182,12 @@ def test_no_backup_filename_warning(temp_config_dir):
     """Test that the warning is eliminated."""
     # Mock the configuration to avoid writing to /etc/ethoscope
     from unittest.mock import Mock
+
     mock_config = Mock()
 
-    device = Ethoscope("192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config)
+    device = Ethoscope(
+        "192.168.1.10", 9000, config_dir=temp_config_dir, config=mock_config
+    )
     device._info = create_test_device_new_format()
 
     # Mock the logger to capture warnings

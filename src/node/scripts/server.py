@@ -6,7 +6,6 @@ import sys
 import tempfile
 import time
 import traceback
-from typing import Optional
 
 import bottle
 
@@ -125,8 +124,8 @@ class EthoscopeNodeServer:
         self,
         port: int = DEFAULT_PORT,
         debug: bool = False,
-        ethoscope_data_dir: Optional[str] = None,
-        config_dir: Optional[str] = None,
+        ethoscope_data_dir: str | None = None,
+        config_dir: str | None = None,
     ):
         self.port = port
         self.debug = debug
@@ -134,22 +133,22 @@ class EthoscopeNodeServer:
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Core components
-        self.config: Optional[EthoscopeConfiguration] = None
-        self.device_scanner: Optional[EthoscopeScanner] = None
-        self.sensor_scanner: Optional[SensorScanner] = None
-        self.database: Optional[ExperimentalDB] = None
-        self.tunnel_utils: Optional[TunnelUtils] = None
+        self.config: EthoscopeConfiguration | None = None
+        self.device_scanner: EthoscopeScanner | None = None
+        self.sensor_scanner: SensorScanner | None = None
+        self.database: ExperimentalDB | None = None
+        self.tunnel_utils: TunnelUtils | None = None
 
         # Paths and directories
-        self.tmp_imgs_dir: Optional[str] = None
-        self.ethoscope_data_dir: Optional[str] = ethoscope_data_dir
-        self.results_dir: Optional[str] = os.path.join(ethoscope_data_dir, "results")
-        self.sensors_dir: Optional[str] = os.path.join(ethoscope_data_dir, "sensors")
-        self.roi_templates_dir: Optional[str] = os.path.join(
+        self.tmp_imgs_dir: str | None = None
+        self.ethoscope_data_dir: str | None = ethoscope_data_dir
+        self.results_dir: str | None = os.path.join(ethoscope_data_dir, "results")
+        self.sensors_dir: str | None = os.path.join(ethoscope_data_dir, "sensors")
+        self.roi_templates_dir: str | None = os.path.join(
             ethoscope_data_dir, "roi_templates"
         )
 
-        self.config_dir: Optional[str] = config_dir
+        self.config_dir: str | None = config_dir
 
         # Set module-level defaults for configuration and database paths if custom config_dir provided
         if config_dir:

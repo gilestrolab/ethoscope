@@ -552,7 +552,7 @@ class TestNodeAPI(unittest.TestCase):
         """Test container health check returns inactive on timeout."""
         import socket as _socket
 
-        mock_conn.side_effect = _socket.timeout()
+        mock_conn.side_effect = TimeoutError()
 
         result = self.api._check_container_health("ethoscope-node-backup", 8090)
 

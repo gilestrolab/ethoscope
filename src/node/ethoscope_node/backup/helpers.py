@@ -67,17 +67,17 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Dict, Iterator, List, Optional, Tuple
 
 from ethoscope_node.backup.mysql import DBNotReadyError, MySQLdbToSQLite
 from ethoscope_node.utils.configuration import ensure_ssh_keys
 from ethoscope_node.utils.video_helpers import list_local_video_files
 
 
-def get_sqlite_table_counts(backup_path: str) -> Dict[str, int]:
+def get_sqlite_table_counts(backup_path: str) -> dict[str, int]:
     """
     Utility function to get row counts for all tables in a SQLite database file.
 
@@ -113,7 +113,7 @@ def get_sqlite_table_counts(backup_path: str) -> Dict[str, int]:
 
 
 def calculate_backup_percentage_from_table_counts(
-    remote_counts: Dict[str, int], backup_counts: Dict[str, int]
+    remote_counts: dict[str, int], backup_counts: dict[str, int]
 ) -> float:
     """
     Calculate backup percentage based on table row counts.
@@ -169,9 +169,9 @@ class BackupStatus:
     ended: int = 0
     processing: bool = False
     count: int = 0
-    synced: Dict = None
-    progress: Dict = None
-    metadata: Dict = None
+    synced: dict = None
+    progress: dict = None
+    metadata: dict = None
 
     def __post_init__(self):
         if self.synced is None:
@@ -293,7 +293,7 @@ def mark_backup_completed(backup_path: str, stats: dict = None):
 class BaseBackupClass:
     """Base class for backup operations with common functionality."""
 
-    def __init__(self, device_info: Dict, results_dir: str):
+    def __init__(self, device_info: dict, results_dir: str):
         self._device_info = device_info
         self._device_id = device_info.get("id", "unknown")
         self._device_name = device_info.get("name", "unknown")
@@ -311,7 +311,7 @@ class BaseBackupClass:
         """Abstract method to be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement backup method")
 
-    def check_sync_status(self) -> Dict:
+    def check_sync_status(self) -> dict:
         """Abstract method to be implemented by subclasses."""
         raise NotImplementedError("Subclasses must implement check_sync_status method")
 
@@ -329,7 +329,7 @@ class BackupClass(BaseBackupClass):
     DB_CONNECTION_TIMEOUT = 30
     DB_OPERATION_TIMEOUT = 120
 
-    def __init__(self, device_info: Dict, results_dir: str):
+    def __init__(self, device_info: dict, results_dir: str):
         super().__init__(device_info, results_dir)
         self._database_ip = os.path.basename(self._ip)
 
@@ -509,7 +509,7 @@ class BackupClass(BaseBackupClass):
 
     def _perform_database_backup(
         self, backup_path: str, db_name: str
-    ) -> Tuple[bool, dict]:
+    ) -> tuple[bool, dict]:
         """
         Perform the actual database backup operation using MySQLdbToSQLite's
         built-in incremental max(id) approach to prevent duplicates.
@@ -657,7 +657,7 @@ class BackupClass(BaseBackupClass):
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             return False  # Return False on error to avoid false positives
 
-    def get_sqlite_table_counts(self, backup_path: str) -> Dict[str, int]:
+    def get_sqlite_table_counts(self, backup_path: str) -> dict[str, int]:
         """
         Get row counts for all tables in a SQLite database file.
 
@@ -695,7 +695,7 @@ class BackupClass(BaseBackupClass):
 
         return table_counts
 
-    def check_sync_status(self) -> Dict:
+    def check_sync_status(self) -> dict:
         """Check synchronization status of the database backup."""
         # TODO: Implement database sync status checking
         return {"tracking_db": {}}
@@ -707,7 +707,7 @@ class VideoBackupClass(BaseBackupClass):
     DEFAULT_PORT = 9000
     REQUEST_TIMEOUT = 30
 
-    def __init__(self, device_info: Dict, results_dir: str, port: int = None):
+    def __init__(self, device_info: dict, results_dir: str, port: int = None):
         super().__init__(device_info, results_dir)
         self._port = port or self.DEFAULT_PORT
         self._device_url = f"http://{self._ip}:{self._port}"
@@ -875,7 +875,7 @@ class VideoBackupClass(BaseBackupClass):
             yield self._yield_status("error", error_msg)
             return False
 
-    def get_video_list_json(self) -> Optional[Dict]:
+    def get_video_list_json(self) -> dict | None:
         """
         Get video list in JSON format with metadata from ethoscope device.
 
@@ -944,7 +944,7 @@ class VideoBackupClass(BaseBackupClass):
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             return None
 
-    def check_sync_status(self) -> Optional[Dict[str, Dict[str, int]]]:
+    def check_sync_status(self) -> dict[str, dict[str, int]] | None:
         """
         Compare sync status between remote and local video files (simple file presence check).
         With rsync, detailed integrity checking is handled by rsync itself.
@@ -984,7 +984,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
 
     def __init__(
         self,
-        device_info: Dict,
+        device_info: dict,
         results_dir: str,
         videos_dir: str = None,
         backup_results: bool = True,
@@ -1470,7 +1470,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             # Return True to continue with backup anyway - partial backup better than none
             return True
 
-    def check_sync_status(self) -> Optional[Dict]:
+    def check_sync_status(self) -> dict | None:
         """
         Check sync status for both results and videos directories.
 
@@ -1500,7 +1500,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             self._logger.error(f"Error checking unified sync status: {e}")
             return None
 
-    def _check_directory_sync_status(self, local_dir: str, dir_type: str) -> Dict:
+    def _check_directory_sync_status(self, local_dir: str, dir_type: str) -> dict:
         """
         Check sync status for a specific directory type.
 
@@ -1629,11 +1629,11 @@ class GenericBackupWrapper(threading.Thread):
         self._stop_event = threading.Event()
 
         # Status tracking
-        self.backup_status: Dict[str, BackupStatus] = {}
+        self.backup_status: dict[str, BackupStatus] = {}
         self.last_backup = ""
 
         # Backup instances for detailed status retrieval
-        self._backup_instances: Dict[str, UnifiedRsyncBackupClass] = {}
+        self._backup_instances: dict[str, UnifiedRsyncBackupClass] = {}
 
         # Device discovery tracking
         self._last_device_count = 0
@@ -1653,7 +1653,7 @@ class GenericBackupWrapper(threading.Thread):
         # Ensure logs go to root logger as well
         self._logger.propagate = True
 
-    def find_devices(self, only_active: bool = True) -> List[Dict]:
+    def find_devices(self, only_active: bool = True) -> list[dict]:
         """
         Find available ethoscope devices.
 
@@ -1718,7 +1718,7 @@ class GenericBackupWrapper(threading.Thread):
         self._logger.info(f"Returning all {len(all_devices)} devices")
         return all_devices
 
-    def _get_devices_from_node(self) -> Dict:
+    def _get_devices_from_node(self) -> dict:
         """Get devices from node server."""
         url = f"http://{self._node_address}/devices"
 
@@ -1760,7 +1760,7 @@ class GenericBackupWrapper(threading.Thread):
             self._logger.error("Full traceback:", exc_info=True)
             raise
 
-    def _get_devices_via_scanner(self) -> Dict:
+    def _get_devices_via_scanner(self) -> dict:
         """Get devices via direct scanning as fallback."""
         self._logger.info("Using EthoscopeScanner as fallback")
 
@@ -1801,7 +1801,7 @@ class GenericBackupWrapper(threading.Thread):
             except Exception as cleanup_error:
                 self._logger.error(f"Error during scanner cleanup: {cleanup_error}")
 
-    def initiate_backup_job(self, device_info: Dict) -> bool:
+    def initiate_backup_job(self, device_info: dict) -> bool:
         """
         Initiate backup job for a specific device with improved error handling.
 
@@ -1879,7 +1879,7 @@ class GenericBackupWrapper(threading.Thread):
             self._handle_backup_failure(device_id, str(e))
             return False
 
-    def _initialize_backup_status(self, device_id: str, device_info: Dict):
+    def _initialize_backup_status(self, device_id: str, device_info: dict):
         """Initialize backup status for a device using new comprehensive device data."""
         with self._lock:
             if device_id not in self.backup_status:
@@ -2336,7 +2336,7 @@ class GenericBackupWrapper(threading.Thread):
         self._update_last_backup_time()
         self._logger.info("=== Backup cycle completed ====")
 
-    def _discover_devices_safely(self) -> List[Dict]:
+    def _discover_devices_safely(self) -> list[dict]:
         """Discover devices with multiple fallback mechanisms and error isolation."""
         max_discovery_attempts = 3
 
@@ -2373,8 +2373,8 @@ class GenericBackupWrapper(threading.Thread):
         return []
 
     def _submit_backup_jobs_safely(
-        self, executor: ThreadPoolExecutor, active_devices: List[Dict]
-    ) -> List[Tuple]:
+        self, executor: ThreadPoolExecutor, active_devices: list[dict]
+    ) -> list[tuple]:
         """Submit backup jobs with comprehensive error isolation."""
         self._logger.info("Submitting backup jobs to thread pool...")
         futures = []
@@ -2425,7 +2425,7 @@ class GenericBackupWrapper(threading.Thread):
         )
         return futures
 
-    def _validate_device_for_backup(self, device: Dict) -> bool:
+    def _validate_device_for_backup(self, device: dict) -> bool:
         """Validate that device has required information for backup."""
         required_fields = ["id", "name", "ip"]
 
@@ -2438,7 +2438,7 @@ class GenericBackupWrapper(threading.Thread):
 
         return True
 
-    def _execute_backup_job_safely(self, device: Dict) -> bool:
+    def _execute_backup_job_safely(self, device: dict) -> bool:
         """Execute backup job with comprehensive fault isolation and error recovery."""
         device_id = device.get("id", "unknown")
         device_name = device.get("name", "unknown")
@@ -2472,7 +2472,7 @@ class GenericBackupWrapper(threading.Thread):
             # Never let individual job failures propagate up
             return False
 
-    def _wait_for_backup_completion_safely(self, futures: List[Tuple]):
+    def _wait_for_backup_completion_safely(self, futures: list[tuple]):
         """Wait for backup job completion with comprehensive fault isolation."""
         if not futures:
             self._logger.info("No backup jobs to wait for")
@@ -2616,7 +2616,7 @@ class GenericBackupWrapper(threading.Thread):
         """Check if the backup wrapper is running."""
         return self.is_alive() and not self._stop_event.is_set()
 
-    def get_health_status(self) -> Dict:
+    def get_health_status(self) -> dict:
         """Get comprehensive health status of the backup wrapper."""
         with self._lock:
             current_time = time.time()
@@ -2676,7 +2676,7 @@ class GenericBackupWrapper(threading.Thread):
                 "total_tracked_devices": len(self.backup_status),
             }
 
-    def get_statistics(self) -> Dict:
+    def get_statistics(self) -> dict:
         """
         Get backup statistics.
 

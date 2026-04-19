@@ -6,7 +6,7 @@ import shutil
 import socket
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # Configuration validation constants
 USERS_KEYS = [
@@ -240,7 +240,7 @@ class EthoscopeConfiguration:
             except ConfigurationError as e:
                 self._logger.warning(f"Migration warning: {e}")
 
-    def _validate_configuration(self, config_data: Dict[str, Any]) -> None:
+    def _validate_configuration(self, config_data: dict[str, Any]) -> None:
         """
         Validate configuration data structure.
 
@@ -284,7 +284,7 @@ class EthoscopeConfiguration:
 
         # Users are now stored in database, no validation needed for config file
 
-    def _merge_with_defaults(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_with_defaults(self, config_data: dict[str, Any]) -> dict[str, Any]:
         """
         Merge loaded configuration with defaults.
 
@@ -298,7 +298,7 @@ class EthoscopeConfiguration:
 
         merged = copy.deepcopy(self.DEFAULT_SETTINGS)
 
-        def deep_merge(target: Dict, source: Dict) -> Dict:
+        def deep_merge(target: dict, source: dict) -> dict:
             """Recursively merge dictionaries."""
             for key, value in source.items():
                 if (
@@ -334,7 +334,7 @@ class EthoscopeConfiguration:
         return merged
 
     @property
-    def content(self) -> Dict[str, Any]:
+    def content(self) -> dict[str, Any]:
         """Get configuration content."""
         return self._settings
 
@@ -367,7 +367,7 @@ class EthoscopeConfiguration:
                 f"Failed to write configuration file {self._config_file}: {e}"
             ) from e
 
-    def load(self) -> Dict[str, Any]:
+    def load(self) -> dict[str, Any]:
         """
         Load configuration from file.
 
@@ -437,11 +437,11 @@ class EthoscopeConfiguration:
         self._settings[section] = {}
         self._logger.info(f"Added new section: {section}")
 
-    def list_sections(self) -> List[str]:
+    def list_sections(self) -> list[str]:
         """Get list of configuration sections."""
         return list(self._settings.keys())
 
-    def list_subsection(self, section: str) -> List[str]:
+    def list_subsection(self, section: str) -> list[str]:
         """
         Get list of subsection keys.
 
@@ -455,7 +455,7 @@ class EthoscopeConfiguration:
             return []
         return list(self._settings[section].keys())
 
-    def add_key(self, section: str, obj: Dict[str, Any]) -> None:
+    def add_key(self, section: str, obj: dict[str, Any]) -> None:
         """
         Add key-value pairs to a section.
 
@@ -471,7 +471,7 @@ class EthoscopeConfiguration:
             f"Updated section '{section}' with new keys: {list(obj.keys())}"
         )
 
-    def add_user(self, userdata: Dict[str, Any]) -> Dict[str, Any]:
+    def add_user(self, userdata: dict[str, Any]) -> dict[str, Any]:
         """
         Add or update a user using database storage.
 
@@ -553,7 +553,7 @@ class EthoscopeConfiguration:
             self._logger.error(error_msg)
             raise ValueError(error_msg) from e
 
-    def add_incubator(self, incubatordata: Dict[str, Any]) -> Dict[str, Any]:
+    def add_incubator(self, incubatordata: dict[str, Any]) -> dict[str, Any]:
         """
         Add a new incubator using database storage.
 
@@ -608,7 +608,7 @@ class EthoscopeConfiguration:
             self._logger.error(error_msg)
             raise ValueError(error_msg) from e
 
-    def get_all_sensors(self) -> Dict[str, Any]:
+    def get_all_sensors(self) -> dict[str, Any]:
         """
         Get all configured sensors.
 
@@ -617,7 +617,7 @@ class EthoscopeConfiguration:
         """
         return self._settings.get("sensors", {})
 
-    def get_sensor(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_sensor(self, name: str) -> dict[str, Any] | None:
         """
         Get a single sensor's configuration.
 
@@ -629,7 +629,7 @@ class EthoscopeConfiguration:
         """
         return self._settings.get("sensors", {}).get(name)
 
-    def add_sensor(self, sensordata: Dict[str, Any]) -> Dict[str, Any]:
+    def add_sensor(self, sensordata: dict[str, Any]) -> dict[str, Any]:
         """
         Add a new sensor to configuration.
 
@@ -663,8 +663,8 @@ class EthoscopeConfiguration:
             raise ValueError(error_msg) from e
 
     def update_sensor(
-        self, original_name: str, sensordata: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, original_name: str, sensordata: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Update an existing sensor in configuration.
 
@@ -703,7 +703,7 @@ class EthoscopeConfiguration:
             self._logger.error(error_msg)
             raise ValueError(error_msg) from e
 
-    def delete_sensor(self, name: str) -> Dict[str, Any]:
+    def delete_sensor(self, name: str) -> dict[str, Any]:
         """
         Remove a sensor from configuration.
 
@@ -733,7 +733,7 @@ class EthoscopeConfiguration:
             self._logger.error(error_msg)
             raise ValueError(error_msg) from e
 
-    def get_custom(self, name: Optional[str] = None) -> Any:
+    def get_custom(self, name: str | None = None) -> Any:
         """
         Get custom configuration value(s).
 
@@ -751,7 +751,7 @@ class EthoscopeConfiguration:
             return custom_section.get(name)
 
     # Keep legacy method name for compatibility
-    def custom(self, name: Optional[str] = None) -> Any:
+    def custom(self, name: str | None = None) -> Any:
         """Legacy method name for get_custom."""
         return self.get_custom(name)
 
@@ -799,7 +799,7 @@ class EthoscopeConfiguration:
             self._logger.error(f"Error deactivating user '{username}': {e}")
             return False
 
-    def get_folder_path(self, folder_name: str) -> Optional[str]:
+    def get_folder_path(self, folder_name: str) -> str | None:
         """
         Get path for a specific folder.
 
@@ -813,7 +813,7 @@ class EthoscopeConfiguration:
         folder_config = folders.get(folder_name, {})
         return folder_config.get("path")
 
-    def reload(self) -> Dict[str, Any]:
+    def reload(self) -> dict[str, Any]:
         """
         Reload configuration from file.
 
@@ -877,7 +877,7 @@ class EthoscopeConfiguration:
             # If we can't determine, assume setup is required
             return True
 
-    def get_setup_status(self) -> Dict[str, Any]:
+    def get_setup_status(self) -> dict[str, Any]:
         """
         Get detailed setup status information.
 
@@ -1019,7 +1019,7 @@ class EthoscopeConfiguration:
 
         return node_id.lower()
 
-    def update_tunnel_config(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+    def update_tunnel_config(self, config_data: dict[str, Any]) -> dict[str, Any]:
         """
         Update tunnel configuration.
 
@@ -1064,7 +1064,7 @@ class EthoscopeConfiguration:
 
         return self._settings["tunnel"]
 
-    def get_tunnel_config(self) -> Dict[str, Any]:
+    def get_tunnel_config(self) -> dict[str, Any]:
         """
         Get current tunnel configuration with computed node ID and domain.
 
@@ -1100,8 +1100,8 @@ class EthoscopeConfiguration:
         return tunnel_config
 
     def update_authentication_config(
-        self, config_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, config_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Update authentication configuration.
 
@@ -1135,7 +1135,7 @@ class EthoscopeConfiguration:
 
         return self._settings["authentication"]
 
-    def get_authentication_config(self) -> Dict[str, Any]:
+    def get_authentication_config(self) -> dict[str, Any]:
         """
         Get current authentication configuration.
 
@@ -1238,7 +1238,7 @@ class EthoscopeConfiguration:
         )
         return device_options.get("enable_mysql_result_writer", False)
 
-    def get_device_options(self) -> Dict[str, Any]:
+    def get_device_options(self) -> dict[str, Any]:
         """
         Get all device options configuration.
 
@@ -1249,7 +1249,7 @@ class EthoscopeConfiguration:
             "device_options", self.DEFAULT_SETTINGS["device_options"]
         ).copy()
 
-    def update_device_options(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+    def update_device_options(self, config_data: dict[str, Any]) -> dict[str, Any]:
         """
         Update device options configuration.
 
@@ -1278,7 +1278,7 @@ class EthoscopeConfiguration:
 
         return self._settings["device_options"]
 
-    def get_temperature_alert_config(self) -> Dict[str, Any]:
+    def get_temperature_alert_config(self) -> dict[str, Any]:
         """
         Get temperature alert configuration.
 
@@ -1296,8 +1296,8 @@ class EthoscopeConfiguration:
         }
 
     def update_temperature_alert_config(
-        self, config_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, config_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Update temperature alert configuration.
 
@@ -1404,7 +1404,7 @@ Host {ip_pattern} ethoscope*
         logger.error(f"Failed to setup system SSH config: {e}")
 
 
-def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> Tuple[str, str]:
+def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> tuple[str, str]:
     """
     Ensure SSH keys exist for ethoscope node authentication.
 

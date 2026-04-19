@@ -324,7 +324,7 @@ class TestBaseDevice:
         """Test JSON fetching with timeout."""
         device = BaseDevice("192.168.1.100")
 
-        mock_urlopen.side_effect = socket.timeout("Connection timeout")
+        mock_urlopen.side_effect = TimeoutError("Connection timeout")
 
         with pytest.raises(NetworkError, match="Timeout"):
             device._get_json("http://192.168.1.100/id")

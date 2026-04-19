@@ -13,8 +13,10 @@ import cv2
 import numpy as np
 
 from ethoscope.utils.img_proc import merge_blobs
-from ethoscope.utils.video import ensure_video_directory_structure, list_local_video_files
-
+from ethoscope.utils.video import (
+    ensure_video_directory_structure,
+    list_local_video_files,
+)
 
 # ===========================================================================
 # merge_blobs

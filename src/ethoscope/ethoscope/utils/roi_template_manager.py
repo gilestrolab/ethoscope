@@ -9,7 +9,7 @@ ROI builders to template format.
 import json
 import os
 import warnings
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from ethoscope.roi_builders.template import ROITemplate, ROITemplateValidationError
 
@@ -21,8 +21,8 @@ class ROITemplateManager:
 
     def __init__(
         self,
-        builtin_templates_dir: Optional[str] = None,
-        custom_templates_dir: Optional[str] = None,
+        builtin_templates_dir: str | None = None,
+        custom_templates_dir: str | None = None,
     ):
         """
         Initialize template manager with separate builtin and custom directories.
@@ -67,7 +67,7 @@ class ROITemplateManager:
             )
             os.makedirs(self.custom_dir, exist_ok=True)
 
-    def list_templates(self, include_custom: bool = True) -> List[Dict[str, Any]]:
+    def list_templates(self, include_custom: bool = True) -> list[dict[str, Any]]:
         """
         List all available templates.
 
@@ -88,7 +88,7 @@ class ROITemplateManager:
 
         return sorted(templates, key=lambda x: x["name"])
 
-    def _scan_directory(self, directory: str, source_type: str) -> List[Dict[str, Any]]:
+    def _scan_directory(self, directory: str, source_type: str) -> list[dict[str, Any]]:
         """Scan directory for template files."""
         templates = []
 
@@ -183,7 +183,7 @@ class ROITemplateManager:
         custom_path = os.path.join(self.custom_dir, f"{name}.json")
         return os.path.exists(custom_path)
 
-    def _find_template_file(self, name: str) -> Optional[str]:
+    def _find_template_file(self, name: str) -> str | None:
         """Find template file by name or filename. Checks builtin first, then custom."""
         # Try exact filename match first
         for directory in [self.builtin_dir, self.custom_dir]:
@@ -268,7 +268,7 @@ class ROITemplateManager:
 
         raise FileNotFoundError(f"Template with ID '{template_id}' not found")
 
-    def validate_template(self, template_data: Union[Dict, str]) -> bool:
+    def validate_template(self, template_data: dict | str) -> bool:
         """
         Validate template data or file.
 
@@ -291,7 +291,7 @@ class ROITemplateManager:
             raise ROITemplateValidationError(f"Template validation failed: {e}") from e
 
     def save_template(
-        self, name: str, template_data: Dict[str, Any], template_type: str = "custom"
+        self, name: str, template_data: dict[str, Any], template_type: str = "custom"
     ) -> str:
         """
         Save template to appropriate directory.
@@ -329,7 +329,7 @@ class ROITemplateManager:
 
         return filepath
 
-    def delete_template(self, name: str, template_type: Optional[str] = None) -> bool:
+    def delete_template(self, name: str, template_type: str | None = None) -> bool:
         """
         Delete template by name.
 
@@ -355,7 +355,7 @@ class ROITemplateManager:
         return True
 
 
-def convert_legacy_to_template(legacy_builder_class, **legacy_params) -> Dict[str, Any]:
+def convert_legacy_to_template(legacy_builder_class, **legacy_params) -> dict[str, Any]:
     """
     Convert legacy ROI builder class and parameters to template format.
 

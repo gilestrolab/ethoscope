@@ -82,27 +82,27 @@ def scan_one_device(ip, timeout=2, port=8888, page="id"):
     If the url could not be reached/parsed, (None,None) is returned
     """
 
-    url = "%s:%i/%s" % (ip, port, page)
+    url = f"{ip}:{port}/{page}"
     try:
         req = urllib.request.Request(url)
         f = urllib.request.urlopen(req, timeout=timeout)
         message = f.read()
 
         if not message:
-            logging.error("URL error whist scanning url: %s. No message back." % url)
+            logging.error(f"URL error whist scanning url: {url}. No message back.")
             raise urllib.error.URLError("No message back")
         try:
             resp = json.loads(message)
             return (resp["id"], ip)
         except ValueError:
-            logging.error("Could not parse response from %s as JSON object" % url)
+            logging.error(f"Could not parse response from {url} as JSON object")
 
     except urllib.error.URLError:
         pass
         # logging.error("URL error whist scanning url: %s. Server down?" % url )
 
     except Exception as e:
-        logging.error("Unexpected error whilst scanning url: %s" % url)
+        logging.error(f"Unexpected error whilst scanning url: {url}")
         raise e
 
     return None, ip
@@ -137,7 +137,7 @@ def update_dev_map_wrapped(
         url=request_url, data=data, headers={"Content-Type": "application/json"}
     )
 
-    logging.info("requesting %s" % request_url)
+    logging.info(f"requesting {request_url}")
 
     try:
         f = urllib.request.urlopen(req, timeout=10)
@@ -148,7 +148,7 @@ def update_dev_map_wrapped(
 
             if id not in devices_map:
                 logging.warning(
-                    "Device %s is not in device map. Rescanning subnet..." % id
+                    f"Device {id} is not in device map. Rescanning subnet..."
                 )
                 generate_new_device_map(result_main_dir=result_main_dir)
             try:
@@ -156,8 +156,8 @@ def update_dev_map_wrapped(
                 return data
 
             except KeyError as e:
-                logging.error("Device %s is not detected" % id)
-                raise KeyError("Device %s is not detected" % id) from e
+                logging.error(f"Device {id} is not detected")
+                raise KeyError(f"Device {id} is not detected") from e
 
     except http.client.BadStatusLine as e:
         logging.error("BadlineSatus, most probably due to update device and auto-reset")
@@ -192,7 +192,7 @@ def receive_device_IPs():
         js = json.load(f)
         for key in js:
             if js[key]["status"] != "offline" and "ip" in js[key]:
-                devices.append("http://%s" % js[key]["ip"])
+                devices.append("http://{}".format(js[key]["ip"]))
         # devices = [ "http://" + js[key]['ip'] for key in js.keys() if js[key]['status'] != "offline" ]
     except Exception:
         logging.error(
@@ -232,9 +232,7 @@ def generate_new_device_map():
         logging.warning("No device detected")
         return devices_map
 
-    logging.info(
-        "Detected %i devices:\n%s" % (len(devices_map), str(list(devices_map.keys())))
-    )
+    logging.info(f"Detected {len(devices_map)} devices:\n{list(devices_map.keys())}")
 
     # We can use a with statement to ensure threads are cleaned up promptly
     with futures.ThreadPoolExecutor(max_workers=128) as executor:
@@ -252,11 +250,11 @@ def generate_new_device_map():
                 if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
                     devices_map[id]["status"] = "Unreachable"
                     logging.warning(
-                        "Device %s is unreachable (timeout/network error)" % id
+                        f"Device {id} is unreachable (timeout/network error)"
                     )
                 else:
                     devices_map[id]["status"] = "Software broken"
-                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(f"Could not get data from device {id} :")
                     logging.error(traceback.format_exc())
 
     # Adds the active_branch to devices_,map
@@ -282,10 +280,10 @@ def generate_new_device_map():
                 if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
                     devices_map[id]["status"] = "Unreachable"
                     logging.warning(
-                        "Device %s is unreachable (timeout/network error)" % id
+                        f"Device {id} is unreachable (timeout/network error)"
                     )
                 else:
-                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(f"Could not get data from device {id} :")
                     logging.error(traceback.format_exc())
 
     # Adds the check_update to devices_,map
@@ -311,10 +309,10 @@ def generate_new_device_map():
                 if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
                     devices_map[id]["status"] = "Unreachable"
                     logging.warning(
-                        "Device %s is unreachable (timeout/network error)" % id
+                        f"Device {id} is unreachable (timeout/network error)"
                     )
                 else:
-                    logging.error("Could not get data from device %s :" % id)
+                    logging.error(f"Could not get data from device {id} :")
                     logging.error(traceback.format_exc())
 
     return devices_map
@@ -338,7 +336,7 @@ def updates_api_wrapper(
         url=request_url, data=data, headers={"Content-Type": "application/json"}
     )
 
-    logging.info("requesting %s" % request_url)
+    logging.info(f"requesting {request_url}")
 
     try:
         f = urllib.request.urlopen(req, timeout=timeout)

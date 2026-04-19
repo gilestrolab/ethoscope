@@ -93,7 +93,7 @@ def home():
             recent_errors = 0
             error_types = {}
 
-            for device_id, status in gbw.backup_status.items():
+            for _device_id, status in gbw.backup_status.items():
                 if hasattr(status, "status") and hasattr(status, "ended"):
                     if (
                         status.status == "error"

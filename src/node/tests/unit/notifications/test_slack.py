@@ -123,22 +123,22 @@ class TestSlackNotificationService:
         """Test Slack configuration retrieval for webhook method."""
         config = slack_service_webhook._get_slack_config()
 
-        assert config["enabled"] == True
+        assert config["enabled"]
         assert (
             config["webhook_url"]
             == "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
         )
         assert config["channel"] == "#alerts"
-        assert config["use_webhook"] == True
+        assert config["use_webhook"]
 
     def test_get_slack_config_bot_token(self, slack_service_bot_token):
         """Test Slack configuration retrieval for bot token method."""
         config = slack_service_bot_token._get_slack_config()
 
-        assert config["enabled"] == True
+        assert config["enabled"]
         assert config["bot_token"] == "fake_bot_token_for_testing_only"
         assert config["channel"] == "#alerts"
-        assert config["use_webhook"] == False
+        assert not config["use_webhook"]
 
     def test_get_alert_config(self, slack_service_webhook):
         """Test alert configuration retrieval."""
@@ -152,7 +152,7 @@ class TestSlackNotificationService:
             "device_001", "device_stopped"
         )
 
-        assert result == True
+        assert result
         assert "device_001:device_stopped" in slack_service_webhook._last_alert_times
 
     def test_should_send_alert_cooldown_active(self, slack_service_webhook):
@@ -166,7 +166,7 @@ class TestSlackNotificationService:
         # Try to send again immediately - should be blocked
         result = slack_service_webhook._should_send_alert(device_id, alert_type)
 
-        assert result == False
+        assert not result
 
     def test_should_send_alert_cooldown_expired(self, slack_service_webhook):
         """Test that alert should be sent after cooldown expires."""
@@ -184,7 +184,7 @@ class TestSlackNotificationService:
         # Should be allowed now
         result = slack_service_webhook._should_send_alert(device_id, alert_type)
 
-        assert result == True
+        assert result
 
     def test_should_send_alert_with_run_id(self, slack_service_webhook, mock_db):
         """Test alert with run_id uses database check."""
@@ -194,7 +194,7 @@ class TestSlackNotificationService:
             "device_001", "device_stopped", "run123"
         )
 
-        assert result == True
+        assert result
         mock_db.hasAlertBeenSent.assert_called_once_with(
             "device_001", "device_stopped", "run123"
         )
@@ -209,7 +209,7 @@ class TestSlackNotificationService:
             "device_001", "device_stopped", "run123"
         )
 
-        assert result == False
+        assert not result
         mock_db.hasAlertBeenSent.assert_called_once_with(
             "device_001", "device_stopped", "run123"
         )
@@ -227,7 +227,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_webhook._send_via_webhook(blocks, "Test fallback")
 
-        assert result == True
+        assert result
         mock_post.assert_called_once()
 
         # Verify the payload structure
@@ -252,7 +252,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_webhook._send_via_webhook(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
         mock_post.assert_called_once()
 
     @patch("requests.post")
@@ -265,7 +265,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_webhook._send_via_webhook(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
 
     @patch("requests.post")
     def test_send_via_bot_token_success(self, mock_post, slack_service_bot_token):
@@ -280,7 +280,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_bot_token._send_via_bot_token(blocks, "Test fallback")
 
-        assert result == True
+        assert result
         mock_post.assert_called_once()
 
         # Verify the API call
@@ -307,7 +307,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_bot_token._send_via_bot_token(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
 
     def test_send_message_disabled(self, slack_service_disabled):
         """Test that disabled service doesn't send messages."""
@@ -316,7 +316,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_disabled._send_message(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
     @patch(
@@ -350,7 +350,7 @@ class TestSlackNotificationService:
             last_seen=datetime.datetime.now(),
         )
 
-        assert result == True
+        assert result
         mock_analyze.assert_called_once_with("device_001")
         mock_get_logs.assert_called_once_with("device_001", max_lines=10)
         mock_send.assert_called_once()
@@ -374,7 +374,7 @@ class TestSlackNotificationService:
             run_id="run123",
             last_seen=datetime.datetime.now(),
         )
-        assert result1 == True
+        assert result1
 
         # Second alert immediately should be blocked
         result2 = slack_service_webhook.send_device_stopped_alert(
@@ -383,7 +383,7 @@ class TestSlackNotificationService:
             run_id="run123",
             last_seen=datetime.datetime.now(),
         )
-        assert result2 == False
+        assert not result2
 
         # Should only be called once due to cooldown
         assert mock_send.call_count == 1
@@ -400,7 +400,7 @@ class TestSlackNotificationService:
             available_space="2.1 GB",
         )
 
-        assert result == True
+        assert result
         mock_send.assert_called_once()
 
         # Verify the blocks structure for storage warning
@@ -426,7 +426,7 @@ class TestSlackNotificationService:
             device_id="device_001", device_name="Test Device", last_seen=last_seen
         )
 
-        assert result == True
+        assert result
         mock_send.assert_called_once()
 
         # Verify the blocks structure for unreachable alert
@@ -489,9 +489,9 @@ class TestSlackNotificationService:
 
         result = slack_service_webhook.test_slack_configuration()
 
-        assert result["success"] == True
+        assert result["success"]
         assert result["method"] == "webhook"
-        assert result["webhook_configured"] == True
+        assert result["webhook_configured"]
         assert "Test message sent successfully" in result["message"]
         mock_send.assert_called_once()
 
@@ -504,7 +504,7 @@ class TestSlackNotificationService:
 
         result = slack_service_bot_token.test_slack_configuration()
 
-        assert result["success"] == True
+        assert result["success"]
         assert result["method"] == "bot_token"
         assert result["channel"] == "#alerts"
         assert "Test message sent successfully" in result["message"]
@@ -514,7 +514,7 @@ class TestSlackNotificationService:
         """Test Slack configuration test when disabled."""
         result = slack_service_disabled.test_slack_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "disabled in configuration" in result["error"]
 
     def test_test_slack_configuration_missing_webhook_url(
@@ -526,7 +526,7 @@ class TestSlackNotificationService:
 
         result = service.test_slack_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "webhook URL not configured" in result["error"]
 
     def test_test_slack_configuration_missing_bot_token(
@@ -538,7 +538,7 @@ class TestSlackNotificationService:
 
         result = service.test_slack_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "bot token not configured" in result["error"]
 
     def test_test_slack_configuration_missing_channel(
@@ -550,7 +550,7 @@ class TestSlackNotificationService:
 
         result = service.test_slack_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "channel not configured" in result["error"]
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
@@ -562,7 +562,7 @@ class TestSlackNotificationService:
 
         result = slack_service_webhook.test_slack_configuration()
 
-        assert result["success"] == False
+        assert not result["success"]
         assert "Failed to send test message" in result["error"]
 
     def test_alert_with_exception_handling(self, slack_service_webhook):
@@ -579,7 +579,7 @@ class TestSlackNotificationService:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == False
+            assert not result
 
     @patch("requests.post")
     def test_send_via_webhook_missing_url(
@@ -594,7 +594,7 @@ class TestSlackNotificationService:
         ]
         result = service._send_via_webhook(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
         mock_post.assert_not_called()
 
     @patch("requests.post")
@@ -609,7 +609,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_webhook._send_via_webhook(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
 
     @patch("requests.post")
     def test_send_via_bot_token_missing_token(
@@ -624,7 +624,7 @@ class TestSlackNotificationService:
         ]
         result = service._send_via_bot_token(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
         mock_post.assert_not_called()
 
     @patch("requests.post")
@@ -641,7 +641,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_bot_token._send_via_bot_token(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
 
     @patch("requests.post")
     def test_send_via_bot_token_generic_exception(
@@ -655,7 +655,7 @@ class TestSlackNotificationService:
         ]
         result = slack_service_bot_token._send_via_bot_token(blocks, "Test fallback")
 
-        assert result == False
+        assert not result
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
     @patch(
@@ -678,7 +678,7 @@ class TestSlackNotificationService:
             last_seen=datetime.datetime.now(),
         )
 
-        assert result == False
+        assert not result
         mock_analyze.assert_called_once_with("device_001")
         mock_send.assert_not_called()
 
@@ -710,7 +710,7 @@ class TestSlackNotificationService:
         )
 
         # Should still succeed even if DB logging fails
-        assert result == True
+        assert result
         mock_send.assert_called_once()
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
@@ -727,7 +727,7 @@ class TestSlackNotificationService:
             available_space="2.1 GB",
         )
 
-        assert result == False
+        assert not result
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
     def test_send_device_unreachable_alert_exception(
@@ -742,7 +742,7 @@ class TestSlackNotificationService:
             last_seen=datetime.datetime.now(),
         )
 
-        assert result == False
+        assert not result
 
     def test_test_slack_configuration_exception(self, slack_service_webhook):
         """Test Slack configuration test with exception."""
@@ -751,7 +751,7 @@ class TestSlackNotificationService:
 
             result = slack_service_webhook.test_slack_configuration()
 
-            assert result["success"] == False
+            assert not result["success"]
             assert "Exception during test" in result["error"]
 
     def test_send_message_via_webhook_path(self, slack_service_webhook):
@@ -764,7 +764,7 @@ class TestSlackNotificationService:
         ) as mock_webhook:
             result = slack_service_webhook._send_message(blocks, "Test")
 
-            assert result == True
+            assert result
             mock_webhook.assert_called_once_with(blocks, "Test")
 
     def test_send_message_via_bot_token_path(self, slack_service_bot_token):
@@ -777,5 +777,5 @@ class TestSlackNotificationService:
         ) as mock_bot_token:
             result = slack_service_bot_token._send_message(blocks, "Test")
 
-            assert result == True
+            assert result
             mock_bot_token.assert_called_once_with(blocks, "Test")

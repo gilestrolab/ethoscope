@@ -9,7 +9,7 @@ import urllib.request
 from dataclasses import dataclass
 from functools import wraps
 from threading import RLock, Thread
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import netifaces
 from zeroconf import IPVersion, ServiceBrowser, Zeroconf
@@ -20,7 +20,7 @@ _IFF_LOOPBACK = 0x0008
 _IFF_MULTICAST = 0x1000
 
 
-def _get_multicast_interfaces() -> List[str]:
+def _get_multicast_interfaces() -> list[str]:
     """Return IPv4 addresses of interfaces that support multicast.
 
     Filters out loopback and non-multicast interfaces (e.g. WireGuard/VPN
@@ -70,7 +70,7 @@ class DeviceInfo:
     status: str = "offline"
     name: str = ""
     id: str = ""
-    last_seen: Optional[float] = None
+    last_seen: float | None = None
 
 
 class DeviceStatus:
@@ -101,7 +101,7 @@ class DeviceStatus:
         status_name: str,
         is_user_triggered: bool = False,
         trigger_source: str = "system",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         """
         Initialize device status.
@@ -152,7 +152,7 @@ class DeviceStatus:
         return self._timestamp
 
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         """Get status metadata."""
         return self._metadata.copy()
 
@@ -333,7 +333,7 @@ class DeviceStatus:
         """
         self._metadata[key] = value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Convert status to dictionary for serialization.
 
@@ -351,7 +351,7 @@ class DeviceStatus:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DeviceStatus":
+    def from_dict(cls, data: dict[str, Any]) -> "DeviceStatus":
         """
         Create DeviceStatus from dictionary.
 
@@ -508,9 +508,9 @@ class BaseDevice(Thread):
     def _get_json(
         self,
         url: str,
-        timeout: Optional[float] = None,
-        post_data: Optional[bytes] = None,
-    ) -> Dict[str, Any]:
+        timeout: float | None = None,
+        post_data: bytes | None = None,
+    ) -> dict[str, Any]:
         """
         Fetch JSON data from URL with retry logic and improved error handling.
         """
@@ -538,7 +538,7 @@ class BaseDevice(Thread):
             raise NetworkError(f"HTTP {e.code} error from {url}") from e
         except urllib.error.URLError as e:
             raise NetworkError(f"URL error from {url}: {e.reason}") from e
-        except socket.timeout as e:
+        except TimeoutError as e:
             raise NetworkError(f"Timeout connecting to {url}") from e
         except Exception as e:
             raise ScanException(f"Unexpected error from {url}: {e}") from e
@@ -680,7 +680,7 @@ class BaseDevice(Thread):
         status_name: str,
         is_user_triggered: bool = False,
         trigger_source: str = "system",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         """
         Update device status using DeviceStatus object.
@@ -838,7 +838,7 @@ class BaseDevice(Thread):
         with self._lock:
             return self._device_status
 
-    def info(self) -> Dict[str, Any]:
+    def info(self) -> dict[str, Any]:
         """Get device information dictionary."""
         with self._lock:
             info_copy = self._info.copy()
@@ -900,7 +900,7 @@ class DeviceScanner:
 
     def __init__(self, device_refresh_period: float = 5, device_class=BaseDevice):
         self._zeroconf = None
-        self.devices: List[BaseDevice] = []
+        self.devices: list[BaseDevice] = []
         self.device_refresh_period = device_refresh_period
         self._device_class = device_class
         self._browser = None
@@ -991,19 +991,19 @@ class DeviceScanner:
         self.stop()
 
     @property
-    def current_devices_id(self) -> List[str]:
+    def current_devices_id(self) -> list[str]:
         """Get list of current device IDs."""
         with self._lock:
             return [device.id() for device in self.devices if device.id()]
 
-    def get_all_devices_info(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_devices_info(self) -> dict[str, dict[str, Any]]:
         """Get information for all devices."""
         with self._lock:
             return {
                 device.id(): device.info() for device in self.devices if device.id()
             }
 
-    def get_device(self, device_id: str) -> Optional[BaseDevice]:
+    def get_device(self, device_id: str) -> BaseDevice | None:
         """Get device by ID."""
         with self._lock:
             for device in self.devices:
@@ -1024,9 +1024,9 @@ class DeviceScanner:
         self,
         ip: str,
         port: int,
-        name: Optional[str] = None,
-        device_id: Optional[str] = None,
-        zcinfo: Optional[Dict] = None,
+        name: str | None = None,
+        device_id: str | None = None,
+        zcinfo: dict | None = None,
     ):
         """Add a device to the scanner."""
         if not self._is_running:

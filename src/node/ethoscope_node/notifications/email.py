@@ -7,7 +7,7 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formatdate
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..utils.configuration import EthoscopeConfiguration
 from ..utils.etho_db import ExperimentalDB
@@ -27,8 +27,8 @@ class EmailNotificationService(NotificationAnalyzer):
 
     def __init__(
         self,
-        config: Optional[EthoscopeConfiguration] = None,
-        db: Optional[ExperimentalDB] = None,
+        config: EthoscopeConfiguration | None = None,
+        db: ExperimentalDB | None = None,
     ):
         """
         Initialize email notification service.
@@ -43,11 +43,11 @@ class EmailNotificationService(NotificationAnalyzer):
         self._last_alert_times = {}
         self._default_cooldown = 3600  # 1 hour between similar alerts
 
-    def _get_smtp_config(self) -> Dict[str, Any]:
+    def _get_smtp_config(self) -> dict[str, Any]:
         """Get SMTP configuration from settings."""
         return self.config.content.get("smtp", {})
 
-    def _get_alert_config(self) -> Dict[str, Any]:
+    def _get_alert_config(self) -> dict[str, Any]:
         """Get alert configuration from settings."""
         return self.config.content.get("alerts", {})
 
@@ -104,11 +104,11 @@ class EmailNotificationService(NotificationAnalyzer):
 
     def _create_email_message(
         self,
-        to_emails: List[str],
+        to_emails: list[str],
         subject: str,
         html_body: str,
         text_body: str,
-        attachments: Optional[List[Dict[str, Any]]] = None,
+        attachments: list[dict[str, Any]] | None = None,
     ) -> MIMEMultipart:
         """
         Create email message with HTML and text parts, plus optional attachments.
@@ -791,7 +791,7 @@ class EmailNotificationService(NotificationAnalyzer):
 
         return success
 
-    def test_email_configuration(self) -> Dict[str, Any]:
+    def test_email_configuration(self) -> dict[str, Any]:
         """
         Test email configuration by sending a test message.
 

@@ -377,7 +377,7 @@ class TestStimulatorSchedulingBehavior(unittest.TestCase):
         boundary_tests = [(start_time, False), (end_time, False)]
 
         # Test interior points
-        for test_time, expected in zip(test_times, expected_results):
+        for test_time, expected in zip(test_times, expected_results, strict=False):
             with self.subTest(test_time=test_time):
                 result = scheduler.check_time_range(test_time)
                 self.assertEqual(

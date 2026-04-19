@@ -7,7 +7,7 @@ from external JSON files, replacing hardcoded parameters in ROI builders.
 
 import json
 import os
-from typing import Any, Dict, List, Union
+from typing import Any
 
 import numpy as np
 
@@ -156,7 +156,7 @@ class ROITemplate:
         },
     }
 
-    def __init__(self, template_data: Dict[str, Any]):
+    def __init__(self, template_data: dict[str, Any]):
         """
         Initialize ROI template.
 
@@ -167,7 +167,7 @@ class ROITemplate:
         self._validate()
 
     @classmethod
-    def load(cls, source: Union[str, Dict[str, Any]]) -> "ROITemplate":
+    def load(cls, source: str | dict[str, Any]) -> "ROITemplate":
         """
         Load template from file path or dictionary.
 
@@ -244,7 +244,7 @@ class ROITemplate:
                 f"Template validation failed: {str(e)}"
             ) from e
 
-    def _validate_grid_template(self, roi_def: Dict):
+    def _validate_grid_template(self, roi_def: dict):
         """Validate grid-based template."""
         if "grid" not in roi_def:
             raise ROITemplateValidationError(
@@ -257,7 +257,7 @@ class ROITemplate:
         if not isinstance(grid.get("n_cols"), int) or grid["n_cols"] < 1:
             raise ROITemplateValidationError("grid.n_cols must be positive integer")
 
-    def _validate_manual_template(self, roi_def: Dict):
+    def _validate_manual_template(self, roi_def: dict):
         """Validate manual polygon template."""
         if "manual_rois" not in roi_def:
             raise ROITemplateValidationError(
@@ -312,7 +312,7 @@ class ROITemplate:
         else:
             raise ROITemplateValidationError(f"Unsupported ROI type: {roi_def['type']}")
 
-    def _generate_grid_rois(self, camera, roi_def: Dict):
+    def _generate_grid_rois(self, camera, roi_def: dict):
         """Generate ROIs from grid template using target alignment."""
         from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
 
@@ -349,7 +349,7 @@ class ROITemplate:
         # Return both reference points (detected target coordinates) and ROIs
         return reference_points, rois
 
-    def _generate_manual_rois(self, camera, roi_def: Dict) -> List[ROI]:
+    def _generate_manual_rois(self, camera, roi_def: dict) -> list[ROI]:
         """Generate ROIs from manual polygon definitions."""
         rois = []
         manual_rois = roi_def["manual_rois"]
@@ -363,12 +363,12 @@ class ROITemplate:
 
         return rois
 
-    def _generate_mask_rois(self, camera, roi_def: Dict) -> List[ROI]:
+    def _generate_mask_rois(self, camera, roi_def: dict) -> list[ROI]:
         """Generate ROIs from image mask."""
         # This would load an image mask and extract contours
         raise NotImplementedError("Image mask ROI generation not yet implemented")
 
-    def to_legacy_params(self) -> Dict[str, Any]:
+    def to_legacy_params(self) -> dict[str, Any]:
         """
         Convert template to legacy ROI builder parameters for backward compatibility.
 

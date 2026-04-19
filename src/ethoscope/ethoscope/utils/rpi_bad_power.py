@@ -7,7 +7,6 @@ Minimal Kernel needed is 4.14+
 
 import logging
 import os
-from typing import Optional
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ SYSFILE_LEGACY = "/sys/devices/platform/soc/soc:firmware/get_throttled"
 UNDERVOLTAGE_STICKY_BIT = 1 << 16
 
 
-def get_rpi_volt_hwmon() -> Optional[str]:
+def get_rpi_volt_hwmon() -> str | None:
     """Find rpi_volt hwmon device."""
     try:
         hwmons = os.listdir(SYSFILE_HWMON_DIR)
@@ -76,7 +75,7 @@ class UnderVoltageLegacy(UnderVoltage):
         )
 
 
-def powerChecker() -> Optional[UnderVoltage]:
+def powerChecker() -> UnderVoltage | None:
     """Create new UnderVoltage object."""
     hwmon = get_rpi_volt_hwmon()
     if hwmon:

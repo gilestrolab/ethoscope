@@ -6,7 +6,9 @@ Tests the video file listing and indexing functionality used in backup operation
 
 import os
 import tempfile
+
 import pytest
+
 from ethoscope_node.utils.video_helpers import list_local_video_files
 
 
@@ -27,8 +29,8 @@ class TestListLocalVideoFiles:
             video2 = os.path.join(tmpdir, "test2.h264")
 
             # Create empty files
-            open(video1, 'a').close()
-            open(video2, 'a').close()
+            open(video1, "a").close()
+            open(video2, "a").close()
 
             result = list_local_video_files(tmpdir)
 
@@ -53,7 +55,7 @@ class TestListLocalVideoFiles:
             video3 = os.path.join(subdir2, "sub2.h264")
 
             for video in [video1, video2, video3]:
-                open(video, 'a').close()
+                open(video, "a").close()
 
             result = list_local_video_files(tmpdir)
 
@@ -71,7 +73,7 @@ class TestListLocalVideoFiles:
             txt_file = os.path.join(tmpdir, "readme.txt")
 
             for f in [h264_file, mp4_file, txt_file]:
-                open(f, 'a').close()
+                open(f, "a").close()
 
             result = list_local_video_files(tmpdir)
 
@@ -84,7 +86,7 @@ class TestListLocalVideoFiles:
         """Test that createMD5 parameter is accepted but ignored"""
         with tempfile.TemporaryDirectory() as tmpdir:
             video = os.path.join(tmpdir, "test.h264")
-            open(video, 'a').close()
+            open(video, "a").close()
 
             # Test with createMD5=False
             result1 = list_local_video_files(tmpdir, createMD5=False)
@@ -112,7 +114,7 @@ class TestListLocalVideoFiles:
             video2 = os.path.join(subdir2, "video.h264")
 
             for video in [video1, video2]:
-                open(video, 'a').close()
+                open(video, "a").close()
 
             result = list_local_video_files(tmpdir)
 
@@ -134,7 +136,7 @@ class TestListLocalVideoFiles:
         """Test that permission errors are logged but don't crash"""
         with tempfile.TemporaryDirectory() as tmpdir:
             video = os.path.join(tmpdir, "test.h264")
-            open(video, 'a').close()
+            open(video, "a").close()
 
             # This should work normally
             result = list_local_video_files(tmpdir)
@@ -145,7 +147,7 @@ class TestListLocalVideoFiles:
         """Test that return value has correct structure"""
         with tempfile.TemporaryDirectory() as tmpdir:
             video = os.path.join(tmpdir, "test.h264")
-            open(video, 'a').close()
+            open(video, "a").close()
 
             result = list_local_video_files(tmpdir)
 
@@ -161,7 +163,7 @@ class TestListLocalVideoFiles:
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create file with spaces and special chars
             video = os.path.join(tmpdir, "test video (1).h264")
-            open(video, 'a').close()
+            open(video, "a").close()
 
             result = list_local_video_files(tmpdir)
 

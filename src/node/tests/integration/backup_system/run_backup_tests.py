@@ -36,12 +36,12 @@ def run_test_suite(test_type="all", verbose=False):
 
     # Configure test discovery
     loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
+    unittest.TestSuite()
 
     # Test directories
     test_dir = os.path.dirname(__file__)
-    unit_test_dir = os.path.join(test_dir, "..", "..", "unit")
-    integration_test_dir = os.path.join(test_dir, "..")
+    os.path.join(test_dir, "..", "..", "unit")
+    os.path.join(test_dir, "..")
 
     test_results = {}
 
@@ -53,11 +53,13 @@ def run_test_suite(test_type="all", verbose=False):
         # Unit tests
         unit_suite = unittest.TestSuite()
         try:
-            from unit.test_backup_helpers import TestBytesFormatting
-            from unit.test_backup_helpers import TestCachePerformance
-            from unit.test_backup_helpers import TestDeviceBackupInfo
-            from unit.test_backup_helpers import TestRsyncEnhancement
-            from unit.test_backup_helpers import TestVideoCacheSystem
+            from unit.test_backup_helpers import (
+                TestBytesFormatting,
+                TestCachePerformance,
+                TestDeviceBackupInfo,
+                TestRsyncEnhancement,
+                TestVideoCacheSystem,
+            )
 
             unit_classes = [
                 TestVideoCacheSystem,
@@ -97,8 +99,10 @@ def run_test_suite(test_type="all", verbose=False):
         # Integration tests
         integration_suite = unittest.TestSuite()
         try:
-            from test_backup_api_integration import TestBackupAPIErrorHandling
-            from test_backup_api_integration import TestBackupAPIIntegration
+            from test_backup_api_integration import (
+                TestBackupAPIErrorHandling,
+                TestBackupAPIIntegration,
+            )
 
             integration_classes = [TestBackupAPIIntegration, TestBackupAPIErrorHandling]
 
@@ -132,8 +136,10 @@ def run_test_suite(test_type="all", verbose=False):
         # Performance tests
         performance_suite = unittest.TestSuite()
         try:
-            from test_backup_cache_performance import TestCachePerformanceRealistic
-            from test_backup_cache_performance import TestCacheRobustness
+            from test_backup_cache_performance import (
+                TestCachePerformanceRealistic,
+                TestCacheRobustness,
+            )
 
             performance_classes = [TestCachePerformanceRealistic, TestCacheRobustness]
 

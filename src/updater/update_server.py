@@ -6,7 +6,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from optparse import OptionParser
 
 import bottle
-import updater
 from helpers import (
     WrongMachineID,
     assert_node,
@@ -16,6 +15,8 @@ from helpers import (
     reload_node_daemon,
     updates_api_wrapper,
 )
+
+import updater
 
 
 class UnexpectedAction(Exception):
@@ -387,7 +388,7 @@ def group(what):
             ]
 
             # Handle node updates locally (still sequential for node)
-            for device in node_devices:
+            for _device in node_devices:
                 response = handle_node_update()
                 responses.append(response)
 
@@ -494,7 +495,7 @@ def group(what):
             ]
 
             # Handle node restart locally
-            for device in node_devices:
+            for _device in node_devices:
                 response = handle_node_daemon_restart()
                 responses.append(response)
 
@@ -642,7 +643,7 @@ if __name__ == "__main__":
     try:
         # Use cheroot server (modern replacement for cherrypy)
         try:
-            from cherrypy import wsgiserver
+            from cherrypy import wsgiserver  # noqa: F401
 
             server = "cherrypy"
         except ImportError:

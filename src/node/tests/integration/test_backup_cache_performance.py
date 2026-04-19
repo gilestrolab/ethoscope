@@ -12,18 +12,19 @@ import sys
 import tempfile
 import time
 import unittest
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 # Add the source path for imports
 sys.path.insert(
     0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "ethoscope_node")
 )
 
-from ethoscope_node.backup.helpers import _enhance_databases_with_rsync_info
-from ethoscope_node.backup.helpers import _format_bytes_simple
-from ethoscope_node.backup.helpers import _load_video_cache
-from ethoscope_node.backup.helpers import _save_video_cache
+from ethoscope_node.backup.helpers import (
+    _enhance_databases_with_rsync_info,
+    _format_bytes_simple,
+    _load_video_cache,
+    _save_video_cache,
+)
 
 
 class TestCachePerformanceRealistic(unittest.TestCase):
@@ -397,7 +398,7 @@ class TestCachePerformanceRealistic(unittest.TestCase):
 
         # Verify all caches were created and loaded correctly
         self.assertEqual(len(loaded_caches), device_count)
-        for device_id, cache_data in loaded_caches.items():
+        for _device_id, cache_data in loaded_caches.items():
             self.assertEqual(len(cache_data["files"]), files_per_device)
 
         # Performance should scale reasonably
