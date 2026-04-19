@@ -365,10 +365,11 @@
 
         var spin = function(action) {
             if (action == "start") {
-                $scope.spinner = new Spinner(opts).spin();
+                $scope.spinner = new Spinner(opts);
+                $scope.spinner.spin();
                 var loadingContainer = document.getElementById('userInputs');
                 loadingContainer.appendChild($scope.spinner.el);
-            } else if (action == "stop") {
+            } else if (action == "stop" && $scope.spinner) {
                 $scope.spinner.stop();
                 $scope.spinner = false;
             }
