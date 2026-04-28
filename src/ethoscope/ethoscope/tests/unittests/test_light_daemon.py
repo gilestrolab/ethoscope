@@ -6,11 +6,17 @@ import datetime
 import json
 import os
 import tempfile
+import threading
+import time
 from unittest.mock import call, patch
 
 import pytest
 
-from ethoscope.hardware.interfaces.light_daemon import LightController
+from ethoscope.hardware.interfaces.light_daemon import (
+    LightController,
+    LightDaemonClient,
+    LightDaemonUnavailable,
+)
 
 
 class TestShouldLightBeOn:
@@ -298,3 +304,138 @@ class TestShutdown:
         assert controller._running is True
         controller.shutdown(signum=15)
         assert controller._running is False
+
+
+class TestForceOverride:
+    """Tests for the force-override state machine."""
+
+    @patch("subprocess.run")
+    def test_set_force_on_drives_led_immediately(self, mock_run):
+        controller = LightController(gpio_pin=17)
+        controller.set_force(True)
+        assert controller._force is True
+        # Apply-immediately path: pinctrl was called with dh.
+        mock_run.assert_called_once_with(
+            ["pinctrl", "set", "17", "op", "dh"],
+            check=True,
+            capture_output=True,
+            timeout=5,
+        )
+
+    @patch("subprocess.run")
+    def test_set_force_off_drives_led_immediately(self, mock_run):
+        controller = LightController(gpio_pin=17)
+        controller.set_force(False)
+        assert controller._force is False
+        mock_run.assert_called_once_with(
+            ["pinctrl", "set", "17", "op", "dl"],
+            check=True,
+            capture_output=True,
+            timeout=5,
+        )
+
+    @patch("subprocess.run")
+    def test_release_clears_force_without_pinctrl_call(self, mock_run):
+        controller = LightController(gpio_pin=17)
+        controller.set_force(True)
+        mock_run.reset_mock()
+        controller.set_force(None)
+        assert controller._force is None
+        # Release does not itself drive the LED; the next loop tick chooses the desired state.
+        mock_run.assert_not_called()
+
+
+class TestHandleCommand:
+    """Tests for the wire-protocol parser."""
+
+    def _make_controller(self):
+        return LightController(gpio_pin=17, socket_path=None)
+
+    @patch("subprocess.run")
+    def test_force_on(self, _mock_run):
+        controller = self._make_controller()
+        assert controller._handle_command("FORCE ON") == "OK"
+        assert controller._force is True
+
+    @patch("subprocess.run")
+    def test_force_off(self, _mock_run):
+        controller = self._make_controller()
+        assert controller._handle_command("force off") == "OK"
+        assert controller._force is False
+
+    @patch("subprocess.run")
+    def test_release(self, _mock_run):
+        controller = self._make_controller()
+        controller._force = True
+        assert controller._handle_command("release") == "OK"
+        assert controller._force is None
+
+    @patch("subprocess.run")
+    def test_status_returns_json(self, _mock_run):
+        controller = self._make_controller()
+        controller._current_state = True
+        controller._force = True
+        payload = json.loads(controller._handle_command("STATUS"))
+        assert payload["led"] == "on"
+        assert payload["mode"] == "forced"
+        assert payload["force"] == "on"
+
+    def test_unknown_command_returns_error(self):
+        controller = self._make_controller()
+        response = controller._handle_command("BLINK")
+        assert response.startswith("ERR")
+
+
+class TestSocketRoundTrip:
+    """End-to-end tests against a real listener thread on a tmp socket."""
+
+    @pytest.fixture
+    def running_controller(self, tmp_path):
+        socket_path = str(tmp_path / "light_daemon.sock")
+        controller = LightController(gpio_pin=17, socket_path=socket_path)
+        with patch("subprocess.run"):
+            controller._start_socket_listener()
+            # Wait briefly for the listener thread to be ready to accept.
+            time.sleep(0.05)
+            try:
+                yield controller, socket_path
+            finally:
+                controller._running = False
+                controller._stop_socket_listener()
+
+    def test_force_on_round_trip(self, running_controller):
+        controller, socket_path = running_controller
+        with patch("subprocess.run"):
+            client = LightDaemonClient(socket_path=socket_path)
+            client.force_on()
+        assert controller._force is True
+
+    def test_release_round_trip(self, running_controller):
+        controller, socket_path = running_controller
+        with patch("subprocess.run"):
+            controller.set_force(True)
+            client = LightDaemonClient(socket_path=socket_path)
+            client.release()
+        assert controller._force is None
+
+    def test_status_round_trip(self, running_controller):
+        _, socket_path = running_controller
+        with patch("subprocess.run"):
+            client = LightDaemonClient(socket_path=socket_path)
+            payload = client.status()
+        assert "mode" in payload
+        assert payload["mode"] in {"forced", "schedule"}
+
+
+class TestClientUnavailable:
+    """The client must raise LightDaemonUnavailable on connection failure."""
+
+    def test_missing_socket_raises(self, tmp_path):
+        client = LightDaemonClient(socket_path=str(tmp_path / "does_not_exist.sock"))
+        with pytest.raises(LightDaemonUnavailable):
+            client.force_on()
+
+    def test_status_on_missing_socket_raises(self, tmp_path):
+        client = LightDaemonClient(socket_path=str(tmp_path / "does_not_exist.sock"))
+        with pytest.raises(LightDaemonUnavailable):
+            client.status()

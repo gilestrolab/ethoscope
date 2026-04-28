@@ -98,6 +98,7 @@ testing = [
 [project.scripts]
 device_server = "scripts.device_server:main"
 device_server_optimized = "scripts.device_server_optimized:main"
+ethoscope-light = "ethoscope.hardware.interfaces.light_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
