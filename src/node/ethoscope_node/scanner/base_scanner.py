@@ -475,6 +475,11 @@ class BaseDevice(Thread):
         self._is_online = True
         self._skip_scanning = False
 
+        # mDNS service name (e.g. "ETHOSCOPE000-<id>._ethoscope._tcp.local.").
+        # Stable across IP changes — used by the scanner to re-locate a known
+        # device after a DHCP renewal moves it to a new address.
+        self.zeroconf_name: Optional[str] = None
+
         # Synchronization and error tracking
         self._lock = RLock()
         self._last_refresh = 0
@@ -796,6 +801,28 @@ class BaseDevice(Thread):
             return 60.0  # Busy devices refresh every 60 seconds
         return self._refresh_period  # Normal refresh period
 
+    def _update_address(self, new_ip: str, new_port: int) -> bool:
+        """Update the device's network address (e.g. after a DHCP IP change).
+
+        Rebuilds cached URLs and clears error state so the next refresh hits
+        the new address. Returns True if anything actually changed.
+        """
+        with self._lock:
+            if new_ip == self._ip and new_port == self._port:
+                return False
+            old_ip = self._ip
+            self._ip = new_ip
+            self._port = new_port
+            self._info["ip"] = new_ip
+            # Reason: subclasses cache URLs built from _ip/_port at construction
+            # time (see _setup_urls); we must rebuild them after an address change.
+            self._setup_urls()
+            self.reset_error_state()
+            self._logger.info(
+                f"Device address updated: {old_ip} -> {new_ip}:{new_port}"
+            )
+            return True
+
     # Public interface methods
     def ip(self) -> str:
         """Get device IP address."""
@@ -984,6 +1011,15 @@ class DeviceScanner:
                     return device
         return None
 
+    def _find_device_by_zeroconf_name(self, name: str):
+        """Find a device by its mDNS service name. Caller must hold self._lock."""
+        if not name:
+            return None
+        for device in self.devices:
+            if getattr(device, "zeroconf_name", None) == name:
+                return device
+        return None
+
     def add(
         self,
         ip: str,
@@ -999,6 +1035,25 @@ class DeviceScanner:
 
         try:
             with self._lock:
+                # Reason: mDNS service name embeds the device ID and is stable
+                # across DHCP IP changes — match by it first so a re-announced
+                # device updates its existing entry instead of being treated as
+                # new (which would orphan the old entry at the stale IP).
+                existing_device = self._find_device_by_zeroconf_name(name)
+                if existing_device is not None and existing_device.ip() != ip:
+                    self._logger.info(
+                        f"{self.DEVICE_TYPE} {name} re-announced at new address "
+                        f"{ip}:{port} (was {existing_device.ip()}:{existing_device._port})"
+                    )
+                    existing_device._update_address(ip, port)
+                    existing_device.skip_scanning(False)
+                    with existing_device._lock:
+                        existing_device._update_device_status(
+                            "offline", trigger_source="system"
+                        )
+                        existing_device._info.update({"last_seen": time.time()})
+                    return
+
                 # Check if device already exists by IP (more immediate than waiting for ID)
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
@@ -1110,5 +1165,41 @@ class DeviceScanner:
                     break
 
     def update_service(self, zeroconf, service_type: str, name: str):
-        """Zeroconf callback for service updates."""
-        pass
+        """Zeroconf callback for service updates (e.g. IP address change).
+
+        Looks up the known device by mDNS service name and updates its address
+        in place. If the service is unknown (e.g. we missed the original add),
+        falls back to the regular add path.
+        """
+        if not self._is_running:
+            return
+
+        try:
+            info = zeroconf.get_service_info(service_type, name)
+            if not info or not info.addresses:
+                return
+
+            new_ip = socket.inet_ntoa(info.addresses[0])
+            new_port = info.port
+
+            with self._lock:
+                existing_device = self._find_device_by_zeroconf_name(name)
+
+            if existing_device is None:
+                self._logger.info(
+                    f"Zeroconf update for unknown {self.DEVICE_TYPE} {name} "
+                    f"at {new_ip}:{new_port}, treating as new device"
+                )
+                self.add(new_ip, new_port, name, zcinfo=info.properties)
+                return
+
+            if existing_device._update_address(new_ip, new_port):
+                existing_device.skip_scanning(False)
+                with existing_device._lock:
+                    existing_device._update_device_status(
+                        "offline", trigger_source="system"
+                    )
+                    existing_device._info.update({"last_seen": time.time()})
+
+        except Exception as e:
+            self._logger.error(f"Error handling zeroconf update for {name}: {e}")

@@ -1685,6 +1685,26 @@ class EthoscopeScanner(DeviceScanner):
                         except (IndexError, ValueError):
                             pass
 
+            # Reason: mDNS service name embeds the device ID and is stable
+            # across DHCP IP changes — match by it first so a re-announced
+            # device updates its existing entry instead of being treated as
+            # new (which would orphan the old entry at the stale IP).
+            with self._lock:
+                existing_device = self._find_device_by_zeroconf_name(name)
+                if existing_device is not None and existing_device.ip() != ip:
+                    self._logger.info(
+                        f"Ethoscope {name} re-announced at new address "
+                        f"{ip}:{port} (was {existing_device.ip()}:{existing_device._port})"
+                    )
+                    existing_device._update_address(ip, port)
+                    existing_device.skip_scanning(False)
+                    with existing_device._lock:
+                        existing_device._update_device_status(
+                            "offline", trigger_source="system"
+                        )
+                        existing_device._info.update({"last_seen": time.time()})
+                    return
+
             # Check if device already exists by IP (more immediate than waiting for ID)
             with self._lock:
                 for existing_device in self.devices:

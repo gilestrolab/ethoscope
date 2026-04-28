@@ -976,15 +976,96 @@ class TestDeviceScannerOperations:
 
     @patch("ethoscope_node.scanner.base_scanner.Zeroconf")
     @patch("ethoscope_node.scanner.base_scanner.ServiceBrowser")
-    def test_update_service_callback(self, mock_browser, mock_zeroconf):
-        """Test update_service callback (currently a no-op)."""
+    def test_update_service_updates_device_address(self, mock_browser, mock_zeroconf):
+        """update_service should rewrite the IP/port of an existing device.
+
+        Reason: a Zeroconf TXT/address change (typically a DHCP renewal that
+        moves the device to a new IP) fires update_service rather than
+        add_service. Before this fix the handler was a no-op, so the node kept
+        polling the stale IP forever.
+        """
+        scanner = DeviceScanner()
+        scanner.start()
+
+        scanner.add("192.168.1.100", 9000, name="ETHO-test.local")
+        assert len(scanner.devices) == 1
+        device = scanner.devices[0]
+        # `add()` records the mDNS name on the device for later lookup.
+        assert device.zeroconf_name == "ETHO-test.local"
+
+        mock_zc = MagicMock()
+        new_info = MagicMock()
+        new_info.addresses = [socket.inet_aton("192.168.1.200")]
+        new_info.port = 9000
+        new_info.properties = {}
+        mock_zc.get_service_info.return_value = new_info
+
+        scanner.update_service(mock_zc, "_device._tcp.local.", "ETHO-test.local")
+
+        assert len(scanner.devices) == 1
+        assert scanner.devices[0].ip() == "192.168.1.200"
+
+        scanner.stop()
+
+    @patch("ethoscope_node.scanner.base_scanner.Zeroconf")
+    @patch("ethoscope_node.scanner.base_scanner.ServiceBrowser")
+    def test_update_service_unknown_name_falls_back_to_add(
+        self, mock_browser, mock_zeroconf
+    ):
+        """An update for an unknown service name should add the device."""
         scanner = DeviceScanner()
         scanner.start()
 
         mock_zc = MagicMock()
-        scanner.update_service(mock_zc, "_device._tcp.local.", "test.local")
+        new_info = MagicMock()
+        new_info.addresses = [socket.inet_aton("192.168.1.150")]
+        new_info.port = 9000
+        new_info.properties = {}
+        mock_zc.get_service_info.return_value = new_info
 
-        # Should not crash
+        scanner.update_service(mock_zc, "_device._tcp.local.", "ETHO-new.local")
+
+        assert len(scanner.devices) == 1
+        assert scanner.devices[0].ip() == "192.168.1.150"
+
+        scanner.stop()
+
+    @patch("ethoscope_node.scanner.base_scanner.Zeroconf")
+    @patch("ethoscope_node.scanner.base_scanner.ServiceBrowser")
+    def test_update_service_when_not_running(self, mock_browser, mock_zeroconf):
+        """update_service is a no-op when the scanner is stopped."""
+        scanner = DeviceScanner()
+        # Don't start scanner
+
+        mock_zc = MagicMock()
+        scanner.update_service(mock_zc, "_device._tcp.local.", "ETHO-test.local")
+        # Must not call into zeroconf at all when stopped.
+        mock_zc.get_service_info.assert_not_called()
+
+    @patch("ethoscope_node.scanner.base_scanner.Zeroconf")
+    @patch("ethoscope_node.scanner.base_scanner.ServiceBrowser")
+    def test_add_reannounce_at_new_ip_updates_existing(
+        self, mock_browser, mock_zeroconf
+    ):
+        """A re-announce at a new IP should update the existing device entry.
+
+        Reason: if a device re-announces (add_service) at a new IP without us
+        having processed an update_service first, the IP-based dedup branch
+        wouldn't find it, and the post-creation ID check would reject the new
+        entry — leaving the original stuck at the stale IP. Matching by
+        zeroconf_name first sidesteps that.
+        """
+        scanner = DeviceScanner()
+        scanner.start()
+
+        scanner.add("192.168.1.100", 9000, name="ETHO-test.local")
+        assert len(scanner.devices) == 1
+
+        scanner.add("192.168.1.200", 9000, name="ETHO-test.local")
+
+        assert len(scanner.devices) == 1
+        assert scanner.devices[0].ip() == "192.168.1.200"
+
         scanner.stop()
 
     @patch("ethoscope_node.scanner.base_scanner.Zeroconf")
