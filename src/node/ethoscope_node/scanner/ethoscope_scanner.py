@@ -1608,9 +1608,10 @@ class EthoscopeScanner(DeviceScanner):
                     devices_info[device_id] = {
                         "name": device_name,
                         "id": device_id,
-                        "status": device_data.get(
-                            "status", "offline"
-                        ),  # Default to offline for database-only devices
+                        # Reason: a stored NULL status would otherwise leak
+                        # through .get()'s default; treat any falsy value as
+                        # offline for DB-only devices.
+                        "status": device_data.get("status") or "offline",
                         "ip": device_ip,
                         "last_ip": device_ip,
                         "time": device_data.get("last_seen", 0),
