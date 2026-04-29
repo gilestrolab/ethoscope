@@ -526,7 +526,12 @@ class PiFrameGrabber(threading.Thread):
             import picamera.array
         except (ImportError, OSError) as e:
             logging.error(f"Failed to import picamera: {e}")
-            self._queue.task_done()
+            # Reason: signal the parent that no camera hardware is available so
+            # it doesn't have to wait 30s for the queue.get() timeout. Do NOT
+            # call self._queue.task_done() here — task_done() raises ValueError
+            # when called with no preceding put(), which would crash the thread
+            # silently and mask the real error.
+            self._queue.put(None)
             return
 
         try:
@@ -626,10 +631,22 @@ class PiFrameGrabber(threading.Thread):
 
         finally:
             if self._record_video:
-                capture.stop_recording()  # Ensure we stop recording on exit or exception
-                logging.info("Stopped recording cleanly.")
+                try:
+                    capture.stop_recording()  # Ensure we stop recording on exit or exception
+                    logging.info("Stopped recording cleanly.")
+                except Exception:
+                    # capture may be undefined (PiCamera() failed) or recording
+                    # may already have been stopped — both are fine here.
+                    pass
 
-            self._queue.task_done()  # Indicates to the parent that the thread can be closed
+            # Reason: task_done() raises ValueError when called more times than
+            # put() has been called. In failure paths no frames may have been
+            # produced, so guard the call. (Nothing actually waits via
+            # queue.join(), so this is a no-op in the happy path too.)
+            try:
+                self._queue.task_done()
+            except ValueError:
+                pass
             logging.warning("Camera Frame grabber stopped acquisition cleanly.")
 
 
@@ -655,7 +672,9 @@ class PiFrameGrabber2(PiFrameGrabber):
         # Check if picamera2 was successfully imported at module level
         if Picamera2 is None:
             logging.error("picamera2 not available - cannot start camera")
-            self._queue.task_done()
+            # Reason: see PiFrameGrabber.run() — put(None) signals "no camera"
+            # to the parent immediately and avoids the task_done() ValueError.
+            self._queue.put(None)
             return
 
         logging.info(
@@ -868,7 +887,13 @@ class PiFrameGrabber2(PiFrameGrabber):
             except Exception as cleanup_e:
                 logging.error(f"Error during frame grabber cleanup: {cleanup_e}")
 
-            self._queue.task_done()  # Indicates to the parent that the thread can be closed
+            # Reason: see PiFrameGrabber finally block — task_done() raises
+            # ValueError if no put() happened. Guard it to keep the thread
+            # exiting cleanly on early failures.
+            try:
+                self._queue.task_done()
+            except ValueError:
+                pass
             logging.warning("Camera Frame grabber stopped acquisition cleanly.")
 
 
@@ -978,6 +1003,27 @@ class OurPiCameraAsync(BaseCamera):
             try:
                 # If this is a retry and we're using picamera2, try fallback to picamera
                 if self._initialization_attempts > 1 and USE_PICAMERA2:
+                    # Reason: only fall back to legacy picamera if it is
+                    # actually importable. On Bookworm/Bullseye picamera is no
+                    # longer shipped and trying it just burns another 30s on
+                    # the queue.get() timeout while emitting a misleading
+                    # "No module named 'picamera'" error.
+                    if importlib.util.find_spec("picamera") is None:
+                        logging.error(
+                            "picamera2 failed and legacy picamera is not "
+                            "installed — giving up on camera initialization"
+                        )
+                        # Reason: phrasing must include "Camera hardware not
+                        # available" so ControlThread._run() routes this to
+                        # the gentle stopped-with-error path instead of
+                        # logging a full traceback as a fatal crash.
+                        raise EthoscopeException(
+                            "Camera hardware not available: picamera2 is not "
+                            "producing frames (likely V4L2/libcamera timeout) "
+                            "and the legacy picamera module is not installed "
+                            "for fallback. Check the camera ribbon cable and "
+                            "sensor."
+                        )
                     logging.warning(
                         "Retrying with legacy PiFrameGrabber due to picamera2 issues"
                     )
