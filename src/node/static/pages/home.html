@@ -221,7 +221,8 @@
                 <span ng-if="device.status == 'streaming'" class="fa fa-play-circle color-red" title={{device.status}}></span>
                 <span ng-if="device.status == 'stopped'" class="fa fa-stop-circle" title={{device.status}}></span>
                 <span ng-if="device.status == 'busy'" class="fa fa-question color-coral-red" title="Device online but busy (cannot get status)"></span>
-                <span ng-if="device.status == 'unreached'" class="fa fa-wifi color-coral-red flash-slow" title="Device temporarily unreachable"></span>
+                <span ng-if="device.status == 'unreached' && device.status_details.trigger_source == 'graceful'" class="fa fa-power-off" title="Device rebooting (user-initiated)"></span>
+                <span ng-if="device.status == 'unreached' && device.status_details.trigger_source != 'graceful'" class="fa fa-wifi color-coral-red flash-slow" title="Device temporarily unreachable"></span>
                 <span ng-if="device.underpowered == true" class="fa fa-bolt" title="The device is underpowered!"></span></td>
             <td>{{secToDate(device.time || device.last_seen)}}</td>
             <td>

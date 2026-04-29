@@ -384,16 +384,8 @@ class Ethoscope(BaseDevice):
                 f"Device {self._id} found in tracking state {new_status} - marking as user-initiated"
             )
 
-        # Check if this is a graceful operation
-        alert_config = self._config.get_custom("alerts") or {}
-        graceful_grace_minutes = alert_config.get("graceful_shutdown_grace_minutes", 5)
-        graceful_grace_seconds = graceful_grace_minutes * 60
-
-        if (
-            self._last_user_instruction in DeviceStatus.GRACEFUL_OPERATIONS
-            and self._last_user_action
-            and (time.time() - self._last_user_action) < graceful_grace_seconds
-        ):
+        # Check if this is a graceful operation (e.g. user-triggered reboot)
+        if self._is_within_graceful_window():
             trigger_source = "graceful"
 
         # Update status if it changed
@@ -818,13 +810,19 @@ class Ethoscope(BaseDevice):
                 self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
                 return
         else:
-            # Device is becoming unreachable for the first time
+            # Device is becoming unreachable for the first time. If the user
+            # just sent a reboot/poweroff/restart, attribute the disconnection
+            # to that instead of "network" so the UI doesn't flash an alert.
+            trigger_source = (
+                "graceful" if self._is_within_graceful_window() else "network"
+            )
             self._logger.info(
-                f"Device {self._id} becoming unreachable (was {previous_status})"
+                f"Device {self._id} becoming unreachable "
+                f"(was {previous_status}, trigger: {trigger_source})"
             )
             self._update_device_status(
                 "unreached",
-                trigger_source="network",
+                trigger_source=trigger_source,
                 metadata={"previous_status": previous_status},
             )
 
@@ -920,6 +918,24 @@ class Ethoscope(BaseDevice):
             return True
 
         return False
+
+    def _is_within_graceful_window(self) -> bool:
+        """Return True if the last user instruction was a graceful operation
+        (poweroff/reboot/restart) within the configured grace window. Used to
+        tag downstream status transitions as ``trigger_source="graceful"`` so
+        the UI can distinguish a user-initiated reboot from an unexpected
+        disconnection.
+        """
+        if (
+            not self._last_user_action
+            or self._last_user_instruction not in DeviceStatus.GRACEFUL_OPERATIONS
+        ):
+            return False
+        alert_config = self._config.get_custom("alerts") or {}
+        graceful_grace_seconds = (
+            alert_config.get("graceful_shutdown_grace_minutes", 5) * 60
+        )
+        return (time.time() - self._last_user_action) < graceful_grace_seconds
 
     def _handle_state_transition(self, previous_status: str, new_status: str):
         """Handle state transitions for experiment tracking."""

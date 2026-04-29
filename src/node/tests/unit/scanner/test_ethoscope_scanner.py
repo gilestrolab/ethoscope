@@ -1224,6 +1224,94 @@ class TestEthoscopeHandleUnreachableState:
             run_id="test_run_123", message="unreached"
         )
 
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_unreached_after_user_reboot_marks_graceful(
+        self, mock_config_class, mock_db_class
+    ):
+        """A reboot issued in the grace window tags the unreached transition
+        as ``graceful`` so the UI knows not to show the alert icon."""
+        mock_db_class.return_value = Mock()
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        device._device_status = DeviceStatus("running")
+        device._last_user_action = time.time()
+        device._last_user_instruction = "reboot"
+
+        with patch.object(device._config, "get_custom") as mock_get_custom:
+            mock_get_custom.return_value = {
+                "unreachable_timeout_minutes": 20,
+                "graceful_shutdown_grace_minutes": 5,
+            }
+            with patch.object(device, "_update_device_status") as mock_update:
+                with patch.object(device, "_reset_info"):
+                    device._handle_unreachable_state("running")
+
+        unreached_call = next(
+            c for c in mock_update.call_args_list if c.args[0] == "unreached"
+        )
+        assert unreached_call.kwargs["trigger_source"] == "graceful"
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_unreached_without_recent_user_action_remains_network(
+        self, mock_config_class, mock_db_class
+    ):
+        """A spontaneous disconnection (no recent user instruction) keeps the
+        existing ``network`` trigger source so the alert still fires."""
+        mock_db_class.return_value = Mock()
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        device._device_status = DeviceStatus("running")
+        device._last_user_action = None
+        device._last_user_instruction = None
+
+        with patch.object(device._config, "get_custom") as mock_get_custom:
+            mock_get_custom.return_value = {
+                "unreachable_timeout_minutes": 20,
+                "graceful_shutdown_grace_minutes": 5,
+            }
+            with patch.object(device, "_update_device_status") as mock_update:
+                with patch.object(device, "_reset_info"):
+                    device._handle_unreachable_state("running")
+
+        unreached_call = next(
+            c for c in mock_update.call_args_list if c.args[0] == "unreached"
+        )
+        assert unreached_call.kwargs["trigger_source"] == "network"
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_unreached_after_grace_window_expires_is_network(
+        self, mock_config_class, mock_db_class
+    ):
+        """A reboot issued long ago (outside the grace window) no longer
+        suppresses the alert."""
+        mock_db_class.return_value = Mock()
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        device._device_status = DeviceStatus("running")
+        # Reboot issued 10 minutes ago — outside the default 5-minute window
+        device._last_user_action = time.time() - 600
+        device._last_user_instruction = "reboot"
+
+        with patch.object(device._config, "get_custom") as mock_get_custom:
+            mock_get_custom.return_value = {
+                "unreachable_timeout_minutes": 20,
+                "graceful_shutdown_grace_minutes": 5,
+            }
+            with patch.object(device, "_update_device_status") as mock_update:
+                with patch.object(device, "_reset_info"):
+                    device._handle_unreachable_state("running")
+
+        unreached_call = next(
+            c for c in mock_update.call_args_list if c.args[0] == "unreached"
+        )
+        assert unreached_call.kwargs["trigger_source"] == "network"
+
 
 class TestEthoscopeScannerAdd:
     """Test EthoscopeScanner add method."""
