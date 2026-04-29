@@ -9,11 +9,8 @@ import os
 import sys
 import tempfile
 import time
-from datetime import datetime
-from datetime import timedelta
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import patch
+from datetime import datetime, timedelta
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -154,7 +151,7 @@ class TestRateLimiting:
         client_ip = "192.168.1.100"
 
         # First few attempts should be allowed
-        for i in range(3):
+        for _i in range(3):
             result = self.check_rate_limit(username, client_ip)
             assert result is True
             self.record_failed_attempt(username, client_ip)
@@ -165,7 +162,7 @@ class TestRateLimiting:
         client_ip = "192.168.1.100"
 
         # Make maximum allowed attempts
-        for i in range(self.max_attempts):
+        for _i in range(self.max_attempts):
             self.record_failed_attempt(username, client_ip)
 
         # Next attempt should be blocked
@@ -178,7 +175,7 @@ class TestRateLimiting:
         client_ip = "192.168.1.100"
 
         # Record multiple failed attempts
-        for i in range(self.max_attempts + 3):
+        for _i in range(self.max_attempts + 3):
             self.record_failed_attempt(username, client_ip)
 
         # Should be locked out
@@ -197,7 +194,7 @@ class TestRateLimiting:
         client_ip = "192.168.1.100"
 
         # Record some failed attempts
-        for i in range(3):
+        for _i in range(3):
             self.record_failed_attempt(username, client_ip)
 
         # Clear on successful login
@@ -349,8 +346,8 @@ class TestSessionManagement:
         old_timeout = self.session_timeout
         self.session_timeout = 0.1
 
-        session_id1 = self.create_session(user_data, client_ip)
-        session_id2 = self.create_session(user_data, client_ip)
+        self.create_session(user_data, client_ip)
+        self.create_session(user_data, client_ip)
 
         # Wait for expiry
         time.sleep(0.2)

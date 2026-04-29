@@ -7,12 +7,8 @@ components for use in tests.
 
 import datetime
 import json
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from unittest.mock import MagicMock
-from unittest.mock import Mock
+from typing import Any, Optional
+from unittest.mock import MagicMock, Mock
 
 
 class MockEthoscopeDevice:
@@ -33,7 +29,7 @@ class MockEthoscopeDevice:
         self.stimulation_enabled = kwargs.get("stimulation_enabled", False)
         self._api_responses = {}
 
-    def get_api_response(self, endpoint: str) -> Dict[str, Any]:
+    def get_api_response(self, endpoint: str) -> dict[str, Any]:
         """Get mock API response for a specific endpoint."""
         if endpoint in self._api_responses:
             return self._api_responses[endpoint]
@@ -76,11 +72,11 @@ class MockEthoscopeDevice:
 
         return default_responses.get(endpoint, {})
 
-    def set_api_response(self, endpoint: str, response: Dict[str, Any]):
+    def set_api_response(self, endpoint: str, response: dict[str, Any]):
         """Set custom API response for an endpoint."""
         self._api_responses[endpoint] = response
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert device to dictionary representation."""
         return {
             "id": self.id,
@@ -114,11 +110,11 @@ class MockDeviceScanner:
         """Remove a device from the scanner."""
         self.devices = [d for d in self.devices if d.id != device_id]
 
-    def get_devices(self) -> List[MockEthoscopeDevice]:
+    def get_devices(self) -> list[MockEthoscopeDevice]:
         """Get all discovered devices."""
         return self.devices.copy()
 
-    def get_device(self, device_id: str) -> Optional[MockEthoscopeDevice]:
+    def get_device(self, device_id: str) -> MockEthoscopeDevice | None:
         """Get a specific device by ID."""
         for device in self.devices:
             if device.id == device_id:
@@ -133,7 +129,7 @@ class MockDeviceScanner:
         """Stop device scanning."""
         self.is_scanning = False
 
-    def scan_once(self) -> List[MockEthoscopeDevice]:
+    def scan_once(self) -> list[MockEthoscopeDevice]:
         """Perform a single scan and return devices."""
         return self.get_devices()
 
@@ -157,15 +153,15 @@ class MockDeviceManager:
             del self.devices[device_id]
         self.scanner.remove_device(device_id)
 
-    def get_device(self, device_id: str) -> Optional[MockEthoscopeDevice]:
+    def get_device(self, device_id: str) -> MockEthoscopeDevice | None:
         """Get a device by ID."""
         return self.devices.get(device_id)
 
-    def get_all_devices(self) -> List[MockEthoscopeDevice]:
+    def get_all_devices(self) -> list[MockEthoscopeDevice]:
         """Get all managed devices."""
         return list(self.devices.values())
 
-    def get_device_status(self, device_id: str) -> Dict[str, Any]:
+    def get_device_status(self, device_id: str) -> dict[str, Any]:
         """Get device status."""
         device = self.get_device(device_id)
         if device:
@@ -180,7 +176,7 @@ class MockDeviceManager:
             device.last_seen = datetime.datetime.now().isoformat()
 
 
-def create_mock_device_fleet(count: int = 5) -> List[MockEthoscopeDevice]:
+def create_mock_device_fleet(count: int = 5) -> list[MockEthoscopeDevice]:
     """Create a fleet of mock devices for testing."""
     devices = []
     for i in range(count):

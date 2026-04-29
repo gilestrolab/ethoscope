@@ -8,7 +8,7 @@ import datetime
 import logging
 import secrets
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class SessionManager:
@@ -78,7 +78,7 @@ class SessionManager:
         except Exception as e:
             self.logger.error(f"Error ensuring sessions table: {e}")
 
-    def create_session(self, user: Dict[str, Any]) -> Optional[str]:
+    def create_session(self, user: dict[str, Any]) -> str | None:
         """
         Create a new session for the user.
 
@@ -149,7 +149,7 @@ class SessionManager:
             self.logger.error(f"Error creating session: {e}")
             return None
 
-    def get_user_from_session(self, session_token: str) -> Optional[Dict[str, Any]]:
+    def get_user_from_session(self, session_token: str) -> dict[str, Any] | None:
         """
         Get user information from session token.
 
@@ -280,7 +280,7 @@ class SessionManager:
             self.logger.error(f"Error destroying user sessions: {e}")
             return False
 
-    def get_active_sessions(self, username: Optional[str] = None) -> list:
+    def get_active_sessions(self, username: str | None = None) -> list:
         """
         Get list of active sessions.
 

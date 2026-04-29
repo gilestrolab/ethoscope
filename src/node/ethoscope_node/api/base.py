@@ -8,7 +8,7 @@ import json
 import logging
 import traceback
 from functools import wraps
-from typing import Any, Dict
+from typing import Any
 
 import bottle
 
@@ -75,7 +75,7 @@ class BaseAPI:
         """Get raw request data as bytes."""
         return bottle.request.body.read()
 
-    def get_request_json(self) -> Dict[str, Any]:
+    def get_request_json(self) -> dict[str, Any]:
         """Get request data as JSON."""
         return bottle.request.json or {}
 

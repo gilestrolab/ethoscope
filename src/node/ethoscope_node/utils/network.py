@@ -7,14 +7,13 @@ and managing network interfaces and IP ranges.
 
 import ipaddress
 import logging
-from typing import List, Optional
 
 import netifaces
 
 logger = logging.getLogger(__name__)
 
 
-def get_primary_private_network() -> Optional[str]:
+def get_primary_private_network() -> str | None:
     """
     Get the primary private network range for the current node.
 
@@ -109,7 +108,7 @@ def get_private_ip_pattern() -> str:
     return "192.168.1.*"
 
 
-def get_local_ip_addresses() -> List[str]:
+def get_local_ip_addresses() -> list[str]:
     """
     Get all local IP addresses for this node.
 

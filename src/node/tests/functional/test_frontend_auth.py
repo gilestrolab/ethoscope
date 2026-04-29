@@ -8,9 +8,7 @@ from the frontend perspective.
 import json
 import os
 import tempfile
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -295,7 +293,6 @@ class TestFrontendSecurity:
     def test_sensitive_data_handling(self):
         """Test that sensitive data is handled securely in frontend."""
         # PINs should never be stored in browser storage
-        browser_storage_items = ["localStorage", "sessionStorage", "cookies"]
 
         # Items that should NOT be stored
         sensitive_items = ["pin", "password", "current_pin", "new_pin"]

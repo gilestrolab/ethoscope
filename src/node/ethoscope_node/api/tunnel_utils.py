@@ -5,7 +5,7 @@ Provides utilities for tunnel configuration and URL management.
 """
 
 import os
-from typing import Any, Dict
+from typing import Any
 
 from .base import BaseAPI, error_decorator
 
@@ -153,7 +153,7 @@ class TunnelUtils(BaseAPI):
 
     # Core Tunnel Management Functions
 
-    def get_tunnel_status(self) -> Dict[str, Any]:
+    def get_tunnel_status(self) -> dict[str, Any]:
         """Get current tunnel configuration and status."""
         tunnel_config = self.config.get_tunnel_config()
 
@@ -181,7 +181,7 @@ class TunnelUtils(BaseAPI):
 
         return tunnel_config
 
-    def toggle_tunnel(self, enabled: bool) -> Dict[str, Any]:
+    def toggle_tunnel(self, enabled: bool) -> dict[str, Any]:
         """Enable or disable the tunnel."""
         self.logger.info(f"User requested tunnel {'enable' if enabled else 'disable'}")
 
@@ -240,7 +240,7 @@ class TunnelUtils(BaseAPI):
 
             return {"success": False, "error": error_msg, "enabled": False}
 
-    def update_tunnel_config(self, config_data: Dict[str, Any]) -> Dict[str, Any]:
+    def update_tunnel_config(self, config_data: dict[str, Any]) -> dict[str, Any]:
         """Update tunnel configuration settings."""
         self.logger.info(f"Updating tunnel configuration: {list(config_data.keys())}")
 

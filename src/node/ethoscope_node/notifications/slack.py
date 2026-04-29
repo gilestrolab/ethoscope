@@ -2,7 +2,7 @@
 
 import datetime
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -26,8 +26,8 @@ class SlackNotificationService(NotificationAnalyzer):
 
     def __init__(
         self,
-        config: Optional[EthoscopeConfiguration] = None,
-        db: Optional[ExperimentalDB] = None,
+        config: EthoscopeConfiguration | None = None,
+        db: ExperimentalDB | None = None,
     ):
         """
         Initialize Slack notification service.
@@ -42,11 +42,11 @@ class SlackNotificationService(NotificationAnalyzer):
         self._last_alert_times = {}
         self._default_cooldown = 3600  # 1 hour between similar alerts
 
-    def _get_slack_config(self) -> Dict[str, Any]:
+    def _get_slack_config(self) -> dict[str, Any]:
         """Get Slack configuration from settings."""
         return self.config.content.get("slack", {})
 
-    def _get_alert_config(self) -> Dict[str, Any]:
+    def _get_alert_config(self) -> dict[str, Any]:
         """Get alert configuration from settings."""
         return self.config.content.get("alerts", {})
 
@@ -101,7 +101,7 @@ class SlackNotificationService(NotificationAnalyzer):
         self._last_alert_times[key] = current_time
         return True
 
-    def _send_message(self, blocks: List[Dict[str, Any]], text: str = None) -> bool:
+    def _send_message(self, blocks: list[dict[str, Any]], text: str = None) -> bool:
         """
         Send message to Slack using either webhook or bot token.
 
@@ -127,7 +127,7 @@ class SlackNotificationService(NotificationAnalyzer):
         else:
             return self._send_via_bot_token(blocks, text)
 
-    def _send_via_webhook(self, blocks: List[Dict[str, Any]], text: str = None) -> bool:
+    def _send_via_webhook(self, blocks: list[dict[str, Any]], text: str = None) -> bool:
         """
         Send message via Slack webhook.
 
@@ -177,7 +177,7 @@ class SlackNotificationService(NotificationAnalyzer):
             return False
 
     def _send_via_bot_token(
-        self, blocks: List[Dict[str, Any]], text: str = None
+        self, blocks: list[dict[str, Any]], text: str = None
     ) -> bool:
         """
         Send message via Slack bot token (chat.postMessage API).
@@ -233,11 +233,11 @@ class SlackNotificationService(NotificationAnalyzer):
         self,
         device_name: str,
         device_id: str,
-        failure_analysis: Dict[str, Any],
+        failure_analysis: dict[str, Any],
         run_id: str,
         last_seen: datetime.datetime,
         device_logs: str = None,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Create Slack Block Kit blocks for device stopped alert.
 
@@ -690,7 +690,7 @@ class SlackNotificationService(NotificationAnalyzer):
             self.logger.error(f"Error sending temperature alert: {e}")
             return False
 
-    def test_slack_configuration(self) -> Dict[str, Any]:
+    def test_slack_configuration(self) -> dict[str, Any]:
         """
         Test Slack configuration by sending a test message.
 

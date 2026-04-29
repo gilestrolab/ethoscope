@@ -47,7 +47,6 @@ import os
 import sqlite3
 import threading
 import time
-from typing import Dict
 
 import mysql.connector
 
@@ -107,7 +106,7 @@ class BaseSQLConnector:
         self._remote_db_name = remote_db_name
         self._lock = threading.RLock()
 
-    def _get_remote_db_info(self) -> Dict[str, int]:
+    def _get_remote_db_info(self) -> dict[str, int]:
         """Fast method using INFORMATION_SCHEMA (may be inaccurate with InnoDB)."""
         with DatabaseConnectionManager(
             self._remote_host, self._remote_user, self._remote_pass
@@ -125,7 +124,7 @@ class BaseSQLConnector:
                 tables = cursor.fetchall()
                 return dict(tables)
 
-    def _get_remote_db_info_slow(self) -> Dict[str, Dict[str, int]]:
+    def _get_remote_db_info_slow(self) -> dict[str, dict[str, int]]:
         """Accurate method using direct table queries."""
         with DatabaseConnectionManager(
             self._remote_host, self._remote_user, self._remote_pass
@@ -167,7 +166,7 @@ class BaseSQLConnector:
 
             return db_info
 
-    def _get_local_db_info(self) -> Dict[str, int]:
+    def _get_local_db_info(self) -> dict[str, int]:
         """Get information about local SQLite database."""
         if not os.path.exists(self._dst_path):
             logging.error(f"No db file at {self._dst_path}")
@@ -178,10 +177,12 @@ class BaseSQLConnector:
                 cursor = conn.cursor()
 
                 # Get all non-system tables
-                cursor.execute("""
+                cursor.execute(
+                    """
                     SELECT name FROM sqlite_master
                     WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
-                """)
+                """
+                )
                 tables = cursor.fetchall()
 
                 table_info = {}

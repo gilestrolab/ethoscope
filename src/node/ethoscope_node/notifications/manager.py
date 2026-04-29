@@ -9,7 +9,7 @@ about which specific services are configured or enabled.
 """
 
 import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..utils.configuration import EthoscopeConfiguration
 from ..utils.etho_db import ExperimentalDB
@@ -29,8 +29,8 @@ class NotificationManager(NotificationAnalyzer):
 
     def __init__(
         self,
-        config: Optional[EthoscopeConfiguration] = None,
-        db: Optional[ExperimentalDB] = None,
+        config: EthoscopeConfiguration | None = None,
+        db: ExperimentalDB | None = None,
     ):
         """
         Initialize notification manager.
@@ -325,7 +325,7 @@ class NotificationManager(NotificationAnalyzer):
             )
             return False
 
-    def test_all_configurations(self) -> Dict[str, Any]:
+    def test_all_configurations(self) -> dict[str, Any]:
         """
         Test all notification service configurations.
 
@@ -360,7 +360,7 @@ class NotificationManager(NotificationAnalyzer):
 
         return results
 
-    def get_active_services(self) -> List[str]:
+    def get_active_services(self) -> list[str]:
         """
         Get list of active notification services.
 

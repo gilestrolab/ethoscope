@@ -46,7 +46,7 @@ repos:
   # ===== Ruff: Modern Python linting and import sorting =====
   # Replaces flake8 and isort for better performance and consistency
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.14
+    rev: v0.15.11
     hooks:
       - id: ruff
         args: ['--fix']

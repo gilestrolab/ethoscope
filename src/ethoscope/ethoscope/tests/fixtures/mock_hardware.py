@@ -7,7 +7,7 @@ like cameras, stimulators, and sensors for use in tests.
 
 import threading
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 from unittest.mock import MagicMock, Mock
 
 import numpy as np
@@ -16,7 +16,7 @@ import numpy as np
 class MockCamera:
     """Mock implementation of camera interface."""
 
-    def __init__(self, resolution: Tuple[int, int] = (640, 480), framerate: int = 30):
+    def __init__(self, resolution: tuple[int, int] = (640, 480), framerate: int = 30):
         """Initialize mock camera."""
         self.resolution = resolution
         self.framerate = framerate
@@ -148,11 +148,11 @@ class MockStimulator:
         """Set stimulator parameters."""
         self.parameters.update(kwargs)
 
-    def get_parameters(self) -> Dict[str, Any]:
+    def get_parameters(self) -> dict[str, Any]:
         """Get stimulator parameters."""
         return self.parameters.copy()
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get stimulator status."""
         return {
             "name": self.name,
@@ -191,7 +191,7 @@ class MockSensor:
         """Stop continuous reading."""
         self.is_active = False
 
-    def get_readings(self) -> List[float]:
+    def get_readings(self) -> list[float]:
         """Get all readings."""
         return self.readings.copy()
 
@@ -199,7 +199,7 @@ class MockSensor:
         """Clear reading history."""
         self.readings = []
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Get sensor status."""
         return {
             "name": self.name,
@@ -245,7 +245,7 @@ class MockGPIO:
         """Cleanup GPIO pins."""
         self.pins = {}
 
-    def get_pin_status(self, pin: int) -> Dict[str, Any]:
+    def get_pin_status(self, pin: int) -> dict[str, Any]:
         """Get pin status."""
         return self.pins.get(pin, {})
 
@@ -298,7 +298,7 @@ class MockSerialPort:
         """Add a response to the read buffer."""
         self.read_buffer.append(response)
 
-    def get_written_data(self) -> List[bytes]:
+    def get_written_data(self) -> list[bytes]:
         """Get all written data."""
         return self.write_buffer.copy()
 
@@ -312,7 +312,7 @@ class MockSerialPort:
         self.close()
 
 
-def create_mock_hardware_setup() -> Dict[str, Any]:
+def create_mock_hardware_setup() -> dict[str, Any]:
     """Create a complete mock hardware setup."""
     return {
         "camera": MockCamera(),

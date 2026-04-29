@@ -12,8 +12,8 @@ import queue
 import socket
 import struct
 import time
+from collections.abc import Iterator
 from threading import RLock, Thread
-from typing import Iterator, Tuple
 
 # Import the streaming port constant
 STREAMING_PORT = 8887
@@ -282,7 +282,7 @@ class EthoscopeStreamManager:
             for client_id in disconnected_clients:
                 self._streaming_clients.pop(client_id, None)
 
-    def _add_streaming_client(self) -> Tuple[int, queue.Queue]:
+    def _add_streaming_client(self) -> tuple[int, queue.Queue]:
         """Add a new streaming client and return client_id and queue."""
         with self._streaming_lock:
             client_id = self._next_client_id

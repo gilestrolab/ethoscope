@@ -792,8 +792,14 @@ class ControlThread(Thread):
             else:
                 raise e
 
-        # Use new shared target detection method
-        reference_points, rois = self._detect_and_store_targets(cam)
+        # Force the light module ON during target detection so wells are evenly
+        # illuminated. Released in the finally block; the user-configured schedule
+        # is restored by _write_light_schedule() further below.
+        self._force_lights_on_for_targets()
+        try:
+            reference_points, rois = self._detect_and_store_targets(cam)
+        finally:
+            self._release_lights_after_targets()
 
         # Handle detection failure
         if reference_points is None or rois is None:
@@ -1390,6 +1396,60 @@ class ControlThread(Thread):
                 logging.info("No light schedule configured for this experiment")
         except Exception as e:
             logging.warning("Failed to write light schedule: %s", e)
+
+    def _force_lights_on_for_targets(self):
+        """Force the LED on during target detection on light-equipped ethoscopes.
+
+        Talks to the light daemon over its Unix socket. Best-effort: any failure
+        (no light hardware, daemon down, permission issue) is logged and
+        swallowed so it never blocks tracking start.
+        """
+        try:
+            from ethoscope.hardware.interfaces.light_daemon import (
+                LightDaemonClient,
+                LightDaemonUnavailable,
+            )
+            from ethoscope.utils.pi import has_light_hardware
+        except ImportError as e:
+            logging.debug("Light daemon client unavailable: %s", e)
+            return
+
+        try:
+            if not has_light_hardware():
+                return
+        except Exception as e:
+            logging.debug("has_light_hardware() check failed: %s", e)
+            return
+
+        try:
+            LightDaemonClient().force_on()
+            logging.info("Light forced ON for target detection phase")
+        except LightDaemonUnavailable as e:
+            logging.warning("Could not force lights on for target detection: %s", e)
+
+    def _release_lights_after_targets(self):
+        """Drop any forced-on state so the light schedule resumes."""
+        try:
+            from ethoscope.hardware.interfaces.light_daemon import (
+                LightDaemonClient,
+                LightDaemonUnavailable,
+            )
+            from ethoscope.utils.pi import has_light_hardware
+        except ImportError:
+            return
+
+        try:
+            if not has_light_hardware():
+                return
+        except Exception:
+            return
+
+        try:
+            LightDaemonClient().release()
+        except LightDaemonUnavailable as e:
+            logging.warning(
+                "Could not release light force after target detection: %s", e
+            )
 
     def _clear_light_schedule(self):
         """Clear the light schedule config file so daemon turns lights off."""

@@ -7,29 +7,24 @@ device and node packages with various options and configurations.
 """
 
 import argparse
-import json
-import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
 
 
 class TestRunner:
     """Main test runner class."""
 
-    def __init__(self, project_root: Optional[Path] = None):
+    def __init__(self, project_root: Path | None = None):
         """Initialize test runner."""
         self.project_root = project_root or Path(__file__).parent
         self.device_package = self.project_root / "src" / "ethoscope"
         self.node_package = self.project_root / "src" / "node"
         self.test_results = {}
 
-    def run_command(self, cmd: List[str], cwd: Optional[Path] = None) -> Dict[str, Any]:
+    def run_command(self, cmd: list[str], cwd: Path | None = None) -> dict[str, Any]:
         """Run a command and return results."""
         start_time = time.time()
 
@@ -74,7 +69,7 @@ class TestRunner:
 
     def run_device_tests(
         self, test_type: str = "all", verbose: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run device package tests."""
         print(f"Running device package tests ({test_type})...")
 
@@ -98,7 +93,7 @@ class TestRunner:
 
     def run_node_tests(
         self, test_type: str = "all", verbose: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run node package tests."""
         print(f"Running node package tests ({test_type})...")
 
@@ -122,7 +117,7 @@ class TestRunner:
 
         return self.run_command(cmd, cwd=self.node_package)
 
-    def run_coverage_tests(self, package: str = "both") -> Dict[str, Any]:
+    def run_coverage_tests(self, package: str = "both") -> dict[str, Any]:
         """Run tests with coverage analysis."""
         print(f"Running coverage tests for {package}...")
 
@@ -158,7 +153,7 @@ class TestRunner:
 
         return results
 
-    def run_quality_checks(self) -> Dict[str, Any]:
+    def run_quality_checks(self) -> dict[str, Any]:
         """Run code quality checks."""
         print("Running code quality checks...")
 
@@ -208,7 +203,7 @@ class TestRunner:
 
         return results
 
-    def run_security_checks(self) -> Dict[str, Any]:
+    def run_security_checks(self) -> dict[str, Any]:
         """Run security checks."""
         print("Running security checks...")
 
@@ -231,7 +226,7 @@ class TestRunner:
         return results
 
     def generate_report(
-        self, results: Dict[str, Any], output_file: Optional[Path] = None
+        self, results: dict[str, Any], output_file: Path | None = None
     ) -> str:
         """Generate a test report."""
         report_lines = []
@@ -291,7 +286,7 @@ class TestRunner:
         coverage: bool = False,
         quality: bool = False,
         security: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Run all tests with specified options."""
         print("Starting comprehensive test run...")
 

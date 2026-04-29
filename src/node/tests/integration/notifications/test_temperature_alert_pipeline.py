@@ -104,9 +104,10 @@ def test_over_threshold_sensor_reading_sends_email(fake_db, tmp_path):
     scanner._config = config
     scanner._temperature_monitor = monitor
 
-    with patch("smtplib.SMTP_SSL") as mock_smtp_ssl, patch(
-        "urllib.request.urlopen"
-    ) as mock_urlopen:
+    with (
+        patch("smtplib.SMTP_SSL") as mock_smtp_ssl,
+        patch("urllib.request.urlopen") as mock_urlopen,
+    ):
         # Discover the sensor — this is the path that was broken in production.
         scanner.add("192.168.1.250", 80, name="sensor-incubator-6A", device_id="6A")
         assert len(scanner.devices) == 1
@@ -165,9 +166,10 @@ def test_in_range_sensor_reading_does_not_send_email(fake_db, tmp_path):
     scanner._is_running = True
     scanner._temperature_monitor = monitor
 
-    with patch("smtplib.SMTP_SSL") as mock_smtp_ssl, patch(
-        "urllib.request.urlopen"
-    ) as mock_urlopen:
+    with (
+        patch("smtplib.SMTP_SSL") as mock_smtp_ssl,
+        patch("urllib.request.urlopen") as mock_urlopen,
+    ):
         scanner.add("192.168.1.251", 80, name="sensor-ok", device_id="OK")
         sensor = scanner.devices[0]
         sensor.save_to_csv = False

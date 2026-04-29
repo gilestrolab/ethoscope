@@ -85,9 +85,7 @@ class TestComposedStimulatorInit(unittest.TestCase):
     def test_init_with_module_interrogation(self):
         """Test init with successful module interrogation."""
         mock_hw = Mock()
-        mock_hw.interrogate.return_value = {
-            "capabilities": {"leds": 20, "motors": 10}
-        }
+        mock_hw.interrogate.return_value = {"capabilities": {"leds": 20, "motors": 10}}
         stim = ComposedStimulator(
             hardware_connection=mock_hw,
             trigger_type="inactivity",
@@ -154,9 +152,7 @@ class TestComposedStimulatorDecide(unittest.TestCase):
 
     def test_decide_ghost_stimulus(self):
         """Test ghost stimulus (code 2)."""
-        stim = self._create_bound_stimulator(
-            roi_id=1, stimulus_probability=0.0
-        )
+        stim = self._create_bound_stimulator(roi_id=1, stimulus_probability=0.0)
         stim._trigger._t0 = 0
         out, dic = stim._decide()
         self.assertEqual(int(out), 2)

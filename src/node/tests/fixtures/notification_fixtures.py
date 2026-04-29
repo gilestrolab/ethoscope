@@ -7,8 +7,7 @@ Test fixtures and mock data for notification system tests.
 import datetime
 import json
 import time
-from unittest.mock import MagicMock
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import pytest
 

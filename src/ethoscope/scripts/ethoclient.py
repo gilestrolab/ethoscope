@@ -44,9 +44,9 @@ def listenerIsAlive():
         bool: True if the service responds successfully, False if any communication errors occur.
     """
     try:
-        r = send_command("status")
+        send_command("status")
         return True
-    except:
+    except Exception:
         return False
 
 

@@ -214,12 +214,8 @@ class TestNotificationManager:
     def test_get_active_services(self, mock_config_both_enabled, mock_db):
         """Test getting list of active services."""
         with (
-            patch(
-                "ethoscope_node.notifications.manager.EmailNotificationService"
-            ) as mock_email_cls,
-            patch(
-                "ethoscope_node.notifications.manager.MattermostNotificationService"
-            ) as mock_mattermost_cls,
+            patch("ethoscope_node.notifications.manager.EmailNotificationService"),
+            patch("ethoscope_node.notifications.manager.MattermostNotificationService"),
         ):
 
             manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
@@ -258,7 +254,7 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == True
+            assert result
             mock_email_service.send_device_stopped_alert.assert_called_once()
             mock_mattermost_service.send_device_stopped_alert.assert_called_once()
 
@@ -291,7 +287,7 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == True  # Should succeed if at least one service works
+            assert result  # Should succeed if at least one service works
             mock_email_service.send_device_stopped_alert.assert_called_once()
             mock_mattermost_service.send_device_stopped_alert.assert_called_once()
 
@@ -324,7 +320,7 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == False
+            assert not result
             mock_email_service.send_device_stopped_alert.assert_called_once()
             mock_mattermost_service.send_device_stopped_alert.assert_called_once()
 
@@ -341,7 +337,7 @@ class TestNotificationManager:
             last_seen=datetime.datetime.now(),
         )
 
-        assert result == False
+        assert not result
 
     def test_send_storage_warning_alert_success(
         self, mock_config_both_enabled, mock_db
@@ -372,7 +368,7 @@ class TestNotificationManager:
                 available_space="2.1 GB",
             )
 
-            assert result == True
+            assert result
             mock_email_service.send_storage_warning_alert.assert_called_once()
             mock_mattermost_service.send_storage_warning_alert.assert_called_once()
 
@@ -404,7 +400,7 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == True
+            assert result
             mock_email_service.send_device_unreachable_alert.assert_called_once()
             mock_mattermost_service.send_device_unreachable_alert.assert_called_once()
 
@@ -434,8 +430,8 @@ class TestNotificationManager:
 
             assert "email" in results
             assert "mattermost" in results
-            assert results["email"]["success"] == True
-            assert results["mattermost"]["success"] == True
+            assert results["email"]["success"]
+            assert results["mattermost"]["success"]
             mock_email_service.test_email_configuration.assert_called_once()
             mock_mattermost_service.test_mattermost_configuration.assert_called_once()
 
@@ -469,19 +465,15 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == True  # Should succeed because Mattermost worked
+            assert result  # Should succeed because Mattermost worked
             mock_email_service.send_device_stopped_alert.assert_called_once()
             mock_mattermost_service.send_device_stopped_alert.assert_called_once()
 
     def test_reload_configuration(self, mock_config_both_enabled, mock_db):
         """Test configuration reloading."""
         with (
-            patch(
-                "ethoscope_node.notifications.manager.EmailNotificationService"
-            ) as mock_email_cls,
-            patch(
-                "ethoscope_node.notifications.manager.MattermostNotificationService"
-            ) as mock_mattermost_cls,
+            patch("ethoscope_node.notifications.manager.EmailNotificationService"),
+            patch("ethoscope_node.notifications.manager.MattermostNotificationService"),
         ):
 
             manager = NotificationManager(config=mock_config_both_enabled, db=mock_db)
@@ -604,7 +596,7 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == True
+            assert result
             mock_email_service.send_device_stopped_alert.assert_called_once()
             mock_mattermost_service.send_device_stopped_alert.assert_called_once()
             mock_slack_service.send_device_stopped_alert.assert_called_once()
@@ -630,7 +622,7 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == True
+            assert result
             mock_slack_service.send_device_stopped_alert.assert_called_once()
 
     def test_send_storage_warning_alert_all_services_mixed_results(
@@ -669,7 +661,7 @@ class TestNotificationManager:
                 available_space="2.1 GB",
             )
 
-            assert result == True  # Should succeed if at least one service works
+            assert result  # Should succeed if at least one service works
             mock_email_service.send_storage_warning_alert.assert_called_once()
             mock_mattermost_service.send_storage_warning_alert.assert_called_once()
             mock_slack_service.send_storage_warning_alert.assert_called_once()
@@ -707,9 +699,9 @@ class TestNotificationManager:
             assert "email" in results
             assert "mattermost" in results
             assert "slack" in results
-            assert results["email"]["success"] == True
-            assert results["mattermost"]["success"] == True
-            assert results["slack"]["success"] == True
+            assert results["email"]["success"]
+            assert results["mattermost"]["success"]
+            assert results["slack"]["success"]
             mock_email_service.test_email_configuration.assert_called_once()
             mock_mattermost_service.test_mattermost_configuration.assert_called_once()
             mock_slack_service.test_slack_configuration.assert_called_once()
@@ -752,7 +744,7 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == True  # Should succeed because email and Mattermost worked
+            assert result  # Should succeed because email and Mattermost worked
             mock_email_service.send_device_stopped_alert.assert_called_once()
             mock_mattermost_service.send_device_stopped_alert.assert_called_once()
             mock_slack_service.send_device_stopped_alert.assert_called_once()
@@ -849,7 +841,7 @@ class TestNotificationManager:
             available_space="2.1 GB",
         )
 
-        assert result == False
+        assert not result
 
     def test_send_storage_warning_alert_exception_handling(
         self, mock_config_both_enabled, mock_db
@@ -883,7 +875,7 @@ class TestNotificationManager:
                 available_space="2.1 GB",
             )
 
-            assert result == True  # Should succeed because Mattermost worked
+            assert result  # Should succeed because Mattermost worked
 
     def test_send_device_unreachable_alert_no_services(
         self, mock_config_none_enabled, mock_db
@@ -897,7 +889,7 @@ class TestNotificationManager:
             last_seen=datetime.datetime.now(),
         )
 
-        assert result == False
+        assert not result
 
     def test_send_device_unreachable_alert_exception_handling(
         self, mock_config_both_enabled, mock_db
@@ -932,7 +924,7 @@ class TestNotificationManager:
                 last_seen=datetime.datetime.now(),
             )
 
-            assert result == False  # Should fail because both services failed
+            assert not result  # Should fail because both services failed
 
     def test_test_all_configurations_exception_handling(
         self, mock_config_both_enabled, mock_db
@@ -964,9 +956,9 @@ class TestNotificationManager:
 
             assert "email" in results
             assert "mattermost" in results
-            assert results["email"]["success"] == False
+            assert not results["email"]["success"]
             assert "Test error" in results["email"]["error"]
-            assert results["mattermost"]["success"] == True
+            assert results["mattermost"]["success"]
 
     def test_test_all_configurations_no_test_method(
         self, mock_config_both_enabled, mock_db
@@ -995,7 +987,7 @@ class TestNotificationManager:
 
             assert "email" in results
             assert "mattermost" in results
-            assert results["email"]["success"] == False
+            assert not results["email"]["success"]
             assert "No test method available" in results["email"]["error"]
-            assert results["mattermost"]["success"] == False
+            assert not results["mattermost"]["success"]
             assert "No test method available" in results["mattermost"]["error"]

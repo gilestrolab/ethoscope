@@ -9,8 +9,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -18,7 +17,7 @@ import pytest
 TEST_DATA_DIR = Path(__file__).parent / "fixtures" / "data"
 
 # Import notification fixtures
-from .fixtures.notification_fixtures import *
+from .fixtures.notification_fixtures import *  # noqa: E402, F403
 
 
 @pytest.fixture

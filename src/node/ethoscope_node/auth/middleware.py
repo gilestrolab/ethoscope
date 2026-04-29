@@ -6,8 +6,9 @@ Provides secure session management, PIN validation, and authentication decorator
 
 import logging
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 import bottle
 
@@ -50,7 +51,7 @@ class AuthMiddleware:
         self.session_timeout = 2 * 60 * 60  # 2 hours
         self.progressive_lockout = True
 
-    def get_current_user(self) -> Optional[Dict[str, Any]]:
+    def get_current_user(self) -> dict[str, Any] | None:
         """
         Get current authenticated user from session.
 
@@ -142,7 +143,7 @@ class AuthMiddleware:
 
     def authenticate_user(
         self, username: str, pin: str, client_ip: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """
         Authenticate user with PIN.
 
@@ -185,7 +186,7 @@ class AuthMiddleware:
         self.logger.info(f"User authenticated successfully: {username}")
         return user
 
-    def login_user(self, username: str, pin: str) -> Optional[str]:
+    def login_user(self, username: str, pin: str) -> str | None:
         """
         Perform user login and create session.
 
@@ -390,7 +391,7 @@ def require_admin(func: Callable) -> Callable:
     return wrapper
 
 
-def get_current_user() -> Optional[Dict[str, Any]]:
+def get_current_user() -> dict[str, Any] | None:
     """
     Helper function to get current authenticated user.
 

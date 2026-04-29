@@ -967,9 +967,9 @@ def get_partition_info(folder=""):
 
         # For a specified folder, return a dictionary; otherwise, return a list of dictionaries
         if folder:
-            return dict(zip(keys, values[0].split()))
+            return dict(zip(keys, values[0].split(), strict=False))
         else:
-            return [dict(zip(keys, line.split())) for line in values]
+            return [dict(zip(keys, line.split(), strict=False)) for line in values]
 
     except Exception as e:
         print(f"Error: {e}")

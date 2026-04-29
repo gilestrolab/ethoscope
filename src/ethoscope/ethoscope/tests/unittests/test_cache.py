@@ -53,12 +53,14 @@ class TestSQLiteDatabaseMetadataCache(unittest.TestCase):
         cursor = conn.cursor()
 
         # Create METADATA table (standard for ethoscope databases)
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE METADATA (
                 field TEXT PRIMARY KEY,
                 value TEXT
             )
-        """)
+        """
+        )
 
         # Insert metadata
         cursor.execute("INSERT INTO METADATA VALUES ('machine_name', 'test_device')")
@@ -66,12 +68,14 @@ class TestSQLiteDatabaseMetadataCache(unittest.TestCase):
         cursor.execute("INSERT INTO METADATA VALUES ('date_time', '2025_01_15_120000')")
 
         # Create sample data table
-        cursor.execute("""
+        cursor.execute(
+            """
             CREATE TABLE DATA (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 value TEXT
             )
-        """)
+        """
+        )
 
         # Insert some data
         for i in range(10):

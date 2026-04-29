@@ -359,8 +359,8 @@ epub_exclude_files = ["search.html"]
 autoclass_content = "both"
 
 
-import sys
-from unittest.mock import Mock as MagicMock
+import sys  # noqa: E402
+from unittest.mock import Mock as MagicMock  # noqa: E402
 
 
 class Mock(MagicMock):

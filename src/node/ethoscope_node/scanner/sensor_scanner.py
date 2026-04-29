@@ -5,8 +5,9 @@ import os
 import time
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from threading import RLock
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from ethoscope_node.scanner.base_scanner import BaseDevice, DeviceScanner, ScanException
 
@@ -27,7 +28,7 @@ class Sensor(BaseDevice):
         refresh_period: float = 5,
         results_dir: str = "/ethoscope_data/sensors",
         save_to_csv: bool = True,
-        temperature_callback: Optional[Callable[[str, str, str, float], None]] = None,
+        temperature_callback: Callable[[str, str, str, float], None] | None = None,
     ):
         """
         Initialize sensor device.
@@ -58,7 +59,7 @@ class Sensor(BaseDevice):
         self._id_url = f"http://{self._ip}:{self._port}/id"
         self._post_url = f"http://{self._ip}:{self._port}/set"
 
-    def set(self, post_data: Dict[str, Any], use_json: bool = False) -> Any:
+    def set(self, post_data: dict[str, Any], use_json: bool = False) -> Any:
         """
         Set remote sensor variables.
 
@@ -88,7 +89,7 @@ class Sensor(BaseDevice):
             raise
 
     def set_temperature_callback(
-        self, callback: Optional[Callable[[str, str, str, float], None]]
+        self, callback: Callable[[str, str, str, float], None] | None
     ) -> None:
         """
         Set the temperature monitoring callback.
@@ -177,9 +178,9 @@ class Sensor(BaseDevice):
                         writer.writerow(self.SENSOR_FIELDS)
 
                     # Write data row
-                    current_time = datetime.datetime.now(
-                        tz=datetime.timezone.utc
-                    ).strftime("%Y-%m-%d %H:%M:%S")
+                    current_time = datetime.datetime.now(tz=datetime.UTC).strftime(
+                        "%Y-%m-%d %H:%M:%S"
+                    )
                     writer.writerow(
                         [
                             current_time,
@@ -193,7 +194,7 @@ class Sensor(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error saving to CSV: {e}")
 
-    def _extract_sensor_data(self) -> Dict[str, Any]:
+    def _extract_sensor_data(self) -> dict[str, Any]:
         """Extract sensor data from info dictionary."""
         with self._lock:
             return {
@@ -212,7 +213,7 @@ class Sensor(BaseDevice):
         safe_name = "".join(c for c in sensor_name if c.isalnum() or c in "_-")
         return os.path.join(self.CSV_PATH, f"{safe_name}.csv")
 
-    def _write_csv_header(self, csvfile, sensor_data: Dict[str, Any]):
+    def _write_csv_header(self, csvfile, sensor_data: dict[str, Any]):
         """Write CSV metadata header."""
         header = (
             f"# Sensor ID: {sensor_data['id']}\n"
@@ -250,7 +251,7 @@ class SensorScanner(DeviceScanner):
 
         # Initialize temperature alert monitoring
         self._config = config
-        self._temperature_monitor: Optional[TemperatureAlertMonitor] = None
+        self._temperature_monitor: TemperatureAlertMonitor | None = None
 
         # Lazily initialize temperature monitor when config is available
         if self._config:
@@ -305,9 +306,9 @@ class SensorScanner(DeviceScanner):
         self,
         ip: str,
         port: int,
-        name: Optional[str] = None,
-        device_id: Optional[str] = None,
-        zcinfo: Optional[Dict] = None,
+        name: str | None = None,
+        device_id: str | None = None,
+        zcinfo: dict | None = None,
     ):
         """Add a sensor device and attach the temperature callback if present.
 
@@ -332,7 +333,7 @@ class SensorScanner(DeviceScanner):
                         f"Temperature monitoring enabled for sensor: {name or device_id}"
                     )
 
-    def get_temperature_alert_states(self) -> Dict[str, Any]:
+    def get_temperature_alert_states(self) -> dict[str, Any]:
         """
         Get temperature alert states for all sensors.
 

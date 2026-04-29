@@ -2,7 +2,7 @@
 
 import datetime
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -24,8 +24,8 @@ class MattermostNotificationService(NotificationAnalyzer):
 
     def __init__(
         self,
-        config: Optional[EthoscopeConfiguration] = None,
-        db: Optional[ExperimentalDB] = None,
+        config: EthoscopeConfiguration | None = None,
+        db: ExperimentalDB | None = None,
     ):
         """
         Initialize Mattermost notification service.
@@ -40,11 +40,11 @@ class MattermostNotificationService(NotificationAnalyzer):
         self._last_alert_times = {}
         self._default_cooldown = 3600  # 1 hour between similar alerts
 
-    def _get_mattermost_config(self) -> Dict[str, Any]:
+    def _get_mattermost_config(self) -> dict[str, Any]:
         """Get Mattermost configuration from settings."""
         return self.config.content.get("mattermost", {})
 
-    def _get_alert_config(self) -> Dict[str, Any]:
+    def _get_alert_config(self) -> dict[str, Any]:
         """Get alert configuration from settings."""
         return self.config.content.get("alerts", {})
 
@@ -100,7 +100,7 @@ class MattermostNotificationService(NotificationAnalyzer):
         return True
 
     def _send_message(
-        self, message: str, attachments: Optional[List[Dict[str, Any]]] = None
+        self, message: str, attachments: list[dict[str, Any]] | None = None
     ) -> bool:
         """
         Send message to Mattermost channel.
@@ -427,7 +427,7 @@ class MattermostNotificationService(NotificationAnalyzer):
             self.logger.error(f"Error sending temperature alert: {e}")
             return False
 
-    def test_mattermost_configuration(self) -> Dict[str, Any]:
+    def test_mattermost_configuration(self) -> dict[str, Any]:
         """
         Test Mattermost configuration by sending a test message.
 

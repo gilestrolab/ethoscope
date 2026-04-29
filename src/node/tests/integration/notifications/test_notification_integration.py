@@ -10,9 +10,7 @@ import json
 import os
 import tempfile
 import time
-from unittest.mock import MagicMock
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
@@ -151,7 +149,9 @@ class TestNotificationIntegration:
 
         def mock_get_users_for_device(device_id, running_only=True, asdict=True):
             # Find runs for this device
-            device_runs = [run for run in runs_data.values() if run["ethoscope_id"] == device_id]
+            device_runs = [
+                run for run in runs_data.values() if run["ethoscope_id"] == device_id
+            ]
 
             # If running_only, filter for runs without end_time
             if running_only:
@@ -171,9 +171,23 @@ class TestNotificationIntegration:
             # When asdict=False, return list of user dicts
             if admin_only:
                 if asdict:
-                    return {"admin": {"email": "admin@example.com", "username": "admin", "isAdmin": True, "active": True}}
+                    return {
+                        "admin": {
+                            "email": "admin@example.com",
+                            "username": "admin",
+                            "isAdmin": True,
+                            "active": True,
+                        }
+                    }
                 else:
-                    return [{"email": "admin@example.com", "username": "admin", "isAdmin": True, "active": True}]
+                    return [
+                        {
+                            "email": "admin@example.com",
+                            "username": "admin",
+                            "isAdmin": True,
+                            "active": True,
+                        }
+                    ]
             if asdict:
                 return {}
             return []
@@ -183,7 +197,11 @@ class TestNotificationIntegration:
             run = runs_data.get(run_id)
             if run:
                 username = run.get("user_name")
-                return {"email": f"{username}@example.com", "username": username, "active": 1}
+                return {
+                    "email": f"{username}@example.com",
+                    "username": username,
+                    "active": 1,
+                }
             return None
 
         db.getEthoscope.side_effect = mock_get_ethoscope
@@ -209,14 +227,18 @@ class TestNotificationIntegration:
 
         # Verify analysis contains expected information
         assert analysis["device_id"] == device_id
-        assert analysis["device_name"] == "Device ETHOSCOPE_001"  # analyze_device_failure doesn't extract nested data properly
+        assert (
+            analysis["device_name"] == "Device ETHOSCOPE_001"
+        )  # analyze_device_failure doesn't extract nested data properly
         assert analysis["failure_type"] == "crashed_during_tracking"
         assert analysis["status"] == "Failed while running"
         assert analysis["user"] == "researcher1"
         assert analysis["location"] == "Incubator_A"
         assert analysis["experiment_type"] == "tracking"
         assert analysis["problems"] == "Device stopped responding"
-        assert analysis["device_active"] == False  # Bug: uses device_info instead of device_data
+        assert not analysis[
+            "device_active"
+        ]  # Bug: uses device_info instead of device_data
         assert "experiment_duration" in analysis
         assert "experiment_duration_str" in analysis
 
@@ -233,14 +255,18 @@ class TestNotificationIntegration:
 
         # Verify analysis contains expected information
         assert analysis["device_id"] == device_id
-        assert analysis["device_name"] == "Device ETHOSCOPE_002"  # analyze_device_failure doesn't extract nested data properly
+        assert (
+            analysis["device_name"] == "Device ETHOSCOPE_002"
+        )  # analyze_device_failure doesn't extract nested data properly
         assert analysis["failure_type"] == "completed_normally"
         assert analysis["status"] == "Completed normally"
         assert analysis["user"] == "researcher2"
         assert analysis["location"] == "Incubator_B"
         assert analysis["experiment_type"] == "recording"
-        assert analysis["device_active"] == False
-        assert analysis["device_problems"] == ""  # Bug: uses device_info instead of device_data
+        assert not analysis["device_active"]
+        assert (
+            analysis["device_problems"] == ""
+        )  # Bug: uses device_info instead of device_data
 
         # Verify duration calculation (should be about 1 hour)
         duration = analysis["experiment_duration"]
@@ -337,8 +363,10 @@ class TestNotificationIntegration:
 
         # Verify status retrieval
         assert status["device_id"] == device_id
-        assert status["device_name"] is None  # Bug: uses device_info instead of device_data
-        assert status["online"] == True
+        assert (
+            status["device_name"] is None
+        )  # Bug: uses device_info instead of device_data
+        assert status["online"]
         assert status["status"] == "running"
         assert status["fps"] == 30
         assert "experimental_info" in status
@@ -353,25 +381,25 @@ class TestNotificationIntegration:
         should_send_1 = email_service_integration._should_send_alert(
             device_id, alert_type
         )
-        assert should_send_1 == True
+        assert should_send_1
 
         # Second alert immediately after should be blocked
         should_send_2 = email_service_integration._should_send_alert(
             device_id, alert_type
         )
-        assert should_send_2 == False
+        assert not should_send_2
 
         # Different alert type should be allowed
         should_send_3 = email_service_integration._should_send_alert(
             device_id, "storage_warning"
         )
-        assert should_send_3 == True
+        assert should_send_3
 
         # Different device should be allowed
         should_send_4 = email_service_integration._should_send_alert(
             "ETHOSCOPE_002", alert_type
         )
-        assert should_send_4 == True
+        assert should_send_4
 
     def test_error_handling_workflow(self, email_service_integration):
         """Test error handling in various workflow scenarios."""

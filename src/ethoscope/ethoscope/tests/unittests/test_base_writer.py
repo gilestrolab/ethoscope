@@ -571,9 +571,11 @@ class TestBaseResultWriterWriteFlush(unittest.TestCase):
         data_row.values.return_value = [mock_var]
         data_row.items.return_value = [("x", mock_var)]
 
-        with patch.object(writer, "_initialise_var_map") as mock_init_vm, patch.object(
-            writer, "_initialise_roi_table"
-        ), patch.object(writer, "_add"):
+        with (
+            patch.object(writer, "_initialise_var_map") as mock_init_vm,
+            patch.object(writer, "_initialise_roi_table"),
+            patch.object(writer, "_add"),
+        ):
             writer.write(1000, roi, [data_row])
             mock_init_vm.assert_called_once()
 
@@ -587,8 +589,9 @@ class TestBaseResultWriterWriteFlush(unittest.TestCase):
         data_row = Mock()
         data_row.values.return_value = []
 
-        with patch.object(writer, "_initialise_var_map") as mock_init_vm, patch.object(
-            writer, "_add"
+        with (
+            patch.object(writer, "_initialise_var_map") as mock_init_vm,
+            patch.object(writer, "_add"),
         ):
             writer.write(2000, roi, [data_row])
             mock_init_vm.assert_not_called()

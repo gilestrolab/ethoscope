@@ -339,6 +339,10 @@ EOF
     echo $'#!/bin/env bash\npython /opt/ethoscope/src/ethoscope/scripts/ethoclient.py $@' > /usr/bin/ethoclient
     chmod +x /usr/bin/ethoclient
 
+    print_info "Creating ethoscope-light CLI wrapper..."
+    echo $'#!/bin/env bash\npython /opt/ethoscope/src/ethoscope/ethoscope/hardware/interfaces/light_cli.py "$@"' > /usr/bin/ethoscope-light
+    chmod +x /usr/bin/ethoscope-light
+
     print_success "Ethoscope software installed to /opt/ethoscope"
 }
 

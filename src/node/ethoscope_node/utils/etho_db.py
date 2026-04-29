@@ -32,7 +32,6 @@ import secrets
 import sqlite3
 import string
 import traceback
-from typing import Optional
 
 from ethoscope_node.utils.configuration import migrate_conf_file
 
@@ -645,7 +644,7 @@ class ExperimentalDB(multiprocessing.Process):
         if asdict:
             keys = row[0].keys()
             # return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
-            return {line["run_id"]: dict(zip(keys, line)) for line in row}
+            return {line["run_id"]: dict(zip(keys, line, strict=False)) for line in row}
 
         else:
             return row
@@ -753,7 +752,9 @@ class ExperimentalDB(multiprocessing.Process):
             updates = {
                 name: value
                 for (name, value) in zip(
-                    ["runs", "metadata", "comments"], [runs, metadata, comments]
+                    ["runs", "metadata", "comments"],
+                    [runs, metadata, comments],
+                    strict=False,
                 )
                 if value is not None
             }
@@ -791,7 +792,7 @@ class ExperimentalDB(multiprocessing.Process):
         if asdict:
             keys = row[0].keys()
             # return [dict([(key, value) for key, value in zip(keys, line)]) for line in row]
-            return {line["id"]: dict(zip(keys, line)) for line in row}
+            return {line["id"]: dict(zip(keys, line, strict=False)) for line in row}
 
         else:
             return row
@@ -877,6 +878,7 @@ class ExperimentalDB(multiprocessing.Process):
                         comments,
                         status,
                     ],
+                    strict=False,
                 )
                 if value is not None
             }
@@ -2397,7 +2399,7 @@ class ExperimentalDB(multiprocessing.Process):
             logging.error(f"Error verifying PIN for user {username}: {e}")
             return False
 
-    def authenticate_user(self, username: str, pin: str) -> Optional[dict]:
+    def authenticate_user(self, username: str, pin: str) -> dict | None:
         """
         Authenticate a user with username and PIN.
 
@@ -2604,7 +2606,9 @@ def createRandomRuns(number):
     users = ["ggilestro", "afrench", "hjones", "mjoyce", "ebeckwith", "qgeissmann"]
     ethoscopes = {
         f"ETHOSCOPE_{num:03d}": eid
-        for (num, eid) in zip(range(1, 150), [secrets.token_hex(8) for i in range(149)])
+        for (num, eid) in zip(
+            range(1, 150), [secrets.token_hex(8) for i in range(149)], strict=False
+        )
     }
 
     for run in [secrets.token_hex(8) for i in range(number)]:
@@ -2640,7 +2644,9 @@ def createRandomEthoscopes(number):
     ethoscopes = {
         f"ETHOSCOPE_{num:03d}": eid
         for (num, eid) in zip(
-            range(1, number + 1), [secrets.token_hex(8) for i in range(number)]
+            range(1, number + 1),
+            [secrets.token_hex(8) for i in range(number)],
+            strict=False,
         )
     }
 

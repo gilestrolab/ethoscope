@@ -17,7 +17,6 @@ from ethoscope.stimulators.actions import (
 )
 from ethoscope.stimulators.channel_maps import get_channel_map
 
-
 # ===========================================================================
 # BaseAction
 # ===========================================================================
@@ -138,12 +137,16 @@ class TestGetChannelMap(unittest.TestCase):
     def test_motor_returns_odd_channels(self):
         cmap = get_channel_map("motor")
         for roi_id, channel in cmap.items():
-            self.assertEqual(channel % 2, 1, f"Motor ROI {roi_id} has even channel {channel}")
+            self.assertEqual(
+                channel % 2, 1, f"Motor ROI {roi_id} has even channel {channel}"
+            )
 
     def test_led_default_returns_even_channels(self):
         cmap = get_channel_map("led")
         for roi_id, channel in cmap.items():
-            self.assertEqual(channel % 2, 0, f"LED ROI {roi_id} has odd channel {channel}")
+            self.assertEqual(
+                channel % 2, 0, f"LED ROI {roi_id} has odd channel {channel}"
+            )
 
     def test_led_20_leds_returns_20_channels(self):
         cmap = get_channel_map("led", led_count=20)
@@ -162,7 +165,9 @@ class TestGetChannelMap(unittest.TestCase):
     def test_valve_returns_even_channels(self):
         cmap = get_channel_map("valve")
         for roi_id, channel in cmap.items():
-            self.assertEqual(channel % 2, 0, f"Valve ROI {roi_id} has odd channel {channel}")
+            self.assertEqual(
+                channel % 2, 0, f"Valve ROI {roi_id} has odd channel {channel}"
+            )
 
     def test_unknown_type_raises(self):
         with self.assertRaises(ValueError):

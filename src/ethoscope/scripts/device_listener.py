@@ -223,7 +223,7 @@ class commandingThread(threading.Thread):
                     return "The persistent file was succesfully removed"
                 else:
                     return "The persistent file does not exist"
-            except:
+            except Exception:
                 return "The persistent file exists but could not be removed"
 
         elif action == "restart" and self.control.info["status"] not in [

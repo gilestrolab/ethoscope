@@ -2,12 +2,8 @@ import logging
 import os
 import subprocess
 import traceback
-from typing import Dict
-from typing import Tuple
 
-from git import GitCommandError
-from git import Remote
-from git import Repo
+from git import GitCommandError, Remote, Repo
 
 
 class DeviceUpdateError(Exception):
@@ -65,7 +61,7 @@ class DeviceUpdater:
                 f"Remote '{self._remote_name}' not found in the repository."
             ) from None
 
-    def get_local_and_origin_commits(self) -> Tuple[Repo.commit, Repo.commit]:
+    def get_local_and_origin_commits(self) -> tuple[Repo.commit, Repo.commit]:
         """
         Retrieves the latest commits from the local repository and the origin.
 
@@ -373,9 +369,7 @@ class BareRepoUpdater:
         try:
             # Check if the directory is already in safe.directory
             check_cmd = ["git", "config", "--system", "--get-all", "safe.directory"]
-            check_result = subprocess.run(
-                check_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-            )
+            check_result = subprocess.run(check_cmd, capture_output=True, text=True)
 
             # Handle case where no safe.directory entries exist (exit code 1)
             if check_result.returncode == 0:
@@ -420,8 +414,7 @@ class BareRepoUpdater:
             result = subprocess.run(
                 cmd,
                 check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
             )
             logging.info(
@@ -478,7 +471,7 @@ class BareRepoUpdater:
                 "An unexpected error occurred while adding safe.directory."
             ) from e
 
-    def update_all_visible_branches(self) -> Dict[str, bool]:
+    def update_all_visible_branches(self) -> dict[str, bool]:
         """
         Updates all visible branches in the repository.
 
@@ -488,7 +481,7 @@ class BareRepoUpdater:
         :return: A dictionary mapping branch names to their update status (True for success, False for failure).
         :raises BranchUpdateError: If none of the branches could be updated.
         """
-        update_results: Dict[str, bool] = {}
+        update_results: dict[str, bool] = {}
         any_success = False
 
         logging.info("Starting update_all_visible_branches for bare repository.")
@@ -530,7 +523,6 @@ class BareRepoUpdater:
                 try:
                     # Update local branch to match remote branch in bare repository
                     # This is equivalent to: git branch -f <branch_name> refs/remotes/origin/<branch_name>
-                    local_branch_ref = f"refs/heads/{branch_name}"
                     remote_commit = remote_ref.commit
 
                     # Create or update the local branch reference
@@ -564,7 +556,7 @@ class BareRepoUpdater:
     def update_all_branches(self):
         self._working_repo.git.fetch()
 
-    def discover_branches(self) -> Dict[str, bool]:
+    def discover_branches(self) -> dict[str, bool]:
         """
         Discovers and updates new branches from the remote repository.
 

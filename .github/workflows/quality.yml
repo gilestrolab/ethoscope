@@ -25,7 +25,7 @@ jobs:
     - name: Install linting tools
       run: |
         pip install --upgrade pip
-        pip install flake8 ruff black mypy bandit
+        pip install flake8 'ruff==0.15.11' black mypy bandit
 
     - name: Run flake8 on device package
       run: |
@@ -64,7 +64,7 @@ jobs:
     - name: Install linting tools
       run: |
         pip install --upgrade pip
-        pip install flake8 ruff black mypy bandit
+        pip install flake8 'ruff==0.15.11' black mypy bandit
 
     - name: Run flake8 on node package
       run: |

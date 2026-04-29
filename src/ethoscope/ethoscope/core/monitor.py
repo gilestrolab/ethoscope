@@ -68,7 +68,7 @@ class Monitor:
         elif len(stimulators) == len(rois):
             self._unit_trackers = [
                 TrackingUnit(tracker_class, r, inter, *args, **kwargs)
-                for r, inter in zip(rois, stimulators)
+                for r, inter in zip(rois, stimulators, strict=False)
             ]
         else:
             raise ValueError("You should have one interactor per ROI")

@@ -561,7 +561,7 @@ class RawDataWriter:
             t (int): Current time (unused)
             frame: Current frame (unused)
         """
-        for row, fh in zip(self.data, self.files):
+        for row, fh in zip(self.data, self.files, strict=False):
             fh.write(self.data[row])
 
     def write(self, t, roi, data_rows):

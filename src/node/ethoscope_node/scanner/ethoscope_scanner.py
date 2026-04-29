@@ -7,7 +7,8 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from typing import Any, Dict, Iterator, List, Optional, Union
+from collections.abc import Iterator
+from typing import Any
 
 from ethoscope_node.notifications.manager import NotificationManager
 from ethoscope_node.scanner.base_scanner import (
@@ -68,7 +69,7 @@ class Ethoscope(BaseDevice):
         refresh_period: float = 5,
         results_dir: str = "/ethoscope_data/results",
         config_dir: str = "/etc/ethoscope",
-        config: Optional[EthoscopeConfiguration] = None,
+        config: EthoscopeConfiguration | None = None,
     ):
         # Initialize ethoscope-specific attributes BEFORE calling parent
         self._results_dir = results_dir
@@ -123,9 +124,7 @@ class Ethoscope(BaseDevice):
 
             self._info.update(base_info)
 
-    def send_instruction(
-        self, instruction: str, post_data: Optional[Union[Dict, bytes]] = None
-    ):
+    def send_instruction(self, instruction: str, post_data: dict | bytes | None = None):
         """
         Send instruction to ethoscope with validation and user action tracking.
 
@@ -171,7 +170,7 @@ class Ethoscope(BaseDevice):
 
         self._update_info()
 
-    def send_settings(self, post_data: Union[Dict, bytes]) -> Any:
+    def send_settings(self, post_data: dict | bytes) -> Any:
         """Send settings update to ethoscope."""
 
         # Handle post_data properly
@@ -202,7 +201,7 @@ class Ethoscope(BaseDevice):
                 f"Cannot send '{instruction}' to device in status '{current_status}'"
             )
 
-    def databases_info(self) -> Dict[str, Any]:
+    def databases_info(self) -> dict[str, Any]:
         """Get information about all the databases on the ethoscope."""
 
         if not self._id:
@@ -214,7 +213,7 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return {}
 
-    def machine_info(self) -> Dict[str, Any]:
+    def machine_info(self) -> dict[str, Any]:
         """Get machine information from ethoscope."""
         if not self._id:
             return {}
@@ -225,7 +224,7 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return {}
 
-    def connected_module(self) -> Dict[str, Any]:
+    def connected_module(self) -> dict[str, Any]:
         """Get connected module information."""
         if not self._id:
             return {}
@@ -236,7 +235,7 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return {}
 
-    def firmware_status(self) -> Dict[str, Any]:
+    def firmware_status(self) -> dict[str, Any]:
         """Get firmware status from device (read-only check)."""
         if not self._id:
             return {}
@@ -247,7 +246,7 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return {}
 
-    def update_firmware(self) -> Dict[str, Any]:
+    def update_firmware(self) -> dict[str, Any]:
         """Trigger firmware update on device (compile + upload).
 
         Uses a longer timeout (120s) since compilation and upload take time.
@@ -261,7 +260,7 @@ class Ethoscope(BaseDevice):
         except ScanException as e:
             return {"status": "failed", "error": str(e)}
 
-    def videofiles(self) -> List[str]:
+    def videofiles(self) -> list[str]:
         """Get list of available video files."""
         try:
             url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['videofiles']}/{self._id}"
@@ -269,7 +268,7 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return []
 
-    def user_options(self) -> Optional[Dict[str, Any]]:
+    def user_options(self) -> dict[str, Any] | None:
         """Get user options from ethoscope."""
         try:
             url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['user_options']}/{self._id}"
@@ -277,7 +276,7 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return None
 
-    def get_log(self) -> Optional[Dict[str, Any]]:
+    def get_log(self) -> dict[str, Any] | None:
         """Get log from ethoscope."""
         try:
             url = (
@@ -287,7 +286,7 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return None
 
-    def dump_sql_db(self) -> Optional[Dict[str, Any]]:
+    def dump_sql_db(self) -> dict[str, Any] | None:
         """Trigger SQL database dump on ethoscope."""
         try:
             url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['dumpdb']}/{self._id}"
@@ -1001,7 +1000,7 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error handling state transition: {e}")
 
-    def _get_recent_run_id(self) -> Optional[str]:
+    def _get_recent_run_id(self) -> str | None:
         """
         Get the most recent run_id for this device from the database.
         Used to recover run_id for interrupted tracking sessions.
@@ -1549,7 +1548,7 @@ class EthoscopeScanner(DeviceScanner):
         results_dir: str = "/ethoscope_data/results",
         device_class=Ethoscope,
         config_dir: str = "/etc/ethoscope",
-        config: Optional[EthoscopeConfiguration] = None,
+        config: EthoscopeConfiguration | None = None,
     ):
         super().__init__(device_refresh_period, device_class)
         self.results_dir = results_dir
@@ -1562,7 +1561,7 @@ class EthoscopeScanner(DeviceScanner):
 
     def get_all_devices_info(
         self, include_inactive: bool = False
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> dict[str, dict[str, Any]]:
         """Get device info including offline devices from database."""
         # Start with database devices
         try:
@@ -1659,9 +1658,9 @@ class EthoscopeScanner(DeviceScanner):
         self,
         ip: str,
         port: int = ETHOSCOPE_PORT,
-        name: Optional[str] = None,
-        device_id: Optional[str] = None,
-        zcinfo: Optional[Dict] = None,
+        name: str | None = None,
+        device_id: str | None = None,
+        zcinfo: dict | None = None,
     ):
         """Add ethoscope with enhanced error handling and non-blocking initialization."""
         if not self._is_running:
@@ -1684,6 +1683,26 @@ class EthoscopeScanner(DeviceScanner):
                                 name, device_id = name_parts
                         except (IndexError, ValueError):
                             pass
+
+            # Reason: mDNS service name embeds the device ID and is stable
+            # across DHCP IP changes — match by it first so a re-announced
+            # device updates its existing entry instead of being treated as
+            # new (which would orphan the old entry at the stale IP).
+            with self._lock:
+                existing_device = self._find_device_by_zeroconf_name(name)
+                if existing_device is not None and existing_device.ip() != ip:
+                    self._logger.info(
+                        f"Ethoscope {name} re-announced at new address "
+                        f"{ip}:{port} (was {existing_device.ip()}:{existing_device._port})"
+                    )
+                    existing_device._update_address(ip, port)
+                    existing_device.skip_scanning(False)
+                    with existing_device._lock:
+                        existing_device._update_device_status(
+                            "offline", trigger_source="system"
+                        )
+                        existing_device._info.update({"last_seen": time.time()})
+                    return
 
             # Check if device already exists by IP (more immediate than waiting for ID)
             with self._lock:
@@ -1862,7 +1881,7 @@ class EthoscopeScanner(DeviceScanner):
                 f"Error handling device ID change from {old_id} to {new_id}: {e}"
             )
 
-    def retire_device(self, device_id: str, active: int = 0) -> Dict[str, Any]:
+    def retire_device(self, device_id: str, active: int = 0) -> dict[str, Any]:
         """Retire device by updating database status."""
         try:
             self._edb.updateEthoscopes(ethoscope_id=device_id, active=active)

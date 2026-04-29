@@ -9,7 +9,7 @@ import urllib.request
 from dataclasses import dataclass
 from functools import wraps
 from threading import RLock, Thread
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import netifaces
 from zeroconf import IPVersion, ServiceBrowser, Zeroconf
@@ -20,7 +20,7 @@ _IFF_LOOPBACK = 0x0008
 _IFF_MULTICAST = 0x1000
 
 
-def _get_multicast_interfaces() -> List[str]:
+def _get_multicast_interfaces() -> list[str]:
     """Return IPv4 addresses of interfaces that support multicast.
 
     Filters out loopback and non-multicast interfaces (e.g. WireGuard/VPN
@@ -70,7 +70,7 @@ class DeviceInfo:
     status: str = "offline"
     name: str = ""
     id: str = ""
-    last_seen: Optional[float] = None
+    last_seen: float | None = None
 
 
 class DeviceStatus:
@@ -101,7 +101,7 @@ class DeviceStatus:
         status_name: str,
         is_user_triggered: bool = False,
         trigger_source: str = "system",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         """
         Initialize device status.
@@ -152,7 +152,7 @@ class DeviceStatus:
         return self._timestamp
 
     @property
-    def metadata(self) -> Dict[str, Any]:
+    def metadata(self) -> dict[str, Any]:
         """Get status metadata."""
         return self._metadata.copy()
 
@@ -333,7 +333,7 @@ class DeviceStatus:
         """
         self._metadata[key] = value
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """
         Convert status to dictionary for serialization.
 
@@ -351,7 +351,7 @@ class DeviceStatus:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DeviceStatus":
+    def from_dict(cls, data: dict[str, Any]) -> "DeviceStatus":
         """
         Create DeviceStatus from dictionary.
 
@@ -475,6 +475,11 @@ class BaseDevice(Thread):
         self._is_online = True
         self._skip_scanning = False
 
+        # mDNS service name (e.g. "ETHOSCOPE000-<id>._ethoscope._tcp.local.").
+        # Stable across IP changes — used by the scanner to re-locate a known
+        # device after a DHCP renewal moves it to a new address.
+        self.zeroconf_name: Optional[str] = None
+
         # Synchronization and error tracking
         self._lock = RLock()
         self._last_refresh = 0
@@ -503,9 +508,9 @@ class BaseDevice(Thread):
     def _get_json(
         self,
         url: str,
-        timeout: Optional[float] = None,
-        post_data: Optional[bytes] = None,
-    ) -> Dict[str, Any]:
+        timeout: float | None = None,
+        post_data: bytes | None = None,
+    ) -> dict[str, Any]:
         """
         Fetch JSON data from URL with retry logic and improved error handling.
         """
@@ -533,7 +538,7 @@ class BaseDevice(Thread):
             raise NetworkError(f"HTTP {e.code} error from {url}") from e
         except urllib.error.URLError as e:
             raise NetworkError(f"URL error from {url}: {e.reason}") from e
-        except socket.timeout as e:
+        except TimeoutError as e:
             raise NetworkError(f"Timeout connecting to {url}") from e
         except Exception as e:
             raise ScanException(f"Unexpected error from {url}: {e}") from e
@@ -675,7 +680,7 @@ class BaseDevice(Thread):
         status_name: str,
         is_user_triggered: bool = False,
         trigger_source: str = "system",
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         """
         Update device status using DeviceStatus object.
@@ -796,6 +801,28 @@ class BaseDevice(Thread):
             return 60.0  # Busy devices refresh every 60 seconds
         return self._refresh_period  # Normal refresh period
 
+    def _update_address(self, new_ip: str, new_port: int) -> bool:
+        """Update the device's network address (e.g. after a DHCP IP change).
+
+        Rebuilds cached URLs and clears error state so the next refresh hits
+        the new address. Returns True if anything actually changed.
+        """
+        with self._lock:
+            if new_ip == self._ip and new_port == self._port:
+                return False
+            old_ip = self._ip
+            self._ip = new_ip
+            self._port = new_port
+            self._info["ip"] = new_ip
+            # Reason: subclasses cache URLs built from _ip/_port at construction
+            # time (see _setup_urls); we must rebuild them after an address change.
+            self._setup_urls()
+            self.reset_error_state()
+            self._logger.info(
+                f"Device address updated: {old_ip} -> {new_ip}:{new_port}"
+            )
+            return True
+
     # Public interface methods
     def ip(self) -> str:
         """Get device IP address."""
@@ -811,7 +838,7 @@ class BaseDevice(Thread):
         with self._lock:
             return self._device_status
 
-    def info(self) -> Dict[str, Any]:
+    def info(self) -> dict[str, Any]:
         """Get device information dictionary."""
         with self._lock:
             info_copy = self._info.copy()
@@ -873,7 +900,7 @@ class DeviceScanner:
 
     def __init__(self, device_refresh_period: float = 5, device_class=BaseDevice):
         self._zeroconf = None
-        self.devices: List[BaseDevice] = []
+        self.devices: list[BaseDevice] = []
         self.device_refresh_period = device_refresh_period
         self._device_class = device_class
         self._browser = None
@@ -964,19 +991,19 @@ class DeviceScanner:
         self.stop()
 
     @property
-    def current_devices_id(self) -> List[str]:
+    def current_devices_id(self) -> list[str]:
         """Get list of current device IDs."""
         with self._lock:
             return [device.id() for device in self.devices if device.id()]
 
-    def get_all_devices_info(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_devices_info(self) -> dict[str, dict[str, Any]]:
         """Get information for all devices."""
         with self._lock:
             return {
                 device.id(): device.info() for device in self.devices if device.id()
             }
 
-    def get_device(self, device_id: str) -> Optional[BaseDevice]:
+    def get_device(self, device_id: str) -> BaseDevice | None:
         """Get device by ID."""
         with self._lock:
             for device in self.devices:
@@ -984,13 +1011,22 @@ class DeviceScanner:
                     return device
         return None
 
+    def _find_device_by_zeroconf_name(self, name: str):
+        """Find a device by its mDNS service name. Caller must hold self._lock."""
+        if not name:
+            return None
+        for device in self.devices:
+            if getattr(device, "zeroconf_name", None) == name:
+                return device
+        return None
+
     def add(
         self,
         ip: str,
         port: int,
-        name: Optional[str] = None,
-        device_id: Optional[str] = None,
-        zcinfo: Optional[Dict] = None,
+        name: str | None = None,
+        device_id: str | None = None,
+        zcinfo: dict | None = None,
     ):
         """Add a device to the scanner."""
         if not self._is_running:
@@ -999,6 +1035,25 @@ class DeviceScanner:
 
         try:
             with self._lock:
+                # Reason: mDNS service name embeds the device ID and is stable
+                # across DHCP IP changes — match by it first so a re-announced
+                # device updates its existing entry instead of being treated as
+                # new (which would orphan the old entry at the stale IP).
+                existing_device = self._find_device_by_zeroconf_name(name)
+                if existing_device is not None and existing_device.ip() != ip:
+                    self._logger.info(
+                        f"{self.DEVICE_TYPE} {name} re-announced at new address "
+                        f"{ip}:{port} (was {existing_device.ip()}:{existing_device._port})"
+                    )
+                    existing_device._update_address(ip, port)
+                    existing_device.skip_scanning(False)
+                    with existing_device._lock:
+                        existing_device._update_device_status(
+                            "offline", trigger_source="system"
+                        )
+                        existing_device._info.update({"last_seen": time.time()})
+                    return
+
                 # Check if device already exists by IP (more immediate than waiting for ID)
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
@@ -1110,5 +1165,41 @@ class DeviceScanner:
                     break
 
     def update_service(self, zeroconf, service_type: str, name: str):
-        """Zeroconf callback for service updates."""
-        pass
+        """Zeroconf callback for service updates (e.g. IP address change).
+
+        Looks up the known device by mDNS service name and updates its address
+        in place. If the service is unknown (e.g. we missed the original add),
+        falls back to the regular add path.
+        """
+        if not self._is_running:
+            return
+
+        try:
+            info = zeroconf.get_service_info(service_type, name)
+            if not info or not info.addresses:
+                return
+
+            new_ip = socket.inet_ntoa(info.addresses[0])
+            new_port = info.port
+
+            with self._lock:
+                existing_device = self._find_device_by_zeroconf_name(name)
+
+            if existing_device is None:
+                self._logger.info(
+                    f"Zeroconf update for unknown {self.DEVICE_TYPE} {name} "
+                    f"at {new_ip}:{new_port}, treating as new device"
+                )
+                self.add(new_ip, new_port, name, zcinfo=info.properties)
+                return
+
+            if existing_device._update_address(new_ip, new_port):
+                existing_device.skip_scanning(False)
+                with existing_device._lock:
+                    existing_device._update_device_status(
+                        "offline", trigger_source="system"
+                    )
+                    existing_device._info.update({"last_seen": time.time()})
+
+        except Exception as e:
+            self._logger.error(f"Error handling zeroconf update for {name}: {e}")

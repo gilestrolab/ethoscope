@@ -11,7 +11,7 @@ import shutil
 import socket
 import subprocess
 import sys
-from typing import Any, Dict, List
+from typing import Any
 
 import bottle
 import netifaces
@@ -85,7 +85,7 @@ class BugReportAPI(BaseAPI):
 
         return report
 
-    def _get_report_metadata(self) -> Dict[str, Any]:
+    def _get_report_metadata(self) -> dict[str, Any]:
         """Get report metadata."""
         hostname = "unknown"
         try:
@@ -99,7 +99,7 @@ class BugReportAPI(BaseAPI):
             "hostname": hostname,
         }
 
-    def _collect_node_info(self, errors: List[str], log_lines: int) -> Dict[str, Any]:
+    def _collect_node_info(self, errors: list[str], log_lines: int) -> dict[str, Any]:
         """Collect comprehensive node system information."""
         node_info = {}
 
@@ -129,7 +129,7 @@ class BugReportAPI(BaseAPI):
 
         return node_info
 
-    def _get_system_info(self, errors: List[str]) -> Dict[str, Any]:
+    def _get_system_info(self, errors: list[str]) -> dict[str, Any]:
         """Get system platform information."""
         try:
             # Get uptime
@@ -155,7 +155,7 @@ class BugReportAPI(BaseAPI):
             errors.append(f"Failed to get system info: {e}")
             return {}
 
-    def _get_disk_info(self, errors: List[str]) -> Dict[str, Any]:
+    def _get_disk_info(self, errors: list[str]) -> dict[str, Any]:
         """Get disk usage information."""
         try:
             # Check results directory
@@ -174,7 +174,7 @@ class BugReportAPI(BaseAPI):
             errors.append(f"Failed to get disk info: {e}")
             return {}
 
-    def _get_memory_info(self, errors: List[str]) -> Dict[str, Any]:
+    def _get_memory_info(self, errors: list[str]) -> dict[str, Any]:
         """Get memory usage information."""
         try:
             with open("/proc/meminfo") as f:
@@ -199,7 +199,7 @@ class BugReportAPI(BaseAPI):
             errors.append(f"Failed to get memory info: {e}")
             return {}
 
-    def _get_network_info(self, errors: List[str]) -> Dict[str, Any]:
+    def _get_network_info(self, errors: list[str]) -> dict[str, Any]:
         """Get network interface information."""
         try:
             interfaces = {}
@@ -229,7 +229,7 @@ class BugReportAPI(BaseAPI):
             errors.append(f"Failed to get network info: {e}")
             return {}
 
-    def _get_git_info(self, errors: List[str]) -> Dict[str, Any]:
+    def _get_git_info(self, errors: list[str]) -> dict[str, Any]:
         """Get git repository information."""
         try:
             git_info = {}
@@ -283,7 +283,7 @@ class BugReportAPI(BaseAPI):
             errors.append(f"Failed to get git info: {e}")
             return {}
 
-    def _get_services_status(self, errors: List[str]) -> Dict[str, Any]:
+    def _get_services_status(self, errors: list[str]) -> dict[str, Any]:
         """Get status of ethoscope-related systemd services."""
         services = {}
         service_names = [
@@ -336,7 +336,7 @@ class BugReportAPI(BaseAPI):
 
         return services
 
-    def _get_node_logs(self, errors: List[str], log_lines: int) -> List[str]:
+    def _get_node_logs(self, errors: list[str], log_lines: int) -> list[str]:
         """Get recent node service logs."""
         try:
             result = subprocess.run(
@@ -360,8 +360,8 @@ class BugReportAPI(BaseAPI):
             return []
 
     def _collect_devices_info(
-        self, errors: List[str], log_lines: int
-    ) -> Dict[str, Any]:
+        self, errors: list[str], log_lines: int
+    ) -> dict[str, Any]:
         """Collect information from all connected devices."""
         devices_info = {}
 
@@ -419,7 +419,7 @@ class BugReportAPI(BaseAPI):
 
         return devices_info
 
-    def _collect_backup_status(self, errors: List[str]) -> Dict[str, Any]:
+    def _collect_backup_status(self, errors: list[str]) -> dict[str, Any]:
         """Collect backup service status."""
         backup_status = {}
 
@@ -457,7 +457,7 @@ class BugReportAPI(BaseAPI):
 
         return backup_status
 
-    def _collect_configuration(self, errors: List[str]) -> Dict[str, Any]:
+    def _collect_configuration(self, errors: list[str]) -> dict[str, Any]:
         """Collect configuration information."""
         config_info = {}
 
@@ -483,7 +483,7 @@ class BugReportAPI(BaseAPI):
 
         return config_info
 
-    def _generate_summary(self, report: Dict[str, Any]) -> str:
+    def _generate_summary(self, report: dict[str, Any]) -> str:
         """Generate a human-readable summary of the bug report."""
         lines = []
         lines.append(

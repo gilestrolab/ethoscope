@@ -3,7 +3,7 @@
 import datetime
 import logging
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
 
@@ -24,8 +24,8 @@ class NotificationAnalyzer:
 
     def __init__(
         self,
-        config: Optional[EthoscopeConfiguration] = None,
-        db: Optional[ExperimentalDB] = None,
+        config: EthoscopeConfiguration | None = None,
+        db: ExperimentalDB | None = None,
     ):
         """
         Initialize notification analyzer.
@@ -38,7 +38,7 @@ class NotificationAnalyzer:
         self.db = db or ExperimentalDB()
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def analyze_device_failure(self, device_id: str) -> Dict[str, Any]:
+    def analyze_device_failure(self, device_id: str) -> dict[str, Any]:
         """
         Analyze a device failure and gather comprehensive information.
 
@@ -252,7 +252,7 @@ class NotificationAnalyzer:
             self.logger.error(f"Error parsing timestamp '{timestamp_value}': {e}")
             return 0
 
-    def get_device_logs(self, device_id: str, max_lines: int = 1000) -> Optional[str]:
+    def get_device_logs(self, device_id: str, max_lines: int = 1000) -> str | None:
         """
         Get log content from a device.
 
@@ -310,7 +310,7 @@ class NotificationAnalyzer:
             self.logger.error(f"Error getting device logs for {device_id}: {e}")
             return None
 
-    def get_device_status_info(self, device_id: str) -> Dict[str, Any]:
+    def get_device_status_info(self, device_id: str) -> dict[str, Any]:
         """
         Get current device status information.
 
@@ -403,7 +403,7 @@ class NotificationAnalyzer:
             days = seconds / 86400
             return f"{days:.1f} days"
 
-    def get_device_users(self, device_id: str) -> List[str]:
+    def get_device_users(self, device_id: str) -> list[str]:
         """
         Get list of user email addresses for users with currently running experiments on a device.
 
@@ -429,7 +429,7 @@ class NotificationAnalyzer:
             self.logger.error(f"Error getting device users for {device_id}: {e}")
             return []
 
-    def get_admin_emails(self) -> List[str]:
+    def get_admin_emails(self) -> list[str]:
         """Get list of active admin email addresses."""
         try:
             # Get all active admin users from database
@@ -447,7 +447,7 @@ class NotificationAnalyzer:
             self.logger.error(f"Error getting admin emails: {e}")
             return []
 
-    def get_stopped_experiment_user(self, run_id: str) -> List[str]:
+    def get_stopped_experiment_user(self, run_id: str) -> list[str]:
         """
         Get email address for the user who owns a specific experiment run.
 
