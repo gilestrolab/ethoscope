@@ -329,18 +329,6 @@ class TestBaseDevice:
         with pytest.raises(NetworkError, match="Timeout"):
             device._get_json("http://192.168.1.100/id")
 
-    def test_skip_scanning(self):
-        """Test skip scanning flag."""
-        device = BaseDevice("192.168.1.100")
-        assert device._skip_scanning is False
-
-        device.skip_scanning(True)
-        assert device._skip_scanning is True
-        assert device._consecutive_errors == 0  # Should reset errors
-
-        device.skip_scanning(False)
-        assert device._skip_scanning is False
-
     def test_reset_error_state(self):
         """Test error state reset."""
         device = BaseDevice("192.168.1.100")
@@ -372,6 +360,24 @@ class TestBaseDevice:
         device._update_device_status("busy")
 
         assert device._get_effective_refresh_period() == 60.0
+
+    def test_effective_refresh_period_unreachable(self):
+        """Devices with too many consecutive errors back off to slow polling."""
+        device = BaseDevice("192.168.1.100", refresh_period=5)
+        device._consecutive_errors = device._max_consecutive_errors
+
+        assert (
+            device._get_effective_refresh_period() == device._unreachable_refresh_period
+        )
+
+    def test_effective_refresh_period_recovers_when_errors_reset(self):
+        """Once a successful poll resets the error count, polling speeds up again."""
+        device = BaseDevice("192.168.1.100", refresh_period=5)
+        device._consecutive_errors = device._max_consecutive_errors
+        assert device._get_effective_refresh_period() != 5
+
+        device._consecutive_errors = 0
+        assert device._get_effective_refresh_period() == 5
 
 
 class TestDeviceScanner:
@@ -509,23 +515,6 @@ class TestBaseDeviceLifecycle:
         assert device._consecutive_errors > 0
 
     @patch("urllib.request.urlopen")
-    def test_device_run_loop_skip_scanning(self, mock_urlopen):
-        """Test run loop respects skip_scanning flag."""
-        device = BaseDevice("192.168.1.100", refresh_period=0.1)
-        device.skip_scanning(True)
-
-        # Start device thread
-        device.start()
-        time.sleep(0.3)
-
-        # Stop device
-        device.stop()
-        device.join(timeout=2)
-
-        # Verify no network calls were made
-        mock_urlopen.assert_not_called()
-
-    @patch("urllib.request.urlopen")
     def test_device_run_loop_error_recovery(self, mock_urlopen):
         """Test device recovers after errors."""
         device = BaseDevice("192.168.1.100", refresh_period=0.1)
@@ -558,75 +547,55 @@ class TestBaseDeviceLifecycle:
 class TestDeviceErrorHandling:
     """Test BaseDevice error handling and recovery mechanisms."""
 
-    def test_handle_device_error_connection_refused_graceful(self):
-        """Test handling connection refused with graceful shutdown detection."""
+    def test_handle_device_error_increments_counter(self):
+        """Each handled error bumps the consecutive-error counter."""
         device = BaseDevice("192.168.1.100")
-
-        # Set up graceful operation status
-        device._update_device_status("offline", trigger_source="graceful")
-
-        # Simulate connection refused errors
         error = urllib.error.URLError("[Errno 111] Connection refused")
-        for _ in range(3):
+
+        for i in range(1, 6):
             device._handle_device_error(error)
+            assert device._consecutive_errors == i
 
-        # Should mark for skipping after 3 errors
-        assert device._skip_scanning is True
-        assert device._consecutive_errors == 3
-
-    def test_handle_device_error_connection_refused_ungraceful(self):
-        """Test handling connection refused without graceful shutdown."""
+    def test_handle_device_error_marks_offline(self):
+        """Errors mark the device offline via _reset_info."""
         device = BaseDevice("192.168.1.100")
-
-        # Set up non-graceful status
         device._update_device_status("running", trigger_source="system")
 
-        # Simulate connection refused errors
-        error = urllib.error.URLError("[Errno 111] Connection refused")
-        for _ in range(3):
-            device._handle_device_error(error)
+        device._handle_device_error(urllib.error.URLError("network down"))
 
-        # Should mark for skipping
-        assert device._skip_scanning is True
+        assert device.get_device_status().status_name == "offline"
 
-    def test_handle_device_error_max_errors_reached(self):
-        """Test handling max consecutive errors."""
-        device = BaseDevice("192.168.1.100")
-        device._max_consecutive_errors = 5
-
-        # Simulate generic errors
+    def test_handle_device_error_does_not_block_polling(self):
+        """Crossing the error threshold slows polling but never stops it."""
+        device = BaseDevice("192.168.1.100", refresh_period=5)
         error = urllib.error.URLError("Generic error")
-        for _ in range(5):
+
+        for _ in range(device._max_consecutive_errors):
             device._handle_device_error(error)
 
-        # Should stop scanning after max errors
-        assert device._skip_scanning is True
-        assert device._consecutive_errors == 5
+        # Polling backs off but the device remains active.
+        assert (
+            device._get_effective_refresh_period() == device._unreachable_refresh_period
+        )
+        assert device._is_online is True
 
     def test_handle_device_error_progressive_logging(self):
-        """Test progressive error logging at different thresholds."""
+        """Error #1 logs info, threshold logs warning, others stay debug."""
         device = BaseDevice("192.168.1.100")
-
+        device._max_consecutive_errors = 5
         error = urllib.error.URLError("Test error")
 
-        # First error (should log info)
-        device._handle_device_error(error)
-        assert device._consecutive_errors == 1
-
-        # Fifth error (should log warning)
-        for _ in range(4):
+        with (
+            patch.object(device._logger, "info") as info_log,
+            patch.object(device._logger, "warning") as warning_log,
+        ):
             device._handle_device_error(error)
-        assert device._consecutive_errors == 5
-
-    def test_handle_device_error_with_actively_refused(self):
-        """Test handling 'actively refused' connection errors."""
-        device = BaseDevice("192.168.1.100")
-
-        error = urllib.error.URLError("Connection actively refused")
-        for _ in range(3):
+            assert info_log.call_count == 1
+            for _ in range(3):
+                device._handle_device_error(error)
+            # Hitting the threshold logs a single warning
             device._handle_device_error(error)
-
-        assert device._skip_scanning is True
+            assert warning_log.call_count == 1
 
 
 class TestDeviceIDUpdate:
@@ -687,14 +656,6 @@ class TestDeviceIDUpdate:
         device._update_id()
 
         assert device._id == "new_id"
-
-    def test_update_id_skip_scanning(self):
-        """Test update_id raises when skip_scanning is True."""
-        device = BaseDevice("192.168.1.100")
-        device.skip_scanning(True)
-
-        with pytest.raises(ScanException, match="Not scanning"):
-            device._update_id()
 
     @patch("urllib.request.urlopen")
     def test_update_id_exception_handling(self, mock_urlopen):
@@ -837,25 +798,21 @@ class TestDeviceScannerOperations:
 
     @patch("ethoscope_node.scanner.base_scanner.Zeroconf")
     @patch("ethoscope_node.scanner.base_scanner.ServiceBrowser")
-    def test_add_existing_device_reactivates(self, mock_browser, mock_zeroconf):
-        """Test adding an existing device reactivates it."""
+    def test_add_existing_device_resets_errors(self, mock_browser, mock_zeroconf):
+        """Re-adding a known device clears its error counter and refreshes status."""
         scanner = DeviceScanner()
         scanner.start()
 
-        # Add device first time
         scanner.add("192.168.1.100", 9000, name="test.local")
         assert len(scanner.devices) == 1
 
-        # Mark device as skipping
-        scanner.devices[0].skip_scanning(True)
-        assert scanner.devices[0]._skip_scanning is True
+        # Simulate the device having racked up errors and gone offline
+        scanner.devices[0]._consecutive_errors = 25
 
-        # Add same device again (by IP)
         scanner.add("192.168.1.100", 9000, name="test.local")
 
-        # Should still be 1 device, but reactivated
         assert len(scanner.devices) == 1
-        assert scanner.devices[0]._skip_scanning is False
+        assert scanner.devices[0]._consecutive_errors == 0
 
         scanner.stop()
 
@@ -870,7 +827,6 @@ class TestDeviceScannerOperations:
         device1 = Mock(spec=BaseDevice)
         device1.ip.return_value = "192.168.1.100"
         device1.id.return_value = "test_001"
-        device1._skip_scanning = False
         device1._device_status = DeviceStatus("online")
 
         scanner.devices.append(device1)
@@ -955,8 +911,8 @@ class TestDeviceScannerOperations:
         # Remove service
         scanner.remove_service(mock_zc, "_device._tcp.local.", "test.local")
 
-        # Device should be marked for skipping
-        assert device._skip_scanning is True
+        # Device is marked offline; the device thread keeps probing on the
+        # slow cadence so it can recover automatically when it comes back.
         assert device._device_status.status_name == "offline"
 
         scanner.stop()

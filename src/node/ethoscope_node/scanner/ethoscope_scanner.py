@@ -1696,7 +1696,6 @@ class EthoscopeScanner(DeviceScanner):
                         f"{ip}:{port} (was {existing_device.ip()}:{existing_device._port})"
                     )
                     existing_device._update_address(ip, port)
-                    existing_device.skip_scanning(False)
                     with existing_device._lock:
                         existing_device._update_device_status(
                             "offline", trigger_source="system"
@@ -1708,19 +1707,20 @@ class EthoscopeScanner(DeviceScanner):
             with self._lock:
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
-                        was_skipping = existing_device._skip_scanning
                         device_status = existing_device._device_status.status_name
+                        prev_errors = existing_device._consecutive_errors
 
                         self._logger.info(
-                            f"Ethoscope at {ip} already exists (was skipping: {was_skipping}, status: {device_status}), updating zeroconf info"
+                            f"Ethoscope at {ip} already exists "
+                            f"(status: {device_status}, errors: {prev_errors}), "
+                            f"updating zeroconf info"
                         )
 
                         if hasattr(existing_device, "zeroconf_name"):
                             existing_device.zeroconf_name = name
 
-                        # Reset error state and re-enable scanning in case it was offline
+                        # Reset error state so the next poll fires immediately
                         existing_device.reset_error_state()
-                        existing_device.skip_scanning(False)
 
                         # Force ID update to handle device renaming (ETHOSCOPE_000 -> new name)
                         # This is critical when devices are renamed via webUI
@@ -1754,9 +1754,6 @@ class EthoscopeScanner(DeviceScanner):
                             )
                             existing_device._info.update({"last_seen": time.time()})
 
-                        self._logger.info(
-                            f"Re-enabled scanning for ethoscope at {ip} (was skipping: {was_skipping})"
-                        )
                         return
 
             # Create device with minimal blocking

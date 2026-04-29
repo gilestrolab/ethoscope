@@ -1268,7 +1268,7 @@ class TestEthoscopeScannerAdd:
         existing_device.ip.return_value = "192.168.1.100"
         existing_device.id.return_value = "old_id"
         existing_device._id = "old_id"
-        existing_device._skip_scanning = False
+        existing_device._consecutive_errors = 0
         existing_device._device_status = DeviceStatus("running")
         existing_device._lock = MagicMock()
 
@@ -1280,7 +1280,6 @@ class TestEthoscopeScannerAdd:
         # Verify no new device was added
         assert len(scanner.devices) == 1
         existing_device.reset_error_state.assert_called_once()
-        existing_device.skip_scanning.assert_called()
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     def test_scanner_add_with_zeroconf_info(self, mock_db_class):

@@ -47,7 +47,7 @@ class TestDeviceRenaming:
         device.id.return_value = device_id
         device.name = device_name
         device.ip.return_value = ip
-        device._skip_scanning = False
+        device._consecutive_errors = 0
         device._device_status = Mock()
         device._device_status.status_name = status
         device._lock = Lock()
@@ -59,7 +59,6 @@ class TestDeviceRenaming:
         }
         device.info.return_value = device._info
         device.reset_error_state = Mock()
-        device.skip_scanning = Mock()
         device._update_device_status = Mock()
         return device
 
@@ -300,7 +299,6 @@ class TestDeviceRenaming:
 
         # Verify device was properly reset and re-enabled
         device.reset_error_state.assert_called_once()
-        device.skip_scanning.assert_called_once_with(False)
         device._update_device_status.assert_called_with(
             "offline", trigger_source="system"
         )

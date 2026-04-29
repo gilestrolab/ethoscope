@@ -473,18 +473,24 @@ class BaseDevice(Thread):
         self._info = {"ip": ip}
         self._id = ""
         self._is_online = True
-        self._skip_scanning = False
 
         # mDNS service name (e.g. "ETHOSCOPE000-<id>._ethoscope._tcp.local.").
         # Stable across IP changes — used by the scanner to re-locate a known
         # device after a DHCP renewal moves it to a new address.
-        self.zeroconf_name: Optional[str] = None
+        self.zeroconf_name: str | None = None
 
         # Synchronization and error tracking
         self._lock = RLock()
         self._last_refresh = 0
         self._consecutive_errors = 0
-        self._max_consecutive_errors = 10
+        # Reason: at the default 5s refresh, 30 errors = ~2.5 min of consistent
+        # failure before we slow polling. Transient WiFi blips and short Pi
+        # restarts shouldn't trip this.
+        self._max_consecutive_errors = 30
+        # Polling cadence to use once _consecutive_errors crosses the threshold;
+        # the device is still probed (allowing automatic recovery) but at a much
+        # lower rate to avoid log spam and wasted network calls.
+        self._unreachable_refresh_period = 60.0
         self._last_successful_contact = time.time()
 
         # Logging
@@ -553,104 +559,50 @@ class BaseDevice(Thread):
             # Check if it's time for regular refresh (use dynamic refresh period)
             effective_refresh_period = self._get_effective_refresh_period()
             if current_time - self._last_refresh > effective_refresh_period:
-                if not self._skip_scanning:
-                    try:
-                        self._update_info()
-                        # Reset error counter on successful update
-                        if self._consecutive_errors > 0:
-                            self._logger.info(
-                                f"Device {self._ip} recovered after {self._consecutive_errors} errors"
-                            )
-                            self._consecutive_errors = 0
-                        self._last_successful_contact = current_time
-                    except Exception as e:
-                        # Only handle error if not already marked for skipping
-                        if not self._skip_scanning:
-                            self._handle_device_error(e)
-                else:
-                    # Device is marked for skipping - just update status to offline
-                    self._reset_info()
+                try:
+                    self._update_info()
+                    # Reset error counter on successful update
+                    if self._consecutive_errors > 0:
+                        self._logger.info(
+                            f"Device {self._ip} recovered after {self._consecutive_errors} errors"
+                        )
+                        self._consecutive_errors = 0
+                    self._last_successful_contact = current_time
+                except Exception as e:
+                    self._handle_device_error(e)
 
                 self._last_refresh = current_time
 
     def _handle_device_error(self, error):
-        """Handle device errors. Stop interrogating devices that appear to have shut down ungracefully."""
+        """Record a polling failure.
+
+        We never stop probing the device — once ``_consecutive_errors`` crosses
+        ``_max_consecutive_errors`` the polling loop simply switches to a
+        slower cadence (see ``_get_effective_refresh_period``) so dead hosts
+        don't waste resources, but recovery is automatic on the next
+        successful poll.
+        """
         with self._lock:
             self._consecutive_errors += 1
-
-            # Always reset device info to offline
+            # Always reset device info to offline (status, counters, etc.)
             self._reset_info()
 
-            error_str = str(error).lower()
-
-            # Check if this is a "connection refused" error - indicates potential shutdown
-            if "connection refused" in error_str or "actively refused" in error_str:
-                # After 3 consecutive connection refused errors, determine if this is graceful or ungraceful
-                if self._consecutive_errors >= 3:
-                    # Check if this might be a graceful shutdown
-                    is_graceful = self._is_graceful_shutdown()
-
-                    if is_graceful:
-                        self._logger.info(
-                            f"Device {self._ip} appears to have been shut down gracefully (recent user action). Stopping interrogation."
-                        )
-                        self._skip_scanning = True
-                        self._update_device_status(
-                            "offline",
-                            trigger_source="graceful",
-                            metadata={"reason": "graceful_shutdown"},
-                        )
-                    else:
-                        self._logger.info(
-                            f"Device {self._ip} has {self._consecutive_errors} consecutive connection refused errors - appears shut down ungracefully. Stopping interrogation."
-                        )
-                        self._skip_scanning = True
-                        self._update_device_status(
-                            "offline",
-                            trigger_source="system",
-                            metadata={"reason": "ungraceful_shutdown"},
-                        )
-
-                    self._info.update({"last_seen": time.time()})
-                    return
-                else:
-                    self._logger.info(
-                        f"Device {self._ip} connection refused (attempt {self._consecutive_errors}/3)"
-                    )
-                    return
-
-            if self._consecutive_errors >= self._max_consecutive_errors:
-                # Device seems to have gone offline normally, stop interrogating
-                self._logger.info(
-                    f"Device {self._ip} appears offline after {self._consecutive_errors} errors, stopping interrogation"
+            # Log at decreasing verbosity so a long-offline device doesn't spam.
+            if self._consecutive_errors == 1:
+                self._logger.info(f"Device {self._ip} connection failed: {str(error)}")
+            elif self._consecutive_errors == self._max_consecutive_errors:
+                self._logger.warning(
+                    f"Device {self._ip} unreachable after "
+                    f"{self._consecutive_errors} errors; backing off to "
+                    f"{self._unreachable_refresh_period:.0f}s polling"
                 )
-                self._skip_scanning = True
-                self._update_device_status(
-                    "offline",
-                    trigger_source="system",
-                    metadata={"reason": "max_errors_reached"},
-                )
-                self._info.update({"last_seen": time.time()})
             else:
-                # Log errors less frequently to reduce noise
-                if self._consecutive_errors == 1:
-                    self._logger.info(
-                        f"Device {self._ip} connection failed: {str(error)}"
-                    )
-                elif self._consecutive_errors == 5:
-                    self._logger.warning(
-                        f"Device {self._ip} has 5 consecutive errors, will stop interrogating at 10"
-                    )
-                else:
-                    self._logger.debug(
-                        f"Device {self._ip} error #{self._consecutive_errors}: {str(error)}"
-                    )
+                self._logger.debug(
+                    f"Device {self._ip} error #{self._consecutive_errors}: {str(error)}"
+                )
 
     def _update_id(self):
         """Update device ID with proper error handling."""
-        if self._skip_scanning:
-            raise ScanException(f"Not scanning IP {self._ip}")
-
         try:
             # Try data URL first, then ID URL
             try:
@@ -766,13 +718,6 @@ class BaseDevice(Thread):
         """Stop the device monitoring thread."""
         self._is_online = False
 
-    def skip_scanning(self, value: bool):
-        """Enable/disable scanning for this device."""
-        self._skip_scanning = value
-        if not value:
-            # Re-enabling scanning - reset error state
-            self._consecutive_errors = 0
-
     def reset_error_state(self):
         """Reset error state for this device."""
         self._consecutive_errors = 0
@@ -790,16 +735,18 @@ class BaseDevice(Thread):
         return current_status and current_status.is_graceful_operation()
 
     def _get_effective_refresh_period(self) -> float:
-        """
-        Get the effective refresh period based on device status.
+        """Get the effective refresh period.
 
-        Returns:
-            Refresh period in seconds (60s for busy devices, normal for others)
+        Falls back to a slower cadence for busy devices and for devices that
+        appear unreachable (so we don't hammer dead hosts but still recover
+        automatically as soon as they respond).
         """
         current_status = self.get_device_status()
         if current_status and current_status.status_name == "busy":
-            return 60.0  # Busy devices refresh every 60 seconds
-        return self._refresh_period  # Normal refresh period
+            return 60.0
+        if self._consecutive_errors >= self._max_consecutive_errors:
+            return self._unreachable_refresh_period
+        return self._refresh_period
 
     def _update_address(self, new_ip: str, new_port: int) -> bool:
         """Update the device's network address (e.g. after a DHCP IP change).
@@ -867,9 +814,6 @@ class BaseDevice(Thread):
                         unreachable_timeout
                     ),
                 }
-
-            # Add skip_scanning status for debugging
-            info_copy["skip_scanning"] = self._skip_scanning
 
             # Expose backup status at root level for frontend compatibility
             progress_info = info_copy.get("progress", {})
@@ -1046,7 +990,6 @@ class DeviceScanner:
                         f"{ip}:{port} (was {existing_device.ip()}:{existing_device._port})"
                     )
                     existing_device._update_address(ip, port)
-                    existing_device.skip_scanning(False)
                     with existing_device._lock:
                         existing_device._update_device_status(
                             "offline", trigger_source="system"
@@ -1057,19 +1000,20 @@ class DeviceScanner:
                 # Check if device already exists by IP (more immediate than waiting for ID)
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
-                        was_skipping = existing_device._skip_scanning
                         device_status = existing_device._device_status.status_name
+                        prev_errors = existing_device._consecutive_errors
 
                         self._logger.info(
-                            f"Device at {ip} already exists (was skipping: {was_skipping}, status: {device_status}), updating zeroconf info"
+                            f"Device at {ip} already exists "
+                            f"(status: {device_status}, errors: {prev_errors}), "
+                            f"updating zeroconf info"
                         )
 
                         if hasattr(existing_device, "zeroconf_name"):
                             existing_device.zeroconf_name = name
 
-                        # Reset error state and re-enable scanning in case it was offline
+                        # Reset error state so the next poll fires immediately
                         existing_device.reset_error_state()
-                        existing_device.skip_scanning(False)
 
                         # Explicitly reset status to allow device info to be updated
                         with existing_device._lock:
@@ -1078,9 +1022,6 @@ class DeviceScanner:
                             )
                             existing_device._info.update({"last_seen": time.time()})
 
-                        self._logger.info(
-                            f"Re-enabled scanning for {self.DEVICE_TYPE} at {ip} (was skipping: {was_skipping})"
-                        )
                         return
 
                 # Create and start device
@@ -1151,13 +1092,12 @@ class DeviceScanner:
                 if device.ip() == ip:
                     device_id = device.id()
                     self._logger.info(
-                        f"{self.DEVICE_TYPE} {device_id or 'unknown'} at {ip} went offline via zeroconf removal"
+                        f"{self.DEVICE_TYPE} {device_id or 'unknown'} at {ip} "
+                        f"went offline via zeroconf removal"
                     )
 
-                    # Stop interrogating the device but keep it in the list
-                    device.skip_scanning(True)
-
-                    # Explicitly set status to offline
+                    # Mark offline; the device thread keeps probing on the
+                    # slow cadence in case it comes back.
                     with device._lock:
                         device._update_device_status("offline", trigger_source="system")
                         device._info.update({"last_seen": time.time()})
@@ -1194,7 +1134,8 @@ class DeviceScanner:
                 return
 
             if existing_device._update_address(new_ip, new_port):
-                existing_device.skip_scanning(False)
+                # _update_address already calls reset_error_state(); just refresh
+                # the published status so the next poll re-promotes it to online.
                 with existing_device._lock:
                     existing_device._update_device_status(
                         "offline", trigger_source="system"
