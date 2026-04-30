@@ -635,6 +635,42 @@ class TestEthoscopeSendInstruction:
             with pytest.raises(DeviceError):
                 device.send_instruction("start")
 
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch("urllib.request.urlopen")
+    def test_send_instruction_records_user_action_before_status_check(
+        self, mock_urlopen, mock_config_class, mock_db_class
+    ):
+        """``_last_user_action`` must be set before ``_check_instruction_status``
+        runs so that any concurrent ``_update_info`` (from the polling thread
+        or from ``_check_instruction_status``'s own poll) sees the device
+        within the graceful window and tags an unreached transition as
+        ``graceful`` rather than ``network``.
+        """
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        device._device_status = DeviceStatus("stopped")
+
+        observed = {}
+
+        def assert_set_at_call_time(_instruction):
+            observed["instruction"] = device._last_user_instruction
+            observed["action"] = device._last_user_action
+
+        mock_response = MagicMock()
+        mock_response.__enter__.return_value = mock_response
+        mock_response.read.return_value = json.dumps({"status": "ok"}).encode()
+        mock_urlopen.return_value = mock_response
+
+        with patch.object(
+            device, "_check_instruction_status", side_effect=assert_set_at_call_time
+        ):
+            with patch.object(device, "_update_info"):
+                device.send_instruction("reboot")
+
+        assert observed["instruction"] == "reboot"
+        assert observed["action"] is not None
+
 
 class TestEthoscopeConnectedModule:
     """Test Ethoscope connected_module and related methods."""
@@ -1311,6 +1347,132 @@ class TestEthoscopeHandleUnreachableState:
             c for c in mock_update.call_args_list if c.args[0] == "unreached"
         )
         assert unreached_call.kwargs["trigger_source"] == "network"
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_unreached_demoted_to_offline_after_max_errors(
+        self, mock_config_class, mock_db_class
+    ):
+        """Once consecutive errors cross _max_consecutive_errors, an
+        already-unreached device should be demoted to ``offline`` so the
+        UI alert stops flashing — without waiting for the 20-min timeout.
+        """
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        device._device_status = DeviceStatus("unreached", trigger_source="network")
+        device._consecutive_errors = device._max_consecutive_errors
+
+        with patch.object(device._config, "get_custom") as mock_get_custom:
+            mock_get_custom.return_value = {"unreachable_timeout_minutes": 20}
+            with patch.object(device, "_update_device_status") as mock_update:
+                with patch.object(device, "_reset_info"):
+                    device._handle_unreachable_state("unreached")
+
+        offline_call = next(
+            c for c in mock_update.call_args_list if c.args[0] == "offline"
+        )
+        assert offline_call.kwargs["trigger_source"] == "system"
+        assert offline_call.kwargs["metadata"] == {"reason": "max_errors_reached"}
+        mock_db.updateEthoscopes.assert_any_call(
+            ethoscope_id="test_device", status="offline"
+        )
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_unreached_stays_unreached_below_threshold(
+        self, mock_config_class, mock_db_class
+    ):
+        """Below the error threshold, an unreached device should NOT be
+        demoted yet — a brief blip should keep showing the alert until we
+        have a real signal that the device is gone.
+        """
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        device._device_status = DeviceStatus("unreached", trigger_source="network")
+        device._consecutive_errors = device._max_consecutive_errors - 1
+
+        with patch.object(device._config, "get_custom") as mock_get_custom:
+            mock_get_custom.return_value = {"unreachable_timeout_minutes": 20}
+            with patch.object(device, "_update_device_status") as mock_update:
+                with patch.object(device, "_reset_info"):
+                    device._handle_unreachable_state("unreached")
+
+        offline_calls = [
+            c for c in mock_update.call_args_list if c.args[0] == "offline"
+        ]
+        assert offline_calls == []
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_unreached_demoted_after_long_timeout(
+        self, mock_config_class, mock_db_class
+    ):
+        """The 20-minute timeout still works as a safety net even when the
+        consecutive-error counter never quite reaches the threshold.
+        """
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        unreached_status = DeviceStatus("unreached", trigger_source="network")
+        # Pretend this device went unreached 25 minutes ago — beyond the
+        # default 20-minute alert timeout.
+        unreached_status._unreachable_start_time = time.time() - (25 * 60)
+        device._device_status = unreached_status
+        device._consecutive_errors = 0
+
+        with patch.object(device._config, "get_custom") as mock_get_custom:
+            mock_get_custom.return_value = {"unreachable_timeout_minutes": 20}
+            with patch.object(device, "_update_device_status") as mock_update:
+                with patch.object(device, "_reset_info"):
+                    device._handle_unreachable_state("unreached")
+
+        offline_call = next(
+            c for c in mock_update.call_args_list if c.args[0] == "offline"
+        )
+        assert offline_call.kwargs["metadata"] == {"reason": "unreachable_timeout"}
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_unreached_network_upgraded_to_graceful_when_user_acts(
+        self, mock_config_class, mock_db_class
+    ):
+        """If the polling thread tagged the unreached transition as
+        ``network`` before the user-action timestamp was recorded, a
+        subsequent poll inside the graceful window should upgrade the
+        trigger source to ``graceful`` so the UI stops flashing.
+        """
+        mock_db_class.return_value = Mock()
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        device._device_status = DeviceStatus("unreached", trigger_source="network")
+        device._consecutive_errors = 1
+        device._last_user_action = time.time()
+        device._last_user_instruction = "reboot"
+
+        with patch.object(device._config, "get_custom") as mock_get_custom:
+            mock_get_custom.return_value = {
+                "unreachable_timeout_minutes": 20,
+                "graceful_shutdown_grace_minutes": 5,
+            }
+            with patch.object(device, "_update_device_status") as mock_update:
+                with patch.object(device, "_reset_info"):
+                    device._handle_unreachable_state("unreached")
+
+        upgrade_call = next(
+            c
+            for c in mock_update.call_args_list
+            if c.args[0] == "unreached" and c.kwargs.get("trigger_source") == "graceful"
+        )
+        assert upgrade_call.kwargs["metadata"] == {"upgraded_from": "network"}
 
 
 class TestEthoscopeScannerAdd:

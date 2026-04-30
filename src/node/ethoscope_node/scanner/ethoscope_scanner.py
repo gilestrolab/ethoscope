@@ -132,17 +132,16 @@ class Ethoscope(BaseDevice):
             instruction: Instruction to send
             post_data: Optional data to send with instruction (can be Dict or bytes)
         """
-        self._check_instruction_status(instruction)
-
-        # Determine trigger source and type
-
-        # Check if this is a graceful operation
-        if instruction in DeviceStatus.GRACEFUL_OPERATIONS:
-            pass
-
-        # Track user action timestamp for later status updates
+        # Reason: record user intent BEFORE _check_instruction_status (which
+        # itself triggers _update_info()). Otherwise a concurrent unreached
+        # transition — from either _check_instruction_status's own poll or
+        # the background polling thread — gets tagged trigger_source="network"
+        # because _is_within_graceful_window() doesn't yet see this action,
+        # and the UI then flashes the alert icon for the whole reboot window.
         self._last_user_action = time.time()
         self._last_user_instruction = instruction
+
+        self._check_instruction_status(instruction)
 
         # Handle post_data properly - it might already be bytes or need conversion
         json_data = None
@@ -797,15 +796,44 @@ class Ethoscope(BaseDevice):
                 return
 
         elif current_status.status_name == "unreached":
-            # Device is already unreachable, check for timeout
-            if current_status.is_timeout_exceeded(unreachable_timeout):
+            # If the user issued a graceful op while we were already marked
+            # unreached (race between polling thread and send_instruction),
+            # upgrade the trigger source so the UI stops flashing the alert.
+            if (
+                current_status.trigger_source == "network"
+                and self._is_within_graceful_window()
+            ):
                 self._logger.info(
-                    f"Device {self._id} unreachable timeout exceeded ({unreachable_timeout}m), marking as offline"
+                    f"Device {self._id} unreached transition upgraded "
+                    f"network -> graceful (user action arrived late)"
                 )
+                self._update_device_status(
+                    "unreached",
+                    trigger_source="graceful",
+                    metadata={"upgraded_from": "network"},
+                )
+                return
+
+            # Promote to offline once we've clearly stopped reaching it:
+            # either the polling backoff threshold has been crossed (~3 min
+            # of failures) or the long alert-timeout fired (20 min). Anything
+            # short of that keeps "unreached" so a brief blip doesn't
+            # immediately demote the device.
+            crossed_error_threshold = (
+                self._consecutive_errors >= self._max_consecutive_errors
+            )
+            timeout_exceeded = current_status.is_timeout_exceeded(unreachable_timeout)
+            if crossed_error_threshold or timeout_exceeded:
+                reason = (
+                    "max_errors_reached"
+                    if crossed_error_threshold
+                    else "unreachable_timeout"
+                )
+                self._logger.info(f"Device {self._id} marked offline ({reason})")
                 self._update_device_status(
                     "offline",
                     trigger_source="system",
-                    metadata={"reason": "unreachable_timeout"},
+                    metadata={"reason": reason},
                 )
                 self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
                 return
