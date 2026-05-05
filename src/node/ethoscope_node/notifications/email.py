@@ -237,16 +237,10 @@ class EmailNotificationService(NotificationAnalyzer):
         if not self._should_send_alert(device_id, "device_stopped", run_id):
             return False
 
-        # Get comprehensive device failure analysis
-        failure_analysis = self.analyze_device_failure(device_id)
-
-        # Don't send alert if the run completed normally
-        failure_type = failure_analysis.get("failure_type", "")
-        if failure_type == "completed_normally":
-            self.logger.info(
-                f"Suppressing alert for device {device_id} - run {run_id} completed normally"
-            )
-            return False
+        # Get comprehensive device failure analysis. Pass run_id so we analyze
+        # the exact run that triggered the alert, not whichever row has the
+        # latest start_time (orphan cleanup can rewrite end_time on live runs).
+        failure_analysis = self.analyze_device_failure(device_id, run_id=run_id)
 
         # Get recipients: user whose experiment stopped + admins
         stopped_user = self.get_stopped_experiment_user(run_id)

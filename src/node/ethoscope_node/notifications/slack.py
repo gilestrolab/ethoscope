@@ -378,16 +378,9 @@ class SlackNotificationService(NotificationAnalyzer):
             return False
 
         try:
-            # Get comprehensive device failure analysis
-            failure_analysis = self.analyze_device_failure(device_id)
-
-            # Don't send alert if the run completed normally
-            failure_type = failure_analysis.get("failure_type", "")
-            if failure_type == "completed_normally":
-                self.logger.info(
-                    f"Suppressing alert for device {device_id} - run {run_id} completed normally"
-                )
-                return False
+            # Get comprehensive device failure analysis. Pass run_id so we
+            # analyze the exact run that triggered the alert.
+            failure_analysis = self.analyze_device_failure(device_id, run_id=run_id)
 
             # Get device logs for context
             device_logs = self.get_device_logs(device_id, max_lines=10)

@@ -1600,8 +1600,17 @@ class TestAdvancedCleanupOperations:
             status="offline",
         )
 
-        # Create old running session
+        # Force last_seen to be genuinely old. updateEthoscopes always bumps
+        # last_seen to "now"; cleanup now requires the device to actually be
+        # stale before orphaning a running session.
         old_time = datetime.datetime.now() - datetime.timedelta(hours=3)
+        populated_db.executeSQL(
+            f"UPDATE {populated_db._ethoscopes_table_name} "
+            "SET last_seen = ? WHERE ethoscope_id = ?",
+            (old_time, "offline_device"),
+        )
+
+        # Create old running session
         populated_db.executeSQL(
             f"INSERT INTO {populated_db._runs_table_name} "
             "(run_id, type, ethoscope_name, ethoscope_id, user_name, user_id, "
@@ -1630,6 +1639,46 @@ class TestAdvancedCleanupOperations:
         run = populated_db.getRun("orphan_run", asdict=False)
         assert run[0]["status"] == "stopped"
         assert "Orphaned session cleanup" in run[0]["problems"]
+
+    def test_cleanup_skips_recently_seen_devices(self, populated_db):
+        """A device whose last_seen is fresh must not have its run orphaned.
+
+        Reason: at node startup the cached status can read 'offline' even for
+        a device that is actually still tracking. Closing such a run poisons
+        end_time and silently suppresses the eventual real stop alert.
+        """
+        populated_db.updateEthoscopes(
+            ethoscope_id="recently_seen_device",
+            ethoscope_name="RECENT_DEVICE",
+            status="offline",
+        )
+
+        # last_seen is "now" by virtue of updateEthoscopes — leave it fresh.
+        old_start = datetime.datetime.now() - datetime.timedelta(hours=3)
+        populated_db.executeSQL(
+            f"INSERT INTO {populated_db._runs_table_name} "
+            "(run_id, type, ethoscope_name, ethoscope_id, user_name, user_id, "
+            "location, start_time, end_time, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "live_run",
+                "tracking",
+                "RECENT_DEVICE",
+                "recently_seen_device",
+                "test_user",
+                1,
+                "Room A",
+                old_start,
+                0,
+                "running",
+            ),
+        )
+
+        populated_db.cleanup_orphaned_running_sessions(min_age_hours=1)
+
+        run = populated_db.getRun("live_run", asdict=False)
+        assert run[0]["status"] == "running"
+        assert run[0]["end_time"] in (0, "0", None)
 
     def test_parse_session_time_various_formats(self, test_db):
         """Test parsing session times in various formats."""

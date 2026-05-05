@@ -1044,43 +1044,6 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error handling state transition: {e}")
 
-    def _get_recent_run_id(self) -> str | None:
-        """
-        Get the most recent run_id for this device from the database.
-        Used to recover run_id for interrupted tracking sessions.
-
-        Returns:
-            The most recent run_id for this device, or None if not found
-        """
-        try:
-            # Query for the most recent run for this device
-            sql = """
-            SELECT run_id FROM runs
-            WHERE ethoscope_id = ?
-            ORDER BY start_time DESC
-            LIMIT 1
-            """
-
-            self._logger.info(f"Executing database query for device {self._id}: {sql}")
-            result = self._edb.exec(sql, (self._id,))
-            self._logger.info(f"Database query result: {result}")
-
-            if result and len(result) > 0:
-                recent_run_id = result[0]["run_id"]
-                self._logger.info(
-                    f"Recovered run_id for interrupted session: {recent_run_id}"
-                )
-                return recent_run_id
-            else:
-                self._logger.warning(
-                    f"Could not find recent run_id for device {self._id} - query returned empty"
-                )
-                return None
-
-        except Exception as e:
-            self._logger.error(f"Error recovering run_id for device {self._id}: {e}")
-            return None
-
     def _send_state_transition_alerts(
         self, previous_status: str, new_status: str, run_id: str
     ):

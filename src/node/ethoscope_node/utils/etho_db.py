@@ -2123,17 +2123,35 @@ class ExperimentalDB(multiprocessing.Process):
                 }
             )
 
-        # Get current device statuses from ethoscopes table
+        # Get current device statuses + last_seen from ethoscopes table
         sql_device_status = (
-            f"SELECT ethoscope_id, status FROM {self._ethoscopes_table_name}"
+            f"SELECT ethoscope_id, status, last_seen "
+            f"FROM {self._ethoscopes_table_name}"
         )
         device_statuses = self.executeSQL(sql_device_status)
         device_status_map = {}
+        device_last_seen_map = {}
         if isinstance(device_statuses, list):
             for status_row in device_statuses:
                 device_status_map[status_row[0]] = status_row[1]
+                device_last_seen_map[status_row[0]] = (
+                    status_row[2] if len(status_row) > 2 else None
+                )
 
         orphans_to_cleanup = []
+
+        # Reason: at node startup the cached `status` reflects the last shutdown,
+        # which may say "offline" even for a device that is actually still
+        # tracking. Closing such a run here poisons end_time and causes the real
+        # stop alert (hours later) to be silently suppressed. Require last_seen
+        # to be older than min_age_cutoff before treating a session as orphaned.
+        def _is_device_genuinely_stale(ethoscope_id: str) -> bool:
+            last_seen_dt = self._parse_session_time(
+                device_last_seen_map.get(ethoscope_id)
+            )
+            if not last_seen_dt:
+                return True
+            return last_seen_dt < min_age_cutoff
 
         # Analyze each device's running sessions
         for ethoscope_id, sessions in device_sessions.items():
@@ -2153,9 +2171,12 @@ class ExperimentalDB(multiprocessing.Process):
                 # Only mark as orphaned if:
                 # 1. Device is not currently in 'running' status
                 # 2. Session is older than minimum age threshold
+                # 3. Device hasn't been seen recently (guards against routine
+                #    node restarts where cached status is stale)
                 if (
                     current_device_status not in ["running", "recording", "streaming"]
                     and start_dt < min_age_cutoff
+                    and _is_device_genuinely_stale(ethoscope_id)
                 ):
                     age_days = (datetime.datetime.now() - start_dt).days
                     orphans_to_cleanup.append(

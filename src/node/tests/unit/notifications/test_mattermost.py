@@ -256,7 +256,7 @@ class TestMattermostNotificationService:
             )
 
             assert result
-            mock_analyze.assert_called_once_with(device_id)
+            mock_analyze.assert_called_once_with(device_id, run_id=run_id)
             mock_get_logs.assert_called_once_with(device_id, max_lines=10)
             mock_send.assert_called_once()
 
@@ -547,26 +547,35 @@ class TestMattermostNotificationService:
             call_args[0][0] == "https://mattermost.example.com/api/v4/posts"
         )  # URL as first positional arg
 
+    @patch.object(MattermostNotificationService, "_send_message")
     @patch.object(MattermostNotificationService, "analyze_device_failure")
-    def test_send_device_stopped_alert_completed_normally(
-        self, mock_analyze, mattermost_service
+    def test_send_device_stopped_alert_sends_even_when_analysis_says_completed_normally(
+        self, mock_analyze, mock_send, mattermost_service
     ):
-        """Test device stopped alert suppressed for normally completed runs."""
+        """Mattermost service must not suppress on stored failure_type.
+
+        analyze_device_failure can mis-classify as 'completed_normally' when
+        end_time has been overwritten by orphan cleanup. The scanner's
+        should_alert=True decision is authoritative.
+        """
         mock_analyze.return_value = {
             "failure_type": "completed_normally",
             "status": "Completed normally",
             "user": "test_user",
         }
+        mock_send.return_value = True
 
-        with patch.object(
-            mattermost_service.db, "hasAlertBeenSent", return_value=False
+        with (
+            patch.object(mattermost_service.db, "hasAlertBeenSent", return_value=False),
+            patch.object(mattermost_service.db, "logAlert", return_value=1),
         ):
             result = mattermost_service.send_device_stopped_alert(
                 "device_001", "Test Device", "run_123", datetime.datetime.now()
             )
 
-            assert not result
-            mock_analyze.assert_called_once_with("device_001")
+        assert result
+        mock_analyze.assert_called_once_with("device_001", run_id="run_123")
+        mock_send.assert_called_once()
 
     @patch.object(MattermostNotificationService, "analyze_device_failure")
     @patch.object(MattermostNotificationService, "get_device_logs")

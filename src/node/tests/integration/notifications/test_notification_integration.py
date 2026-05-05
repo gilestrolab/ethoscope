@@ -230,7 +230,6 @@ class TestNotificationIntegration:
         assert (
             analysis["device_name"] == "Device ETHOSCOPE_001"
         )  # analyze_device_failure doesn't extract nested data properly
-        assert analysis["failure_type"] == "crashed_during_tracking"
         assert analysis["status"] == "Failed while running"
         assert analysis["user"] == "researcher1"
         assert analysis["location"] == "Incubator_A"
@@ -258,8 +257,7 @@ class TestNotificationIntegration:
         assert (
             analysis["device_name"] == "Device ETHOSCOPE_002"
         )  # analyze_device_failure doesn't extract nested data properly
-        assert analysis["failure_type"] == "completed_normally"
-        assert analysis["status"] == "Completed normally"
+        assert analysis["status"] == "Stopped"
         assert analysis["user"] == "researcher2"
         assert analysis["location"] == "Incubator_B"
         assert analysis["experiment_type"] == "recording"

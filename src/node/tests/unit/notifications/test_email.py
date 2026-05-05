@@ -322,7 +322,7 @@ class TestEmailNotificationService:
             assert result
             mock_get_stopped_user.assert_called_once_with(run_id)
             mock_get_admin.assert_called_once()
-            mock_analyze.assert_called_once_with(device_id)
+            mock_analyze.assert_called_once_with(device_id, run_id=run_id)
             mock_get_logs.assert_called_once_with(device_id, max_lines=500)
             mock_send.assert_called_once()
 
@@ -351,13 +351,32 @@ class TestEmailNotificationService:
             "device_001", "device_stopped", "run_123"
         )
 
+    @patch.object(EmailNotificationService, "_send_email")
+    @patch.object(EmailNotificationService, "get_device_logs")
     @patch.object(EmailNotificationService, "analyze_device_failure")
+    @patch.object(EmailNotificationService, "get_stopped_experiment_user")
+    @patch.object(EmailNotificationService, "get_admin_emails")
     @patch.object(EmailNotificationService, "_should_send_alert")
-    def test_send_device_stopped_alert_completed_normally(
-        self, mock_should_send, mock_analyze, email_service
+    def test_send_device_stopped_alert_sends_even_when_analysis_says_completed_normally(
+        self,
+        mock_should_send,
+        mock_get_admin,
+        mock_get_stopped_user,
+        mock_analyze,
+        mock_get_logs,
+        mock_send,
+        email_service,
     ):
-        """Test device stopped alert suppressed for normally completed runs."""
+        """The orchestration layer (scanner) is the authority on whether to alert.
+
+        analyze_device_failure can read a stale end_time (e.g. poisoned by orphan
+        cleanup at startup) and report failure_type='completed_normally' for a
+        run that actually crashed. The notification service must not second-guess
+        the scanner's should_alert=True decision based on that stored end_time.
+        """
         mock_should_send.return_value = True
+        mock_get_stopped_user.return_value = ["user@example.com"]
+        mock_get_admin.return_value = ["admin@example.com"]
         mock_analyze.return_value = {
             "failure_type": "completed_normally",
             "status": "Completed normally",
@@ -366,16 +385,19 @@ class TestEmailNotificationService:
             "experiment_duration_str": "3.1 days",
             "experiment_type": "tracking",
         }
+        mock_get_logs.return_value = ""
+        mock_send.return_value = True
 
-        result = email_service.send_device_stopped_alert(
-            "device_001", "Test Device", "run_123", datetime.datetime.now()
-        )
+        with (
+            patch.object(email_service.db, "hasAlertBeenSent", return_value=False),
+            patch.object(email_service.db, "logAlert", return_value=1),
+        ):
+            result = email_service.send_device_stopped_alert(
+                "device_001", "Test Device", "run_123", datetime.datetime.now()
+            )
 
-        assert not result
-        mock_should_send.assert_called_once_with(
-            "device_001", "device_stopped", "run_123"
-        )
-        mock_analyze.assert_called_once_with("device_001")
+        assert result
+        mock_send.assert_called_once()
 
     @patch.object(EmailNotificationService, "get_device_users")
     @patch.object(EmailNotificationService, "get_admin_emails")

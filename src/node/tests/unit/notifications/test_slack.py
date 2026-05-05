@@ -351,7 +351,7 @@ class TestSlackNotificationService:
         )
 
         assert result
-        mock_analyze.assert_called_once_with("device_001")
+        mock_analyze.assert_called_once_with("device_001", run_id="run123")
         mock_get_logs.assert_called_once_with("device_001", max_lines=10)
         mock_send.assert_called_once()
 
@@ -661,15 +661,21 @@ class TestSlackNotificationService:
     @patch(
         "ethoscope_node.notifications.slack.SlackNotificationService.analyze_device_failure"
     )
-    def test_send_device_stopped_alert_completed_normally(
+    def test_send_device_stopped_alert_sends_even_when_analysis_says_completed_normally(
         self, mock_analyze, mock_send, slack_service_webhook
     ):
-        """Test device stopped alert suppressed when run completed normally."""
+        """Slack service must not suppress on stored failure_type.
+
+        analyze_device_failure can mis-classify as 'completed_normally' when
+        end_time has been overwritten by orphan cleanup. The scanner's
+        should_alert=True decision is authoritative.
+        """
         mock_analyze.return_value = {
             "user": "test_user",
             "status": "Completed",
             "failure_type": "completed_normally",
         }
+        mock_send.return_value = True
 
         result = slack_service_webhook.send_device_stopped_alert(
             device_id="device_001",
@@ -678,9 +684,9 @@ class TestSlackNotificationService:
             last_seen=datetime.datetime.now(),
         )
 
-        assert not result
-        mock_analyze.assert_called_once_with("device_001")
-        mock_send.assert_not_called()
+        assert result
+        mock_analyze.assert_called_once_with("device_001", run_id="run123")
+        mock_send.assert_called_once()
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
     @patch(
