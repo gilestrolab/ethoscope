@@ -837,6 +837,14 @@ class Ethoscope(BaseDevice):
                 )
                 self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
                 return
+        elif previous_status == "offline":
+            # Reason: an already-offline device that is still unreachable must
+            # stay offline. The earlier elif demoted unreached -> offline once
+            # we crossed _max_consecutive_errors; without this guard the next
+            # poll would re-promote offline -> unreached (fresh age, network
+            # trigger) and the pair would ping-pong every cycle, flashing the
+            # "temporarily unreachable" alert forever.
+            return
         else:
             # Device is becoming unreachable for the first time. If the user
             # just sent a reboot/poweroff/restart, attribute the disconnection

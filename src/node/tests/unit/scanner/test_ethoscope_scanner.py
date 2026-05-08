@@ -1474,6 +1474,37 @@ class TestEthoscopeHandleUnreachableState:
         )
         assert upgrade_call.kwargs["metadata"] == {"upgraded_from": "network"}
 
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_offline_device_stays_offline_when_still_unreachable(
+        self, mock_config_class, mock_db_class
+    ):
+        """A device already demoted to offline must NOT be re-promoted to
+        unreached on the next failed poll. Otherwise the pair ping-pongs
+        offline <-> unreached every cycle and the UI flashes the alert
+        forever (regression: ETHOSCOPE_000 on production stayed in this
+        loop for days after consecutive_errors crossed the threshold).
+        """
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+        device._device_status = DeviceStatus("offline", trigger_source="system")
+        device._consecutive_errors = device._max_consecutive_errors + 50
+
+        with patch.object(device._config, "get_custom") as mock_get_custom:
+            mock_get_custom.return_value = {"unreachable_timeout_minutes": 20}
+            with patch.object(device, "_update_device_status") as mock_update:
+                with patch.object(device, "_reset_info"):
+                    device._handle_unreachable_state("offline")
+
+        unreached_calls = [
+            c for c in mock_update.call_args_list if c.args[0] == "unreached"
+        ]
+        assert unreached_calls == []
+        mock_db.updateEthoscopes.assert_not_called()
+
 
 class TestEthoscopeScannerAdd:
     """Test EthoscopeScanner add method."""
