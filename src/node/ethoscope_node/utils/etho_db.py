@@ -199,7 +199,9 @@ class ExperimentalDB(multiprocessing.Process):
                                 created TIMESTAMP NOT NULL,
                                 active INTEGER DEFAULT 1,
                                 lights_on TEXT DEFAULT '',
-                                lights_off TEXT DEFAULT ''
+                                lights_off TEXT DEFAULT '',
+                                light_period_minutes INTEGER DEFAULT 1440,
+                                light_cycle_anchor REAL
                             );"""
 
         self.executeSQL(sql_create_runs_table)
@@ -231,6 +233,8 @@ class ExperimentalDB(multiprocessing.Process):
             self._migrate_incubators_from_config()
             # Migration 7: Add light schedule columns to incubators table
             self._migrate_incubators_add_light_schedule()
+            # Migration 8: Add T-cycle period and anchor columns to incubators table
+            self._migrate_incubators_add_period_and_anchor()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
 
@@ -620,6 +624,40 @@ class ExperimentalDB(multiprocessing.Process):
             logging.error(
                 f"Error migrating incubators table (adding light schedule): {e}"
             )
+
+    def _migrate_incubators_add_period_and_anchor(self):
+        """
+        Add light_period_minutes and light_cycle_anchor columns to incubators
+        table if absent. Period stores cycle length in minutes (default 1440 =
+        24h). Anchor is a unix timestamp marking ZT0 of the cycle; NULL means
+        wall-clock midnight (legacy 24h behaviour).
+        """
+        try:
+            check_columns = f"PRAGMA table_info({self._incubators_table_name})"
+            table_info = self.executeSQL(check_columns)
+
+            if not isinstance(table_info, list):
+                return
+
+            has_period = any(col[1] == "light_period_minutes" for col in table_info)
+            has_anchor = any(col[1] == "light_cycle_anchor" for col in table_info)
+
+            if not has_period:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN light_period_minutes INTEGER DEFAULT 1440"
+                )
+                logging.info("Added light_period_minutes to incubators table")
+
+            if not has_anchor:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN light_cycle_anchor REAL"
+                )
+                logging.info("Added light_cycle_anchor to incubators table")
+
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (period/anchor): {e}")
 
     def getRun(self, run_id, asdict=False):
         """
@@ -1292,6 +1330,8 @@ class ExperimentalDB(multiprocessing.Process):
         active: int = 1,
         lights_on: str = "",
         lights_off: str = "",
+        light_period_minutes: int = 1440,
+        light_cycle_anchor: float = None,
     ):
         """
         Add a new incubator to the database.
@@ -1303,6 +1343,10 @@ class ExperimentalDB(multiprocessing.Process):
             description: Description of the incubator
             created: Creation timestamp (uses current time if None)
             active: Whether incubator is active (1) or not (0)
+            lights_on: Lights-on time HH:MM
+            lights_off: Lights-off time HH:MM
+            light_period_minutes: Cycle length in minutes (default 1440 = 24h)
+            light_cycle_anchor: Unix timestamp marking ZT0; None = wall-clock midnight
 
         Returns:
             ID of the inserted incubator or -1 if error
@@ -1328,13 +1372,19 @@ class ExperimentalDB(multiprocessing.Process):
             escaped_description = description.replace("'", "''")
             escaped_lights_on = lights_on.replace("'", "''")
             escaped_lights_off = lights_off.replace("'", "''")
+            period_sql = int(light_period_minutes) if light_period_minutes else 1440
+            anchor_sql = (
+                "NULL" if light_cycle_anchor is None else f"{float(light_cycle_anchor)}"
+            )
 
             sql_add_incubator = f"""
             INSERT INTO {self._incubators_table_name}
-            (name, location, owner, description, created, active, lights_on, lights_off)
+            (name, location, owner, description, created, active,
+             lights_on, lights_off, light_period_minutes, light_cycle_anchor)
             VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}',
                     '{escaped_description}', '{created}', {active},
-                    '{escaped_lights_on}', '{escaped_lights_off}')
+                    '{escaped_lights_on}', '{escaped_lights_off}',
+                    {period_sql}, {anchor_sql})
             """
 
             result = self.executeSQL(sql_add_incubator)
@@ -1393,6 +1443,14 @@ class ExperimentalDB(multiprocessing.Process):
                     set_clauses.append(f"{field} = '{escaped_value}'")
                 elif field in ["active"]:
                     set_clauses.append(f"{field} = {int(value)}")
+                elif field == "light_period_minutes":
+                    set_clauses.append(f"{field} = {int(value)}")
+                elif field == "light_cycle_anchor":
+                    # Explicit None clears the anchor (returns cycle to legacy wall-clock mode).
+                    if value is None:
+                        set_clauses.append(f"{field} = NULL")
+                    else:
+                        set_clauses.append(f"{field} = {float(value)}")
                 elif field == "created":
                     set_clauses.append(f"{field} = '{value}'")
                 else:

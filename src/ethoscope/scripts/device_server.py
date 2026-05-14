@@ -626,6 +626,8 @@ def info(id):
         "active": False,
         "lights_on": "",
         "lights_off": "",
+        "period_minutes": 1440,
+        "anchor": None,
         "led_on": False,
     }
     try:
@@ -644,6 +646,8 @@ def info(id):
             light_info["active"] = light_data.get("active", False)
             light_info["lights_on"] = light_data.get("lights_on", "")
             light_info["lights_off"] = light_data.get("lights_off", "")
+            light_info["period_minutes"] = light_data.get("period_minutes", 1440)
+            light_info["anchor"] = light_data.get("anchor")
             if (
                 light_info["active"]
                 and light_info["lights_on"]
@@ -652,7 +656,10 @@ def info(id):
                 from ethoscope.hardware.interfaces.light_daemon import LightController
 
                 light_info["led_on"] = LightController.should_light_be_on(
-                    light_info["lights_on"], light_info["lights_off"]
+                    light_info["lights_on"],
+                    light_info["lights_off"],
+                    period_minutes=light_info["period_minutes"],
+                    anchor=light_info["anchor"],
                 )
     except Exception as e:
         logging.debug("Could not read light schedule: %s", e)

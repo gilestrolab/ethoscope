@@ -550,6 +550,70 @@ class TestIncubatorCRUD:
         incubator = populated_db.getIncubatorByName("Incubator_01", asdict=True)
         assert incubator["active"] == 0
 
+    def test_incubator_has_period_and_anchor_columns(self, test_db):
+        """Newly created incubators table includes the T-cycle columns."""
+        import sqlite3
+
+        conn = sqlite3.connect(test_db._db_name)
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({test_db._incubators_table_name})")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "light_period_minutes" in cols
+        assert "light_cycle_anchor" in cols
+
+    def test_add_incubator_with_period_and_anchor(self, test_db):
+        """Period and anchor round-trip through addIncubator."""
+        result = test_db.addIncubator(
+            name="T21_box",
+            location="Room T",
+            light_period_minutes=1260,
+            light_cycle_anchor=1715000000.5,
+        )
+        assert result > 0
+
+        inc = test_db.getIncubatorByName("T21_box", asdict=True)
+        assert inc["light_period_minutes"] == 1260
+        assert inc["light_cycle_anchor"] == 1715000000.5
+
+    def test_add_incubator_default_period_no_anchor(self, test_db):
+        """Defaults: period 1440 and NULL anchor when not supplied."""
+        result = test_db.addIncubator(name="Default_box")
+        assert result > 0
+
+        inc = test_db.getIncubatorByName("Default_box", asdict=True)
+        assert inc["light_period_minutes"] == 1440
+        assert inc["light_cycle_anchor"] is None
+
+    def test_update_incubator_set_period_and_anchor(self, populated_db):
+        """Update can set both period and anchor."""
+        result = populated_db.updateIncubator(
+            name="Incubator_01",
+            light_period_minutes=1680,
+            light_cycle_anchor=1715000000.0,
+        )
+        assert result >= 0
+
+        inc = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert inc["light_period_minutes"] == 1680
+        assert inc["light_cycle_anchor"] == 1715000000.0
+
+    def test_update_incubator_clear_anchor_with_none(self, populated_db):
+        """Passing anchor=None clears it back to NULL."""
+        populated_db.updateIncubator(
+            name="Incubator_01",
+            light_cycle_anchor=1715000000.0,
+        )
+        result = populated_db.updateIncubator(
+            name="Incubator_01",
+            light_cycle_anchor=None,
+        )
+        assert result >= 0
+
+        inc = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert inc["light_cycle_anchor"] is None
+
 
 class TestDeviceManagement:
     """Test ethoscope device management."""
@@ -1231,6 +1295,42 @@ class TestDatabaseMigrations:
             # Verify incubators were migrated
             incubators = db.getAllIncubators()
             assert len(incubators) >= 2
+
+    def test_migrate_incubators_add_period_and_anchor(self, temp_config_dir):
+        """Migration adds period+anchor columns to pre-existing incubators table."""
+        db_path = os.path.join(temp_config_dir, "ethoscope-node.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE incubators (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                location TEXT,
+                owner TEXT,
+                description TEXT,
+                created TIMESTAMP NOT NULL,
+                active INTEGER DEFAULT 1,
+                lights_on TEXT DEFAULT '',
+                lights_off TEXT DEFAULT ''
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        # Instantiating ExperimentalDB triggers migrations.
+        _ = ExperimentalDB(config_dir=temp_config_dir)
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(incubators)")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "light_period_minutes" in cols
+        assert "light_cycle_anchor" in cols
 
 
 class TestExperimentOperations:

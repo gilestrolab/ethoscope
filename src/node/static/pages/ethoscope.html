@@ -40,12 +40,12 @@
             <!-- Light Schedule Icons -->
             <span ng-if="device.light_schedule.hardware && device.light_schedule.led_on"
                   class="fa fa-sun fa-3x"
-                  title="LED ON ({{device.light_schedule.lights_on}} – {{device.light_schedule.lights_off}})"
+                  title="LED ON ({{device.light_schedule.lights_on}} – {{device.light_schedule.lights_off}}{{device.light_schedule.period_minutes && device.light_schedule.period_minutes !== 1440 ? ', T' + (device.light_schedule.period_minutes / 60) + 'h' : ''}})"
                   style="color: #f0ad4e; transform: scale(0.9);">
             </span>
             <span ng-if="device.light_schedule.hardware && device.light_schedule.active && !device.light_schedule.led_on"
                   class="fa fa-moon fa-3x"
-                  title="LED OFF ({{device.light_schedule.lights_on}} – {{device.light_schedule.lights_off}})"
+                  title="LED OFF ({{device.light_schedule.lights_on}} – {{device.light_schedule.lights_off}}{{device.light_schedule.period_minutes && device.light_schedule.period_minutes !== 1440 ? ', T' + (device.light_schedule.period_minutes / 60) + 'h' : ''}})"
                   style="color: #888; transform: scale(0.9);">
             </span>
             <span ng-if="device.light_schedule.hardware && !device.light_schedule.active"

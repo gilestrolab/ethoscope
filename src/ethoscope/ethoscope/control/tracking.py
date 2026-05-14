@@ -107,11 +107,33 @@ class ExperimentalInformation(DescribedObject):
                 "default": "",
                 "hidden": "true",
             },
+            {
+                "type": "int",
+                "name": "light_period_minutes",
+                "description": "Light schedule: cycle length in minutes (1440 = 24h)",
+                "default": 1440,
+                "hidden": "true",
+            },
+            {
+                "type": "str",
+                "name": "light_cycle_anchor",
+                "description": "Light schedule: ZT0 unix timestamp (empty for wall-clock midnight)",
+                "default": "",
+                "hidden": "true",
+            },
         ],
     }
 
     def __init__(
-        self, name="", location="", code="", sensor="", lights_on="", lights_off=""
+        self,
+        name="",
+        location="",
+        code="",
+        sensor="",
+        lights_on="",
+        lights_off="",
+        light_period_minutes=1440,
+        light_cycle_anchor="",
     ):
         self._check_code(code)
         self._info_dic = {
@@ -121,6 +143,8 @@ class ExperimentalInformation(DescribedObject):
             "sensor": sensor,
             "lights_on": lights_on,
             "lights_off": lights_off,
+            "light_period_minutes": light_period_minutes,
+            "light_cycle_anchor": light_cycle_anchor,
         }
 
     def _check_code(self, code):
@@ -1366,7 +1390,14 @@ class ControlThread(Thread):
                 pass
 
     def _write_light_schedule(self):
-        """Write light schedule config file for the light daemon."""
+        """Write light schedule config file for the light daemon.
+
+        The schedule supports both wall-clock 24 h cycles and arbitrary
+        T-cycles. For T-cycles the anchor (ZT0 unix timestamp) is sourced
+        from the incubator at the node and passed through experimental_info
+        — never computed on the device — so every device in the same
+        incubator shares the same phase.
+        """
         try:
             schedule_dir = os.path.dirname(self.LIGHT_SCHEDULE_FILE)
             os.makedirs(schedule_dir, exist_ok=True)
@@ -1375,10 +1406,30 @@ class ControlThread(Thread):
             lights_on = exp_info.get("lights_on", "")
             lights_off = exp_info.get("lights_off", "")
 
+            # Period: integer minutes, default 1440 (24h). Tolerate strings.
+            period_raw = exp_info.get("light_period_minutes", 1440)
+            try:
+                period_minutes = (
+                    int(period_raw) if period_raw not in (None, "") else 1440
+                )
+            except (TypeError, ValueError):
+                period_minutes = 1440
+            if period_minutes <= 0:
+                period_minutes = 1440
+
+            # Anchor: optional unix timestamp. Empty string / None / unparseable → None.
+            anchor_raw = exp_info.get("light_cycle_anchor", "")
+            try:
+                anchor = float(anchor_raw) if anchor_raw not in (None, "") else None
+            except (TypeError, ValueError):
+                anchor = None
+
             schedule = {
                 "lights_on": lights_on,
                 "lights_off": lights_off,
                 "active": bool(lights_on and lights_off),
+                "period_minutes": period_minutes,
+                "anchor": anchor,
                 "updated_at": time.time(),
             }
 
@@ -1389,8 +1440,14 @@ class ControlThread(Thread):
             os.replace(tmp_file, self.LIGHT_SCHEDULE_FILE)
 
             if lights_on and lights_off:
+                period_str = (
+                    "" if period_minutes == 1440 else f", T={period_minutes // 60}h"
+                )
                 logging.info(
-                    "Light schedule written: on=%s, off=%s", lights_on, lights_off
+                    "Light schedule written: on=%s, off=%s%s",
+                    lights_on,
+                    lights_off,
+                    period_str,
                 )
             else:
                 logging.info("No light schedule configured for this experiment")

@@ -897,6 +897,16 @@
                     if (incubator.lights_on && incubator.lights_off) {
                         option.experimental_info.arguments.lights_on = incubator.lights_on;
                         option.experimental_info.arguments.lights_off = incubator.lights_off;
+                        // Period defaults to 1440 (24h, wall-clock) when absent.
+                        option.experimental_info.arguments.light_period_minutes =
+                            parseInt(incubator.light_period_minutes, 10) || 1440;
+                        // Anchor is per-incubator and pushed verbatim so all
+                        // devices in this incubator share the same ZT0.
+                        // Empty string means "wall-clock midnight" mode.
+                        option.experimental_info.arguments.light_cycle_anchor =
+                            (incubator.light_cycle_anchor !== null && incubator.light_cycle_anchor !== undefined)
+                                ? String(incubator.light_cycle_anchor)
+                                : '';
                         hasLightSchedule = true;
                     }
                 }
@@ -1239,6 +1249,12 @@
                     if (incubator.lights_on && incubator.lights_off) {
                         option.experimental_info.arguments.lights_on = incubator.lights_on;
                         option.experimental_info.arguments.lights_off = incubator.lights_off;
+                        option.experimental_info.arguments.light_period_minutes =
+                            parseInt(incubator.light_period_minutes, 10) || 1440;
+                        option.experimental_info.arguments.light_cycle_anchor =
+                            (incubator.light_cycle_anchor !== null && incubator.light_cycle_anchor !== undefined)
+                                ? String(incubator.light_cycle_anchor)
+                                : '';
                     }
                 }
             }

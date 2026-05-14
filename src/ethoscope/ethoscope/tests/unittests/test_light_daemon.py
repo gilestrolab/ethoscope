@@ -148,6 +148,203 @@ class TestShouldLightBeOn:
         )
 
 
+class TestAnchoredCycle:
+    """Tests for the T-cycle (period+anchor) mode of should_light_be_on."""
+
+    def _now(self, anchor_ts, hours_after):
+        """Helper: return a datetime ``hours_after`` past the anchor timestamp."""
+        return datetime.datetime.fromtimestamp(anchor_ts + hours_after * 3600)
+
+    def test_t21_in_light_phase(self):
+        """T=21h with 12L:9D — at +3h of cycle the light is on."""
+        anchor = 1_700_000_000.0
+        assert (
+            LightController.should_light_be_on(
+                "00:00",
+                "12:00",
+                now=self._now(anchor, 3),
+                period_minutes=21 * 60,
+                anchor=anchor,
+            )
+            is True
+        )
+
+    def test_t21_in_dark_phase(self):
+        """T=21h with 12L:9D — at +15h the light is off."""
+        anchor = 1_700_000_000.0
+        assert (
+            LightController.should_light_be_on(
+                "00:00",
+                "12:00",
+                now=self._now(anchor, 15),
+                period_minutes=21 * 60,
+                anchor=anchor,
+            )
+            is False
+        )
+
+    def test_t21_wraps_into_next_cycle(self):
+        """T=21h: at +22h we've wrapped 1h into a new cycle → light on."""
+        anchor = 1_700_000_000.0
+        assert (
+            LightController.should_light_be_on(
+                "00:00",
+                "12:00",
+                now=self._now(anchor, 22),
+                period_minutes=21 * 60,
+                anchor=anchor,
+            )
+            is True
+        )
+
+    def test_t21_cycle_end_wrap_window(self):
+        """T=21h, lights_on=18:00 lights_off=03:00 — crosses cycle wrap.
+        Within the cycle phase axis (mod 21h), the window 18:00→21:00 ∪ 00:00→03:00 is 'on'.
+        """
+        anchor = 1_700_000_000.0
+        # +19h since anchor → phase = 19h:00 → on (in 18-21 part)
+        assert (
+            LightController.should_light_be_on(
+                "18:00",
+                "03:00",
+                now=self._now(anchor, 19),
+                period_minutes=21 * 60,
+                anchor=anchor,
+            )
+            is True
+        )
+        # +2h → phase = 2h:00 → on (in 0-3 part)
+        assert (
+            LightController.should_light_be_on(
+                "18:00",
+                "03:00",
+                now=self._now(anchor, 2),
+                period_minutes=21 * 60,
+                anchor=anchor,
+            )
+            is True
+        )
+        # +10h → phase = 10h:00 → off
+        assert (
+            LightController.should_light_be_on(
+                "18:00",
+                "03:00",
+                now=self._now(anchor, 10),
+                period_minutes=21 * 60,
+                anchor=anchor,
+            )
+            is False
+        )
+
+    def test_t24_anchored_matches_wallclock(self):
+        """T=24h with anchor = midnight of a wallclock date should agree
+        with wall-clock mode at the same moment."""
+        # Pick an anchor at midnight local time on a known date.
+        midnight = datetime.datetime(2026, 5, 1, 0, 0, 0)
+        anchor_ts = midnight.timestamp()
+        # 14:00 the same day, both modes
+        t = datetime.datetime(2026, 5, 1, 14, 0, 0)
+        anchored = LightController.should_light_be_on(
+            "07:00",
+            "19:00",
+            now=t,
+            period_minutes=1440,
+            anchor=anchor_ts,
+        )
+        wallclock = LightController.should_light_be_on(
+            "07:00",
+            "19:00",
+            now=t.time(),
+        )
+        assert anchored is True
+        assert wallclock is True
+
+    def test_anchored_requires_anchor(self):
+        """Asking for a non-24h period without an anchor → False (refuse)."""
+        assert (
+            LightController.should_light_be_on(
+                "00:00",
+                "12:00",
+                now=datetime.datetime(2026, 5, 1, 12),
+                period_minutes=21 * 60,
+                anchor=None,
+            )
+            is False
+        )
+
+    def test_anchored_equal_times_always_on(self):
+        """In anchored mode, equal on==off means 24h light on (any phase)."""
+        anchor = 1_700_000_000.0
+        assert (
+            LightController.should_light_be_on(
+                "06:00",
+                "06:00",
+                now=self._now(anchor, 13),
+                period_minutes=21 * 60,
+                anchor=anchor,
+            )
+            is True
+        )
+
+    def test_anchored_rejects_negative_period(self):
+        anchor = 1_700_000_000.0
+        assert (
+            LightController.should_light_be_on(
+                "00:00",
+                "12:00",
+                now=self._now(anchor, 1),
+                period_minutes=-60,
+                anchor=anchor,
+            )
+            is False
+        )
+
+
+class TestReadScheduleFull:
+    """Tests for the dict-returning read_schedule_full()."""
+
+    def test_missing_file_returns_inactive(self):
+        controller = LightController(config_file="/nonexistent/path.json")
+        assert controller.read_schedule_full() == {"active": False}
+
+    def test_legacy_config_no_tcycle_fields(self, tmp_path):
+        config_file = tmp_path / "light_schedule.json"
+        config_file.write_text(
+            json.dumps(
+                {
+                    "lights_on": "07:00",
+                    "lights_off": "19:00",
+                    "active": True,
+                }
+            )
+        )
+        controller = LightController(config_file=str(config_file))
+        sched = controller.read_schedule_full()
+        assert sched["active"] is True
+        assert sched["lights_on"] == "07:00"
+        assert sched["period_minutes"] == 1440
+        assert sched["anchor"] is None
+
+    def test_tcycle_config(self, tmp_path):
+        config_file = tmp_path / "light_schedule.json"
+        config_file.write_text(
+            json.dumps(
+                {
+                    "lights_on": "00:00",
+                    "lights_off": "12:00",
+                    "active": True,
+                    "period_minutes": 1260,
+                    "anchor": 1715000000.0,
+                }
+            )
+        )
+        controller = LightController(config_file=str(config_file))
+        sched = controller.read_schedule_full()
+        assert sched["active"] is True
+        assert sched["period_minutes"] == 1260
+        assert sched["anchor"] == 1715000000.0
+
+
 class TestParseTime:
     """Tests for time string parsing."""
 

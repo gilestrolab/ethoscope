@@ -614,6 +614,248 @@ class TestSetupAPI(unittest.TestCase):
         self.assertEqual(result["result"], "error")
         self.assertIn("Original incubator name is required", result["message"])
 
+    # ---- T-cycle: period + anchor handling ----
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    @patch("ethoscope_node.api.setup_api.time.time", return_value=1715000000.0)
+    def test_add_incubator_with_tcycle_autostamps_anchor(
+        self, _mock_time, mock_db_class, mock_request
+    ):
+        """Period != 1440 with no anchor → anchor auto-stamped to now()."""
+        mock_request.json = {
+            "name": "T21",
+            "light_period_minutes": 1260,
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 1
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "success")
+        call_args = mock_db.addIncubator.call_args[1]
+        self.assertEqual(call_args["light_period_minutes"], 1260)
+        self.assertEqual(call_args["light_cycle_anchor"], 1715000000.0)
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_incubator_default_period_no_anchor(self, mock_db_class, mock_request):
+        """Period 1440 (default) → anchor stays None."""
+        mock_request.json = {"name": "Standard"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 1
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "success")
+        call_args = mock_db.addIncubator.call_args[1]
+        self.assertEqual(call_args["light_period_minutes"], 1440)
+        self.assertIsNone(call_args["light_cycle_anchor"])
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    @patch("ethoscope_node.api.setup_api.time.time", return_value=1715000000.0)
+    def test_update_period_to_tcycle_autostamps_anchor(
+        self, _mock_time, mock_db_class, mock_request
+    ):
+        """Updating period from 1440 → 1260 stamps anchor when none present."""
+        mock_request.json = {
+            "original_name": "Box1",
+            "light_period_minutes": 1260,
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "name": "Box1",
+            "light_period_minutes": 1440,
+            "light_cycle_anchor": None,
+        }
+        mock_db.updateIncubator.return_value = 1
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {}
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        call_args = mock_db.updateIncubator.call_args[1]
+        self.assertEqual(call_args["light_period_minutes"], 1260)
+        self.assertEqual(call_args["light_cycle_anchor"], 1715000000.0)
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_update_period_back_to_24h_clears_anchor(self, mock_db_class, mock_request):
+        """Updating period back to 1440 clears the anchor."""
+        mock_request.json = {
+            "original_name": "Box1",
+            "light_period_minutes": 1440,
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "name": "Box1",
+            "light_period_minutes": 1260,
+            "light_cycle_anchor": 1715000000.0,
+        }
+        mock_db.updateIncubator.return_value = 1
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {}
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        call_args = mock_db.updateIncubator.call_args[1]
+        self.assertEqual(call_args["light_period_minutes"], 1440)
+        self.assertIsNone(call_args["light_cycle_anchor"])
+
+    # ---- Busy guard ----
+
+    def _running_device(self, name, location):
+        return {
+            "name": name,
+            "id": name,
+            "status": "running",
+            "experimental_info": {"current": {"location": location}},
+        }
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_update_locked_field_while_running_returns_busy(
+        self, mock_db_class, mock_request
+    ):
+        """Editing lights_on while a device runs in this incubator is rejected."""
+        mock_request.json = {
+            "original_name": "Box1",
+            "lights_on": "06:00",
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "name": "Box1",
+            "light_period_minutes": 1440,
+            "light_cycle_anchor": None,
+        }
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {
+            "etho_1": self._running_device("ETHO_001", "Box1"),
+        }
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "error")
+        self.assertEqual(result["code"], "incubator_busy")
+        self.assertIn("ETHO_001", result["devices"])
+        mock_db.updateIncubator.assert_not_called()
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_update_cosmetic_field_while_running_allowed(
+        self, mock_db_class, mock_request
+    ):
+        """Editing description while running is fine — it's not a locked field."""
+        mock_request.json = {
+            "original_name": "Box1",
+            "description": "new note",
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "name": "Box1",
+            "light_period_minutes": 1440,
+            "light_cycle_anchor": None,
+        }
+        mock_db.updateIncubator.return_value = 1
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {
+            "etho_1": self._running_device("ETHO_001", "Box1"),
+        }
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        mock_db.updateIncubator.assert_called_once()
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_update_busy_check_ignores_other_incubators(
+        self, mock_db_class, mock_request
+    ):
+        """A device running in a *different* incubator does not block edits."""
+        mock_request.json = {
+            "original_name": "Box1",
+            "lights_on": "06:00",
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "name": "Box1",
+            "light_period_minutes": 1440,
+            "light_cycle_anchor": None,
+        }
+        mock_db.updateIncubator.return_value = 1
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {
+            "etho_x": self._running_device("ETHO_X", "OtherBox"),
+        }
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_delete_incubator_blocked_while_running(self, mock_db_class, mock_request):
+        """Deletion is blocked while devices run in the incubator."""
+        mock_request.json = {"name": "Box1"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {
+            "etho_1": self._running_device("ETHO_001", "Box1"),
+        }
+
+        result = self.api._setup_delete_incubator()
+
+        self.assertEqual(result["result"], "error")
+        self.assertEqual(result["code"], "incubator_busy")
+        mock_db.deleteIncubator.assert_not_called()
+
+    # ---- Reset anchor endpoint ----
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    @patch("ethoscope_node.api.setup_api.time.time", return_value=1715111111.0)
+    def test_reset_incubator_anchor_success(
+        self, _mock_time, mock_db_class, mock_request
+    ):
+        """Reset anchor stamps now() into the incubator row."""
+        mock_request.json = {"name": "Box1"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.updateIncubator.return_value = 1
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {}
+
+        result = self.api._setup_reset_incubator_anchor()
+
+        self.assertEqual(result["result"], "success")
+        self.assertEqual(result["light_cycle_anchor"], 1715111111.0)
+        call_args = mock_db.updateIncubator.call_args[1]
+        self.assertEqual(call_args["light_cycle_anchor"], 1715111111.0)
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_reset_incubator_anchor_blocked_while_running(
+        self, mock_db_class, mock_request
+    ):
+        """Resetting anchor is also blocked while devices run."""
+        mock_request.json = {"name": "Box1"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {
+            "etho_1": self._running_device("ETHO_001", "Box1"),
+        }
+
+        result = self.api._setup_reset_incubator_anchor()
+
+        self.assertEqual(result["result"], "error")
+        self.assertEqual(result["code"], "incubator_busy")
+        mock_db.updateIncubator.assert_not_called()
+
     # ============================================================================
     # POST Endpoints - Notification Tests
     # ============================================================================
