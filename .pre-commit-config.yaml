@@ -126,7 +126,14 @@ repos:
                 rel=${file#"$pkg_root"/}
                 module=${rel%.py}
                 module=${module//\//.}
-                (cd "$pkg_root" && python -c "import importlib; importlib.import_module('$module')") 2>&1 \
+                # Reason: standalone scripts (src/*/scripts/*.py) often
+                # import sibling modules by bare name (e.g. `from
+                # ethoclient import ...`), which works at runtime because
+                # systemd invokes them with cwd in their own directory.
+                # Add that directory to PYTHONPATH so the import check
+                # mirrors runtime behaviour.
+                file_dir=$(dirname "$file")
+                (cd "$pkg_root" && PYTHONPATH="$OLDPWD/$file_dir:$PYTHONPATH" python -c "import importlib; importlib.import_module('$module')") 2>&1 \
                   && echo "✓ $file" \
                   || { echo "✗ $file: Import failed"; failed=1; }
               else
