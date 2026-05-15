@@ -27,142 +27,53 @@ from ethoscope_node.scanner.base_scanner import (
 
 
 class TestDeviceStatus:
-    """Test DeviceStatus class."""
+    """``DeviceStatus`` is now a small data holder: name + timestamp + age.
+
+    The previous, larger surface (chain walking, user-trigger flags,
+    initial-discovery markers, alert decisions) moved into the scanner's
+    run-centric finalisation logic — see ``TestEthoscopeRunReconciliation``
+    in test_ethoscope_scanner.py.
+    """
 
     def test_initialization_valid_status(self):
-        """Test DeviceStatus initialization with valid status."""
-        status = DeviceStatus("running", is_user_triggered=True, trigger_source="user")
+        status = DeviceStatus("running")
         assert status.status_name == "running"
-        assert status.is_user_triggered is True
-        assert status.trigger_source == "user"
-        assert status.consecutive_errors == 0
 
     def test_initialization_invalid_status(self):
-        """Test DeviceStatus initialization with invalid status."""
         with pytest.raises(ValueError, match="Invalid status"):
             DeviceStatus("invalid_status")
 
     def test_status_age_tracking(self):
-        """Test status age tracking."""
         status = DeviceStatus("running")
         time.sleep(0.1)
         assert status.get_age_seconds() >= 0.1
         assert status.get_age_minutes() >= 0.001
 
-    def test_error_tracking(self):
-        """Test consecutive error tracking."""
-        status = DeviceStatus("unreached")
-        assert status.consecutive_errors == 0
-
-        status.increment_errors()
-        assert status.consecutive_errors == 1
-
-        status.increment_errors()
-        status.increment_errors()
-        assert status.consecutive_errors == 3
-
-        status.reset_errors()
-        assert status.consecutive_errors == 0
-
-    def test_previous_status_tracking(self):
-        """Test previous status tracking."""
-        status1 = DeviceStatus("running")
-        status2 = DeviceStatus("stopped")
-        status2.set_previous_status(status1)
-
-        assert status2.get_previous_status() == status1
-        assert status2.get_previous_status().status_name == "running"
-
-    def test_graceful_operation_detection(self):
-        """Test graceful operation detection."""
-        # Graceful operation
-        status = DeviceStatus("offline", trigger_source="graceful")
-        assert status.is_graceful_operation() is True
-
-        # Not graceful
-        status = DeviceStatus("offline", trigger_source="system")
-        assert status.is_graceful_operation() is False
-
     def test_timeout_exceeded(self):
-        """Test timeout exceeded checking."""
         status = DeviceStatus("unreached")
-        status._unreachable_start_time = time.time() - 25 * 60  # 25 minutes ago
-
+        # Backdate to ~25 minutes ago.
+        status._timestamp = time.time() - 25 * 60
         assert status.is_timeout_exceeded(20) is True
         assert status.is_timeout_exceeded(30) is False
 
-    def test_should_send_alert_user_triggered(self):
-        """Test alert suppression for user-triggered actions."""
-        status = DeviceStatus("stopped", is_user_triggered=True)
-        assert status.should_send_alert() is False
-
-    def test_should_send_alert_graceful(self):
-        """Test alert suppression for graceful operations."""
-        status = DeviceStatus("offline", trigger_source="graceful")
-        assert status.should_send_alert() is False
-
-    def test_should_send_alert_initial_discovery(self):
-        """Test alert suppression for initial device discovery."""
-        status = DeviceStatus("stopped", trigger_source="system")
-        status.mark_as_initial_discovery()
-        assert status.should_send_alert() is False
-
-    def test_interrupted_tracking_session_detection(self):
-        """Test detection of interrupted tracking sessions."""
-        # Create a chain: running -> unreached -> stopped
-        status1 = DeviceStatus("running")
-        status2 = DeviceStatus("unreached")
-        status2.set_previous_status(status1)
-        status3 = DeviceStatus("stopped")
-        status3.set_previous_status(status2)
-
-        assert status3.is_interrupted_tracking_session() is True
-
-    def test_interrupted_tracking_no_intermediate(self):
-        """Test that direct transitions are not considered interrupted."""
-        # Direct transition: running -> stopped (user-triggered)
-        status1 = DeviceStatus("running")
-        status2 = DeviceStatus("stopped", is_user_triggered=True)
-        status2.set_previous_status(status1)
-
-        assert status2.is_interrupted_tracking_session() is False
-
-    def test_metadata_handling(self):
-        """Test metadata storage and updates."""
-        metadata = {"reason": "test", "count": 42}
-        status = DeviceStatus("running", metadata=metadata)
-
-        assert status.metadata["reason"] == "test"
-        assert status.metadata["count"] == 42
-
-        status.update_metadata("new_key", "new_value")
-        assert status.metadata["new_key"] == "new_value"
+    def test_is_active_tracking(self):
+        assert DeviceStatus("running").is_active_tracking() is True
+        assert DeviceStatus("recording").is_active_tracking() is True
+        assert DeviceStatus("streaming").is_active_tracking() is True
+        assert DeviceStatus("stopped").is_active_tracking() is False
+        assert DeviceStatus("unreached").is_active_tracking() is False
 
     def test_to_dict_serialization(self):
-        """Test status serialization to dictionary."""
-        status = DeviceStatus("running", is_user_triggered=True, trigger_source="user")
-        status_dict = status.to_dict()
-
-        assert status_dict["status_name"] == "running"
-        assert status_dict["is_user_triggered"] is True
-        assert status_dict["trigger_source"] == "user"
-        assert "timestamp" in status_dict
+        status = DeviceStatus("running")
+        d = status.to_dict()
+        assert d["status_name"] == "running"
+        assert "timestamp" in d
 
     def test_from_dict_deserialization(self):
-        """Test status deserialization from dictionary."""
-        status_dict = {
-            "status_name": "stopped",
-            "is_user_triggered": False,
-            "trigger_source": "system",
-            "metadata": {"reason": "test"},
-            "timestamp": time.time(),
-            "consecutive_errors": 2,
-        }
-
-        status = DeviceStatus.from_dict(status_dict)
+        ts = time.time() - 5
+        status = DeviceStatus.from_dict({"status_name": "stopped", "timestamp": ts})
         assert status.status_name == "stopped"
-        assert status.is_user_triggered is False
-        assert status.consecutive_errors == 2
+        assert status.timestamp == ts
 
 
 class TestExceptions:
@@ -559,7 +470,7 @@ class TestDeviceErrorHandling:
     def test_handle_device_error_marks_offline(self):
         """Errors mark the device offline via _reset_info."""
         device = BaseDevice("192.168.1.100")
-        device._update_device_status("running", trigger_source="system")
+        device._update_device_status("running")
 
         device._handle_device_error(urllib.error.URLError("network down"))
 
@@ -705,51 +616,28 @@ class TestDeviceStatusTransitions:
     def test_update_device_status_basic(self):
         """Test basic status update."""
         device = BaseDevice("192.168.1.100")
-
-        device._update_device_status("running", trigger_source="user")
-
-        assert device._device_status.status_name == "running"
-        assert device._device_status.trigger_source == "user"
-
-    def test_update_device_status_preserves_errors(self):
-        """Test status update preserves error count."""
-        device = BaseDevice("192.168.1.100")
-
-        # Set up previous status with errors
-        prev_status = DeviceStatus("unreached")
-        prev_status.increment_errors()
-        prev_status.increment_errors()
-        device._device_status = prev_status
-
-        device._update_device_status("offline")
-
-        assert device._device_status.consecutive_errors == 2
-
-    def test_update_device_status_initial_discovery(self):
-        """Test initial discovery marking."""
-        device = BaseDevice("192.168.1.100")
-
-        # Initial offline state
-        assert device._device_status.status_name == "offline"
-
-        # First real status should be marked as initial discovery
         device._update_device_status("running")
+        assert device._device_status.status_name == "running"
 
-        # The marking happens internally, verify by checking attribute
-        assert hasattr(device, "_has_received_real_status")
+    def test_update_device_status_preserves_error_count(self):
+        """Errors live on BaseDevice, not on DeviceStatus, so a status change
+        does not reset the consecutive-error count."""
+        device = BaseDevice("192.168.1.100")
+        device._consecutive_errors = 2
+        device._update_device_status("offline")
+        assert device._consecutive_errors == 2
+        assert device._info["consecutive_errors"] == 2
 
     def test_info_includes_status_details(self):
-        """Test that info() includes detailed status information."""
+        """Test that info() includes status details."""
         device = BaseDevice("192.168.1.100")
-        device._update_device_status("running", is_user_triggered=True)
+        device._update_device_status("running")
 
         info = device.info()
-
-        assert "status" in info
         assert info["status"] == "running"
-        assert "status_details" in info
         assert info["status_details"]["status"] == "running"
-        assert info["status_details"]["is_user_triggered"] is True
+        assert "age_minutes" in info["status_details"]
+        assert "consecutive_errors" in info["status_details"]
 
     def test_info_includes_backup_status(self):
         """Test that info() exposes backup status at root level."""
@@ -1096,73 +984,17 @@ class TestDeviceScannerOperations:
 
 
 class TestDeviceStatusEdgeCases:
-    """Test edge cases and additional DeviceStatus functionality."""
+    """Edge cases for the (now small) DeviceStatus contract."""
 
-    def test_should_send_alert_interrupted_session(self):
-        """Test alert for interrupted tracking session."""
-        # Create interrupted session chain
-        status1 = DeviceStatus("running")
-        status2 = DeviceStatus("unreached")
-        status2.set_previous_status(status1)
-        status3 = DeviceStatus("stopped", trigger_source="system")
-        status3.set_previous_status(status2)
-
-        assert status3.should_send_alert() is True
-
-    def test_timeout_exceeded_no_unreachable_time(self):
-        """Test timeout check when no unreachable time set."""
-        status = DeviceStatus("running")
+    def test_timeout_exceeded_fresh_status(self):
+        """A fresh status has not exceeded any positive timeout."""
+        status = DeviceStatus("unreached")
         assert status.is_timeout_exceeded(20) is False
 
-    def test_device_status_string_representation(self):
-        """Test DeviceStatus __str__ method."""
-        status = DeviceStatus("running", trigger_source="user")
-        time.sleep(0.1)
-
-        str_repr = str(status)
-        assert "running" in str_repr
-        assert "user" in str_repr
-
-    def test_device_status_repr(self):
-        """Test DeviceStatus __repr__ method."""
-        status = DeviceStatus("stopped", is_user_triggered=True)
-
-        repr_str = repr(status)
-        assert "DeviceStatus" in repr_str
-        assert "stopped" in repr_str
-        assert "is_user_triggered=True" in repr_str
-
-    def test_interrupted_session_complex_chain(self):
-        """Test interrupted session detection with complex chain."""
-        # Create chain: recording -> busy -> unreached -> stopping -> offline
-        status1 = DeviceStatus("recording")
-        status2 = DeviceStatus("busy")
-        status2.set_previous_status(status1)
-        status3 = DeviceStatus("unreached")
-        status3.set_previous_status(status2)
-        status4 = DeviceStatus("stopping")
-        status4.set_previous_status(status3)
-        status5 = DeviceStatus("offline", trigger_source="system")
-        status5.set_previous_status(status4)
-
-        assert status5.is_interrupted_tracking_session() is True
-
-    def test_interrupted_session_max_lookback(self):
-        """Test interrupted session respects max lookback limit."""
-        # Create very long chain
+    def test_string_representations(self):
         status = DeviceStatus("running")
-        for _ in range(15):
-            new_status = DeviceStatus("busy")
-            new_status.set_previous_status(status)
-            status = new_status
-
-        final_status = DeviceStatus("offline")
-        final_status.set_previous_status(status)
-
-        # Should still detect despite long chain (max 10 lookback)
-        result = final_status.is_interrupted_tracking_session()
-        # Result depends on chain structure
-        assert isinstance(result, bool)
+        assert "running" in str(status)
+        assert "running" in repr(status)
 
 
 class TestRetryDecoratorEdgeCases:
@@ -1206,16 +1038,6 @@ class TestRetryDecoratorEdgeCases:
 
 class TestBaseDeviceEdgeCases:
     """Test BaseDevice edge cases and additional functionality."""
-
-    def test_is_graceful_shutdown(self):
-        """Test graceful shutdown detection."""
-        device = BaseDevice("192.168.1.100")
-
-        device._update_device_status("offline", trigger_source="graceful")
-        assert device._is_graceful_shutdown() is True
-
-        device._update_device_status("offline", trigger_source="system")
-        assert device._is_graceful_shutdown() is False
 
     @patch("urllib.request.urlopen")
     def test_get_json_url_error(self, mock_urlopen):

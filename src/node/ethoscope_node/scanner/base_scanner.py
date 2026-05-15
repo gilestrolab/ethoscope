@@ -9,7 +9,7 @@ import urllib.request
 from dataclasses import dataclass
 from functools import wraps
 from threading import RLock, Thread
-from typing import Any, Optional
+from typing import Any
 
 import netifaces
 from zeroconf import IPVersion, ServiceBrowser, Zeroconf
@@ -74,12 +74,15 @@ class DeviceInfo:
 
 
 class DeviceStatus:
-    """
-    Sophisticated device status management class that tracks status changes,
-    user interactions, and provides intelligent alerting logic.
+    """Per-device status snapshot.
+
+    Reduced to what the UI and the polling cadence actually need: the status
+    name, the timestamp it was set, and a "how long since" helper. Alert
+    decisions, user-triggered classification, and chain walking — historically
+    smeared across this class — have all moved to ``Ethoscope._reconcile_run_state``,
+    which reasons about ``runs`` rows instead of in-memory state chains.
     """
 
-    # Valid status types
     VALID_STATUSES = {
         "online",
         "offline",
@@ -93,300 +96,49 @@ class DeviceStatus:
         "busy",
     }
 
-    # Graceful operation types
-    GRACEFUL_OPERATIONS = {"poweroff", "reboot", "restart"}
+    ACTIVE_TRACKING_STATUSES = {"running", "recording", "streaming"}
 
-    def __init__(
-        self,
-        status_name: str,
-        is_user_triggered: bool = False,
-        trigger_source: str = "system",
-        metadata: dict[str, Any] | None = None,
-    ):
-        """
-        Initialize device status.
-
-        Args:
-            status_name: Name of the status (must be in VALID_STATUSES)
-            is_user_triggered: Whether this status change was triggered by user action
-            trigger_source: Source of the trigger ("user", "system", "network", "graceful")
-            metadata: Additional metadata about the status change
-        """
+    def __init__(self, status_name: str):
         if status_name not in self.VALID_STATUSES:
             raise ValueError(
                 f"Invalid status: {status_name}. Must be one of: {self.VALID_STATUSES}"
             )
-
         self._status_name = status_name
-        self._is_user_triggered = is_user_triggered
-        self._trigger_source = trigger_source
         self._timestamp = time.time()
-        self._previous_status = None
-        self._metadata = metadata or {}
-        self._unreachable_start_time = None
-        self._consecutive_errors = 0
-        self._is_initial_discovery = False  # Flag to track initial device discovery
-
-        # Set unreachable start time if this is an unreached status
-        if status_name == "unreached":
-            self._unreachable_start_time = self._timestamp
 
     @property
     def status_name(self) -> str:
-        """Get the status name."""
         return self._status_name
 
     @property
-    def is_user_triggered(self) -> bool:
-        """Check if this status change was triggered by user action."""
-        return self._is_user_triggered
-
-    @property
-    def trigger_source(self) -> str:
-        """Get the trigger source."""
-        return self._trigger_source
-
-    @property
     def timestamp(self) -> float:
-        """Get the timestamp when this status was set."""
         return self._timestamp
 
-    @property
-    def metadata(self) -> dict[str, Any]:
-        """Get status metadata."""
-        return self._metadata.copy()
-
-    @property
-    def consecutive_errors(self) -> int:
-        """Get the number of consecutive errors."""
-        return self._consecutive_errors
-
-    def set_previous_status(self, previous_status: Optional["DeviceStatus"]):
-        """Set the previous status for transition tracking."""
-        self._previous_status = previous_status
-
-    def get_previous_status(self) -> Optional["DeviceStatus"]:
-        """Get the previous status."""
-        return self._previous_status
-
-    def increment_errors(self):
-        """Increment the consecutive error count."""
-        self._consecutive_errors += 1
-
-    def reset_errors(self):
-        """Reset the consecutive error count."""
-        self._consecutive_errors = 0
-
-    def mark_as_initial_discovery(self):
-        """Mark this status as an initial device discovery (server startup)."""
-        self._is_initial_discovery = True
-
-    def should_send_alert(self, unreachable_timeout_minutes: int = 20) -> bool:
-        """
-        Determine if an alert should be sent for this status.
-
-        Args:
-            unreachable_timeout_minutes: Minutes to wait before alerting for unreachable devices
-
-        Returns:
-            True if an alert should be sent
-        """
-        # No alerts for user-triggered actions
-        if self._is_user_triggered:
-            return False
-
-        # No alerts for graceful operations within grace period
-        if self.is_graceful_operation():
-            return False
-
-        # Check for interrupted tracking session (reboot scenario)
-        if (
-            self._status_name in ["stopped", "offline"]
-            and self.is_interrupted_tracking_session()
-        ):
-            return True
-
-        # Alert for autonomous stops and other system issues (direct transitions)
-        # But exclude initial device discovery transitions during server startup
-        if (
-            self._status_name in ["stopped", "offline"]
-            and self._trigger_source == "system"
-        ):
-            # Don't alert for initial device discovery
-            if self._is_initial_discovery:
-                return False
-            return True
-
-        return False
-
-    def is_timeout_exceeded(self, timeout_minutes: int) -> bool:
-        """
-        Check if the timeout has been exceeded for unreachable devices.
-
-        Args:
-            timeout_minutes: Timeout in minutes
-
-        Returns:
-            True if timeout has been exceeded
-        """
-        if not self._unreachable_start_time:
-            return False
-
-        elapsed_minutes = (time.time() - self._unreachable_start_time) / 60
-        return elapsed_minutes > timeout_minutes
-
-    def is_graceful_operation(self) -> bool:
-        """
-        Check if this status resulted from a graceful operation.
-
-        Returns:
-            True if this is a graceful operation
-        """
-        return self._trigger_source == "graceful"
-
     def get_age_seconds(self) -> float:
-        """
-        Get the age of this status in seconds.
-
-        Returns:
-            Age in seconds
-        """
         return time.time() - self._timestamp
 
     def get_age_minutes(self) -> float:
-        """
-        Get the age of this status in minutes.
-
-        Returns:
-            Age in minutes
-        """
         return self.get_age_seconds() / 60
 
-    def is_interrupted_tracking_session(self) -> bool:
-        """
-        Detect if this represents an interrupted tracking session.
+    def is_timeout_exceeded(self, timeout_minutes: int) -> bool:
+        return self.get_age_minutes() > timeout_minutes
 
-        Pattern: {tracking,recording,running} -> (intermediate_states)n -> {stopped,offline}
-        where intermediate_states are: unreached, busy, initialising, stopping
-
-        This detects when an active tracking/recording session is permanently
-        interrupted (e.g., by reboot, crash) rather than just temporarily unreachable.
-
-        Returns:
-            True if this appears to be an interrupted tracking session
-        """
-        # Only relevant for final states that indicate permanent interruption
-        if self._status_name not in ["stopped", "offline"]:
-            return False
-
-        # Check if we have a previous status chain
-        if not self._previous_status:
-            return False
-
-        # Look for interrupted session patterns
-        current = self._previous_status
-        found_active_session = False
-        went_through_intermediates = False
-        status_chain = []
-
-        # Active session states that we care about being interrupted
-        active_states = {"running", "recording", "tracking"}
-
-        # Intermediate states that indicate interruption (not user-initiated)
-        intermediate_states = {"unreached", "busy", "initialising", "stopping"}
-
-        # Walk back through status chain (max 10 steps for complex sequences)
-        max_lookback = 10
-        steps = 0
-
-        while current and steps < max_lookback:
-            status_chain.append(current.status_name)
-
-            if current.status_name in active_states:
-                found_active_session = True
-                break
-            elif current.status_name in intermediate_states:
-                went_through_intermediates = True
-
-            current = current._previous_status
-            steps += 1
-
-        # Store debug info for external logging
-        self._debug_chain = (
-            " -> ".join(reversed(status_chain)) + f" -> {self._status_name}"
-        )
-        self._debug_found_active_session = found_active_session
-        self._debug_went_through_intermediates = went_through_intermediates
-
-        # We have an interrupted session if:
-        # 1. We found an active session state in the history
-        # 2. We went through intermediate states (indicating non-graceful transition)
-        return found_active_session and went_through_intermediates
-
-    def update_metadata(self, key: str, value: Any):
-        """
-        Update metadata for this status.
-
-        Args:
-            key: Metadata key
-            value: Metadata value
-        """
-        self._metadata[key] = value
+    def is_active_tracking(self) -> bool:
+        return self._status_name in self.ACTIVE_TRACKING_STATUSES
 
     def to_dict(self) -> dict[str, Any]:
-        """
-        Convert status to dictionary for serialization.
-
-        Returns:
-            Dictionary representation of the status
-        """
-        return {
-            "status_name": self._status_name,
-            "is_user_triggered": self._is_user_triggered,
-            "trigger_source": self._trigger_source,
-            "timestamp": self._timestamp,
-            "metadata": self._metadata,
-            "unreachable_start_time": self._unreachable_start_time,
-            "consecutive_errors": self._consecutive_errors,
-        }
+        return {"status_name": self._status_name, "timestamp": self._timestamp}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "DeviceStatus":
-        """
-        Create DeviceStatus from dictionary.
-
-        Args:
-            data: Dictionary representation
-
-        Returns:
-            DeviceStatus instance
-        """
-        status = cls(
-            status_name=data["status_name"],
-            is_user_triggered=data.get("is_user_triggered", False),
-            trigger_source=data.get("trigger_source", "system"),
-            metadata=data.get("metadata", {}),
-        )
-
+        status = cls(status_name=data["status_name"])
         status._timestamp = data.get("timestamp", time.time())
-        status._unreachable_start_time = data.get("unreachable_start_time")
-        status._consecutive_errors = data.get("consecutive_errors", 0)
-
         return status
 
     def __str__(self) -> str:
-        """String representation of the status."""
-        age_minutes = self.get_age_minutes()
-        return f"DeviceStatus({self._status_name}, {self._trigger_source}, {age_minutes:.1f}m ago)"
+        return f"DeviceStatus({self._status_name}, {self.get_age_minutes():.1f}m ago)"
 
-    def __repr__(self) -> str:
-        """Detailed string representation."""
-        return (
-            f"DeviceStatus(status_name='{self._status_name}', "
-            f"is_user_triggered={self._is_user_triggered}, "
-            f"trigger_source='{self._trigger_source}', "
-            f"age_minutes={self.get_age_minutes():.1f})"
-        )
+    __repr__ = __str__
 
 
 class ScanException(Exception):
@@ -469,7 +221,7 @@ class BaseDevice(Thread):
         self._timeout = timeout
 
         # Device state with DeviceStatus
-        self._device_status = DeviceStatus("offline", trigger_source="system")
+        self._device_status = DeviceStatus("offline")
         self._info = {"ip": ip}
         self._id = ""
         self._is_online = True
@@ -627,60 +379,17 @@ class BaseDevice(Thread):
         except Exception as e:
             raise ScanException(f"Failed to update device ID: {e}") from e
 
-    def _update_device_status(
-        self,
-        status_name: str,
-        is_user_triggered: bool = False,
-        trigger_source: str = "system",
-        metadata: dict[str, Any] | None = None,
-    ):
-        """
-        Update device status using DeviceStatus object.
-
-        Args:
-            status_name: New status name
-            is_user_triggered: Whether this was triggered by user action
-            trigger_source: Source of the trigger
-            metadata: Additional metadata
-        """
+    def _update_device_status(self, status_name: str):
+        """Set the current ``DeviceStatus`` to ``status_name`` and log changes."""
         with self._lock:
-            # Create new status object
             previous_status = self._device_status
-            new_status = DeviceStatus(
-                status_name=status_name,
-                is_user_triggered=is_user_triggered,
-                trigger_source=trigger_source,
-                metadata=metadata or {},
-            )
-
-            # Set previous status for transition tracking
-            new_status.set_previous_status(previous_status)
-
-            # Mark as initial discovery if transitioning from initial offline state
-            if (
-                previous_status
-                and previous_status.status_name == "offline"
-                and not hasattr(self, "_has_received_real_status")
-            ):
-                new_status.mark_as_initial_discovery()
-                self._has_received_real_status = True
-
-            # Update consecutive errors from previous status
-            if previous_status:
-                new_status._consecutive_errors = previous_status.consecutive_errors
-
-            # Update device status
-            self._device_status = new_status
-
-            # Update info dict (no longer storing status directly)
+            self._device_status = DeviceStatus(status_name=status_name)
             self._info["last_seen"] = time.time()
-            self._info["consecutive_errors"] = new_status.consecutive_errors
+            self._info["consecutive_errors"] = self._consecutive_errors
 
-            # Log status change
             if previous_status and previous_status.status_name != status_name:
                 self._logger.info(
-                    f"Status changed: {previous_status.status_name} -> {status_name} "
-                    f"(trigger: {trigger_source}, user: {is_user_triggered})"
+                    f"Status changed: {previous_status.status_name} -> {status_name}"
                 )
 
     def _reset_info(self):
@@ -691,7 +400,7 @@ class BaseDevice(Thread):
             preserved_id = self._info.get("id", self._id)
 
             # Update status using DeviceStatus
-            self._update_device_status("offline", trigger_source="system")
+            self._update_device_status("offline")
 
             base_info = {
                 "ip": self._ip,
@@ -711,7 +420,7 @@ class BaseDevice(Thread):
         """Update device information. Override in subclasses."""
         self._update_id()
         with self._lock:
-            self._update_device_status("online", trigger_source="system")
+            self._update_device_status("online")
             self._info["last_seen"] = time.time()
 
     def stop(self):
@@ -722,17 +431,6 @@ class BaseDevice(Thread):
         """Reset error state for this device."""
         self._consecutive_errors = 0
         self._error_backoff_time = 0
-
-    def _is_graceful_shutdown(self) -> bool:
-        """
-        Check if a connection refused error is likely due to graceful shutdown.
-
-        Returns:
-            True if this appears to be a graceful shutdown
-        """
-        # The DeviceStatus class already handles graceful operation detection
-        current_status = self.get_device_status()
-        return current_status and current_status.is_graceful_operation()
 
     def _get_effective_refresh_period(self) -> float:
         """Get the effective refresh period.
@@ -790,29 +488,12 @@ class BaseDevice(Thread):
         with self._lock:
             info_copy = self._info.copy()
 
-            # Add enhanced status information from DeviceStatus
             if self._device_status:
-                # Get timeout from configuration if available (for Ethoscope devices)
-                unreachable_timeout = 20  # Default
-                if hasattr(self, "_config"):
-                    alert_config = self._config.get_custom("alerts") or {}
-                    unreachable_timeout = alert_config.get(
-                        "unreachable_timeout_minutes", 20
-                    )
-
-                # Add status at root level for backward compatibility
                 info_copy["status"] = self._device_status.status_name
-
-                # Add detailed status information
                 info_copy["status_details"] = {
                     "status": self._device_status.status_name,
-                    "is_user_triggered": self._device_status.is_user_triggered,
-                    "trigger_source": self._device_status.trigger_source,
                     "age_minutes": self._device_status.get_age_minutes(),
-                    "consecutive_errors": self._device_status.consecutive_errors,
-                    "should_alert": self._device_status.should_send_alert(
-                        unreachable_timeout
-                    ),
+                    "consecutive_errors": self._consecutive_errors,
                 }
 
             # Expose backup status at root level for frontend compatibility
@@ -991,9 +672,7 @@ class DeviceScanner:
                     )
                     existing_device._update_address(ip, port)
                     with existing_device._lock:
-                        existing_device._update_device_status(
-                            "offline", trigger_source="system"
-                        )
+                        existing_device._update_device_status("offline")
                         existing_device._info.update({"last_seen": time.time()})
                     return
 
@@ -1017,9 +696,7 @@ class DeviceScanner:
 
                         # Explicitly reset status to allow device info to be updated
                         with existing_device._lock:
-                            existing_device._update_device_status(
-                                "offline", trigger_source="system"
-                            )
+                            existing_device._update_device_status("offline")
                             existing_device._info.update({"last_seen": time.time()})
 
                         return
@@ -1099,7 +776,7 @@ class DeviceScanner:
                     # Mark offline; the device thread keeps probing on the
                     # slow cadence in case it comes back.
                     with device._lock:
-                        device._update_device_status("offline", trigger_source="system")
+                        device._update_device_status("offline")
                         device._info.update({"last_seen": time.time()})
 
                     break
@@ -1137,9 +814,7 @@ class DeviceScanner:
                 # _update_address already calls reset_error_state(); just refresh
                 # the published status so the next poll re-promotes it to online.
                 with existing_device._lock:
-                    existing_device._update_device_status(
-                        "offline", trigger_source="system"
-                    )
+                    existing_device._update_device_status("offline")
                     existing_device._info.update({"last_seen": time.time()})
 
         except Exception as e:

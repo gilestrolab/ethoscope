@@ -332,16 +332,17 @@ class EthoscopeNodeServer:
                     f"Failed to cleanup offline busy devices at startup: {e}"
                 )
 
-            # Clean up orphaned running sessions at startup
-            try:
-                orphaned_count = self.database.cleanup_orphaned_running_sessions()
-                self.logger.info(
-                    f"Cleaned up {orphaned_count} orphaned running sessions at startup"
-                )
-            except Exception as e:
-                self.logger.warning(
-                    f"Failed to cleanup orphaned running sessions at startup: {e}"
-                )
+            # NOTE: cleanup_orphaned_running_sessions used to run here. It set
+            # end_time on rows the scanner had never observed transitioning,
+            # which (a) sometimes closed genuinely-live runs across a node
+            # restart and (b) was the proximate cause of the run-id leak that
+            # produced 11 false-positive "stopped" emails on 2026-05-15. The
+            # scanner now finalises runs only from observed transitions, so a
+            # stale ``running`` row in the DB is harmless: it stays open until
+            # the scanner observes the device again, and never drives an alert
+            # on its own. An admin-triggered manual sweep can still be added
+            # to ``cleanup_orphaned_running_sessions`` if it becomes useful for
+            # UI hygiene.
 
             # Initialize device scanner
             try:

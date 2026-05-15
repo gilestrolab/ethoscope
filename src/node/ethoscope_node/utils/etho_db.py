@@ -204,12 +204,30 @@ class ExperimentalDB(multiprocessing.Process):
                                 light_cycle_anchor REAL
                             );"""
 
+        # device_interventions: append-only log of user-originated mutating actions
+        # against a device (stop/reboot/poweroff via web UI, firmware update via
+        # updater, etc.). Used to decide whether a run's termination was user-
+        # initiated, replacing the in-memory _last_user_action / trigger_source /
+        # graceful-window heuristics that did not survive node restarts.
+        sql_create_interventions_table = """CREATE TABLE IF NOT EXISTS device_interventions (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                device_id TEXT NOT NULL,
+                                action TEXT NOT NULL,
+                                created_at TIMESTAMP NOT NULL
+                            );"""
+        sql_create_interventions_index = (
+            "CREATE INDEX IF NOT EXISTS idx_device_interventions_device_time "
+            "ON device_interventions(device_id, created_at)"
+        )
+
         self.executeSQL(sql_create_runs_table)
         self.executeSQL(sql_create_experiments_table)
         self.executeSQL(sql_create_users_table)
         self.executeSQL(sql_create_ethoscopes_table)
         self.executeSQL(sql_create_alert_logs_table)
         self.executeSQL(sql_create_incubators_table)
+        self.executeSQL(sql_create_interventions_table)
+        self.executeSQL(sql_create_interventions_index)
 
         # Run database migrations
         self._migrate_database()
@@ -235,8 +253,31 @@ class ExperimentalDB(multiprocessing.Process):
             self._migrate_incubators_add_light_schedule()
             # Migration 8: Add T-cycle period and anchor columns to incubators table
             self._migrate_incubators_add_period_and_anchor()
+            # Migration 9: Add termination_reason column to runs table
+            self._migrate_runs_add_termination_reason()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
+
+    def _migrate_runs_add_termination_reason(self):
+        """Add termination_reason column to runs.
+
+        Stores why a run ended: user_stop, crash, unreached_timeout, superseded,
+        terminated_unobserved. Used both for forensics and so the alert decision
+        in the scanner has a single column to query against.
+        """
+        try:
+            table_info = self.executeSQL(f"PRAGMA table_info({self._runs_table_name})")
+            if not isinstance(table_info, list):
+                return
+            if any(col[1] == "termination_reason" for col in table_info):
+                return
+            logging.info("Adding termination_reason column to runs table")
+            self.executeSQL(
+                f"ALTER TABLE {self._runs_table_name} "
+                "ADD COLUMN termination_reason TEXT"
+            )
+        except Exception as e:
+            logging.error(f"Error migrating runs table (termination_reason): {e}")
 
     def _migrate_ethoscopes_primary_key(self):
         """
@@ -726,6 +767,9 @@ class ExperimentalDB(multiprocessing.Process):
         problems = ""
 
         sql_enter_new_experiment = f"""INSERT INTO {self._runs_table_name}
+            (run_id, type, ethoscope_name, ethoscope_id, user_name, user_id,
+             location, start_time, end_time, alert, problems, experimental_data,
+             comments, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
         return self.executeSQL(
@@ -748,19 +792,39 @@ class ExperimentalDB(multiprocessing.Process):
             ),
         )
 
-    def stopRun(self, run_id):
-        """
-        Stop the experiment with the provided id
+    def stopRun(self, run_id, termination_reason: str | None = None):
+        """Stop the experiment with the provided id.
+
         :param run_id: the ID of the run to be stopped
-        :param ethoscope_id: the ethoscope id of the run to be stopped
-        :return status: the new status of the experiment
+        :param termination_reason: why the run ended — one of user_stop, crash,
+            unreached_timeout, superseded, terminated_unobserved. ``None`` is
+            allowed for callers that don't know (legacy code paths).
+        :return: the new status, or ``None`` if the row no longer exists.
         """
         end_time = datetime.datetime.now()
         status = "stopped"
 
-        sql_update_experiment = f"UPDATE {self._runs_table_name} SET end_time = ?, status = ? WHERE run_id = ?"
-        self.executeSQL(sql_update_experiment, (end_time, status, run_id))
-        return self.getRun(run_id)[0]["status"]
+        if termination_reason is None:
+            sql_update_experiment = (
+                f"UPDATE {self._runs_table_name} "
+                "SET end_time = ?, status = ? WHERE run_id = ?"
+            )
+            self.executeSQL(sql_update_experiment, (end_time, status, run_id))
+        else:
+            sql_update_experiment = (
+                f"UPDATE {self._runs_table_name} "
+                "SET end_time = ?, status = ?, termination_reason = ? "
+                "WHERE run_id = ?"
+            )
+            self.executeSQL(
+                sql_update_experiment,
+                (end_time, status, termination_reason, run_id),
+            )
+
+        row = self.getRun(run_id)
+        if not row:
+            return None
+        return row[0]["status"]
 
     def flagProblem(self, run_id, message=""):
         """ """
@@ -1614,6 +1678,57 @@ class ExperimentalDB(multiprocessing.Process):
             return result
         else:
             return rows
+
+    def recordIntervention(self, device_id: str, action: str) -> int:
+        """Record a user-originated mutating action against a device.
+
+        Every node-side code path that may cause a device to leave a tracking
+        state — web-UI ``send_instruction`` (stop/reboot/poweroff/restart),
+        firmware updates, and the bulk updater's update/restart/branch_switch
+        — calls this. The scanner consults ``recent_intervention`` when a run
+        finalises to decide whether the termination was user-initiated.
+        """
+        try:
+            return self.executeSQL(
+                "INSERT INTO device_interventions (device_id, action, created_at) "
+                "VALUES (?, ?, ?)",
+                (device_id, action, datetime.datetime.now()),
+            )
+        except Exception as e:
+            logging.error(f"Error recording intervention for {device_id}: {e}")
+            return -1
+
+    def recent_intervention(self, device_id: str, within_seconds: int) -> bool:
+        """Has any intervention been recorded for this device in the last N seconds?"""
+        try:
+            cutoff = datetime.datetime.now() - datetime.timedelta(
+                seconds=within_seconds
+            )
+            rows = self.executeSQL(
+                "SELECT 1 FROM device_interventions "
+                "WHERE device_id = ? AND created_at >= ? LIMIT 1",
+                (device_id, cutoff),
+            )
+            return isinstance(rows, list) and len(rows) > 0
+        except Exception as e:
+            logging.error(f"Error checking recent intervention for {device_id}: {e}")
+            return False
+
+    def getOpenRunsForDevice(self, device_id: str) -> list[str]:
+        """Return run_ids of any runs for this device that are not yet finalised."""
+        try:
+            rows = self.executeSQL(
+                f"SELECT run_id FROM {self._runs_table_name} "
+                "WHERE ethoscope_id = ? AND status = 'running' "
+                "AND (end_time = '0' OR end_time = 0 OR end_time IS NULL)",
+                (device_id,),
+            )
+            if not isinstance(rows, list):
+                return []
+            return [r[0] for r in rows]
+        except Exception as e:
+            logging.error(f"Error fetching open runs for {device_id}: {e}")
+            return []
 
     def logAlert(
         self,

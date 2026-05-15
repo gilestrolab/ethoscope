@@ -46,8 +46,14 @@ class TestMattermostNotificationService:
 
     @pytest.fixture
     def mock_db(self):
-        """Mock database object."""
+        """Mock database object.
+
+        Default ``hasAlertBeenSent`` to ``False`` so tests don't accidentally
+        trip the alert_logs de-dup gate — individual tests that care about
+        suppression should override this explicitly.
+        """
         db = Mock()
+        db.hasAlertBeenSent.return_value = False
         return db
 
     @pytest.fixture
@@ -60,9 +66,6 @@ class TestMattermostNotificationService:
         from ethoscope_node.notifications.base import NotificationAnalyzer
 
         assert isinstance(mattermost_service, NotificationAnalyzer)
-        assert hasattr(mattermost_service, "_last_alert_times")
-        assert hasattr(mattermost_service, "_default_cooldown")
-        assert mattermost_service._default_cooldown == 3600
 
     def test_get_mattermost_config(self, mattermost_service):
         """Test Mattermost configuration retrieval."""
@@ -79,43 +82,21 @@ class TestMattermostNotificationService:
 
         assert config["cooldown_seconds"] == 300
 
-    def test_should_send_alert_first_time(self, mattermost_service):
-        """Test that alert should be sent the first time."""
-        result = mattermost_service._should_send_alert("device_001", "device_stopped")
-
-        assert result
-        assert "device_001:device_stopped" in mattermost_service._last_alert_times
-
-    def test_should_send_alert_cooldown_active(self, mattermost_service):
-        """Test that alert should not be sent during cooldown period."""
-        device_id = "device_001"
-        alert_type = "device_stopped"
-
-        # Send first alert
-        mattermost_service._should_send_alert(device_id, alert_type)
-
-        # Try to send again immediately - should be blocked
-        result = mattermost_service._should_send_alert(device_id, alert_type)
-
-        assert not result
-
-    def test_should_send_alert_cooldown_expired(self, mattermost_service):
-        """Test that alert should be sent after cooldown expires."""
-        device_id = "device_001"
-        alert_type = "device_stopped"
-
-        # Send first alert
-        mattermost_service._should_send_alert(device_id, alert_type)
-
-        # Manually set last alert time to past
-        mattermost_service._last_alert_times[f"{device_id}:{alert_type}"] = (
-            time.time() - 400
+    def test_should_send_alert_when_not_in_log(self, mattermost_service):
+        """Alert proceeds when ``alert_logs`` has no matching row."""
+        mattermost_service.db.hasAlertBeenSent.return_value = False
+        assert mattermost_service._should_send_alert(
+            "device_001", "device_stopped", run_id="run-A"
         )
 
-        # Should be able to send again
-        result = mattermost_service._should_send_alert(device_id, alert_type)
-
-        assert result
+    def test_should_not_send_alert_when_already_logged(self, mattermost_service):
+        """Alert is suppressed when ``alert_logs`` shows the same alert was
+        sent. The previous in-memory cooldown is gone — DB is the only source
+        of truth."""
+        mattermost_service.db.hasAlertBeenSent.return_value = True
+        assert not mattermost_service._should_send_alert(
+            "device_001", "device_stopped", run_id="run-A"
+        )
 
     def test_should_send_alert_with_run_id(self, mattermost_service):
         """Test alert sending with run_id for database duplicate checking."""

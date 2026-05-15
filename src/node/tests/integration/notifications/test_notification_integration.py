@@ -370,34 +370,31 @@ class TestNotificationIntegration:
         assert "experimental_info" in status
         assert "database_info" in status
 
-    def test_cooldown_mechanism_workflow(self, email_service_integration):
-        """Test alert cooldown mechanism workflow."""
+    def test_dedup_via_alert_logs(self, email_service_integration):
+        """The single source of truth for "already sent" is the persistent
+        ``alert_logs`` table — not an in-memory cooldown (which used to live
+        on the service and produced silent false-negatives across restarts).
+        """
         device_id = "ETHOSCOPE_001"
         alert_type = "device_stopped"
 
-        # First alert should be allowed
-        should_send_1 = email_service_integration._should_send_alert(
-            device_id, alert_type
+        # DB says nothing has been sent yet.
+        email_service_integration.db.hasAlertBeenSent.return_value = False
+        assert email_service_integration._should_send_alert(
+            device_id, alert_type, run_id="run-A"
         )
-        assert should_send_1
 
-        # Second alert immediately after should be blocked
-        should_send_2 = email_service_integration._should_send_alert(
-            device_id, alert_type
+        # DB now says this exact (device, alert_type, run_id) has been sent.
+        email_service_integration.db.hasAlertBeenSent.return_value = True
+        assert not email_service_integration._should_send_alert(
+            device_id, alert_type, run_id="run-A"
         )
-        assert not should_send_2
 
-        # Different alert type should be allowed
-        should_send_3 = email_service_integration._should_send_alert(
-            device_id, "storage_warning"
+        # A different run_id is still allowed even with the same device/type.
+        email_service_integration.db.hasAlertBeenSent.return_value = False
+        assert email_service_integration._should_send_alert(
+            device_id, alert_type, run_id="run-B"
         )
-        assert should_send_3
-
-        # Different device should be allowed
-        should_send_4 = email_service_integration._should_send_alert(
-            "ETHOSCOPE_002", alert_type
-        )
-        assert should_send_4
 
     def test_error_handling_workflow(self, email_service_integration):
         """Test error handling in various workflow scenarios."""

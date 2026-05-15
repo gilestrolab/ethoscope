@@ -11,6 +11,7 @@ from helpers import (
     assert_node,
     generate_new_device_map,
     get_commit_version,
+    record_device_intervention,
     reload_device_daemon,
     reload_node_daemon,
     updates_api_wrapper,
@@ -98,6 +99,11 @@ def process_device_update(device):
     """Process update for a single device in parallel"""
     logging.info("Starting update for device {}".format(device["id"]))
 
+    # Tell the node scanner: "the user is intentionally going to disturb this
+    # device". Without this row, the scanner sees the device drop offline and
+    # fires a "device stopped unexpectedly" alert.
+    record_device_intervention(device["id"], "update")
+
     # Update device via API (longer timeout for git pull)
     try:
         update_response = updates_api_wrapper(
@@ -138,6 +144,9 @@ def process_device_branch_switch(device, new_branch):
             )
         )
 
+        # See ``process_device_update`` — same suppression reasoning.
+        record_device_intervention(device["id"], "branch_switch")
+
         # Switch branch via API
         data_one_dev = {"new_branch": new_branch}
         switch_response = updates_api_wrapper(
@@ -163,6 +172,9 @@ def process_device_restart(device):
     """Process restart for a single device in parallel"""
     try:
         logging.info("Starting restart for device {}".format(device["id"]))
+
+        # See ``process_device_update`` — same suppression reasoning.
+        record_device_intervention(device["id"], "restart_daemon")
 
         # Restart daemon via API
         restart_response = updates_api_wrapper(

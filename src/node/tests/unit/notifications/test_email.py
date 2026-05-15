@@ -52,8 +52,14 @@ class TestEmailNotificationService:
 
     @pytest.fixture
     def mock_db(self):
-        """Mock database object."""
+        """Mock database object.
+
+        Default ``hasAlertBeenSent`` to ``False`` so tests don't accidentally
+        trip the alert_logs de-dup gate — individual tests that care about
+        suppression should override this explicitly.
+        """
         db = Mock()
+        db.hasAlertBeenSent.return_value = False
         return db
 
     @pytest.fixture
@@ -66,9 +72,6 @@ class TestEmailNotificationService:
         from ethoscope_node.notifications.base import NotificationAnalyzer
 
         assert isinstance(email_service, NotificationAnalyzer)
-        assert hasattr(email_service, "_last_alert_times")
-        assert hasattr(email_service, "_default_cooldown")
-        assert email_service._default_cooldown == 3600
 
     def test_get_smtp_config(self, email_service):
         """Test SMTP configuration retrieval."""
@@ -85,41 +88,21 @@ class TestEmailNotificationService:
 
         assert config["cooldown_seconds"] == 300
 
-    def test_should_send_alert_first_time(self, email_service):
-        """Test that alert should be sent the first time."""
-        result = email_service._should_send_alert("device_001", "device_stopped")
+    def test_should_send_alert_when_not_in_log(self, email_service):
+        """Alert proceeds when ``alert_logs`` has no matching row."""
+        email_service.db.hasAlertBeenSent.return_value = False
+        assert email_service._should_send_alert(
+            "device_001", "device_stopped", run_id="run-A"
+        )
 
-        assert result
-        assert "device_001:device_stopped" in email_service._last_alert_times
-
-    def test_should_send_alert_cooldown_active(self, email_service):
-        """Test that alert should not be sent during cooldown period."""
-        device_id = "device_001"
-        alert_type = "device_stopped"
-
-        # Send first alert
-        email_service._should_send_alert(device_id, alert_type)
-
-        # Try to send again immediately - should be blocked
-        result = email_service._should_send_alert(device_id, alert_type)
-
-        assert not result
-
-    def test_should_send_alert_cooldown_expired(self, email_service):
-        """Test that alert should be sent after cooldown expires."""
-        device_id = "device_001"
-        alert_type = "device_stopped"
-
-        # Send first alert
-        email_service._should_send_alert(device_id, alert_type)
-
-        # Manually set last alert time to past
-        email_service._last_alert_times[f"{device_id}:{alert_type}"] = time.time() - 400
-
-        # Should be able to send again
-        result = email_service._should_send_alert(device_id, alert_type)
-
-        assert result
+    def test_should_not_send_alert_when_already_logged(self, email_service):
+        """Alert is suppressed when ``alert_logs`` shows the same
+        (device, alert_type, run_id) was already sent. This is the only
+        de-dup layer; the previous in-memory cooldown is gone."""
+        email_service.db.hasAlertBeenSent.return_value = True
+        assert not email_service._should_send_alert(
+            "device_001", "device_stopped", run_id="run-A"
+        )
 
     def test_create_email_message_basic(self, email_service):
         """Test basic email message creation."""

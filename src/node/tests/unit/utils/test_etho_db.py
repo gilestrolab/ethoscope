@@ -819,6 +819,40 @@ class TestAlertOperations:
         assert len(alerts) == 2
 
 
+class TestDeviceInterventions:
+    """``device_interventions`` is the persisted audit log of user-originated
+    actions that should suppress run-termination alerts (web-UI stop, firmware
+    update, bulk updater operations). The scanner consults it on every run
+    finalisation. These tests cover the two methods that interact with it.
+    """
+
+    def test_record_intervention_inserts_row(self, test_db):
+        rowid = test_db.recordIntervention("device_001", "stop")
+        assert rowid > 0
+
+    def test_recent_intervention_returns_true_within_window(self, test_db):
+        test_db.recordIntervention("device_001", "reboot")
+        assert test_db.recent_intervention("device_001", within_seconds=60) is True
+
+    def test_recent_intervention_returns_false_outside_window(self, test_db):
+        # Insert with a backdated created_at, then query a tighter window.
+        import datetime
+
+        backdated = datetime.datetime.now() - datetime.timedelta(seconds=120)
+        test_db.executeSQL(
+            "INSERT INTO device_interventions (device_id, action, created_at) "
+            "VALUES (?, ?, ?)",
+            ("device_001", "reboot", backdated),
+        )
+        assert test_db.recent_intervention("device_001", within_seconds=30) is False
+        assert test_db.recent_intervention("device_001", within_seconds=300) is True
+
+    def test_recent_intervention_is_per_device(self, test_db):
+        test_db.recordIntervention("device_A", "stop")
+        assert test_db.recent_intervention("device_A", within_seconds=60) is True
+        assert test_db.recent_intervention("device_B", within_seconds=60) is False
+
+
 class TestPINAuthentication:
     """Test PIN hashing and authentication."""
 

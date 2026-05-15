@@ -299,9 +299,7 @@ class TestDeviceRenaming:
 
         # Verify device was properly reset and re-enabled
         device.reset_error_state.assert_called_once()
-        device._update_device_status.assert_called_with(
-            "offline", trigger_source="system"
-        )
+        device._update_device_status.assert_called_with("offline")
 
         # Verify device info was updated
         assert device._info["last_seen"] <= time.time()

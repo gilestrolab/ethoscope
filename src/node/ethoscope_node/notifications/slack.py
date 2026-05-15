@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import datetime
-import time
 from typing import Any
 
 import requests
@@ -29,18 +28,7 @@ class SlackNotificationService(NotificationAnalyzer):
         config: EthoscopeConfiguration | None = None,
         db: ExperimentalDB | None = None,
     ):
-        """
-        Initialize Slack notification service.
-
-        Args:
-            config: Configuration instance, will create new one if None
-            db: Database instance, will create new one if None
-        """
         super().__init__(config, db)
-
-        # Rate limiting: track last alert time per device/type
-        self._last_alert_times = {}
-        self._default_cooldown = 3600  # 1 hour between similar alerts
 
     def _get_slack_config(self) -> dict[str, Any]:
         """Get Slack configuration from settings."""
@@ -51,55 +39,18 @@ class SlackNotificationService(NotificationAnalyzer):
         return self.config.content.get("alerts", {})
 
     def _should_send_alert(
-        self, device_id: str, alert_type: str, run_id: str = None
+        self, device_id: str, alert_type: str, run_id: str | None = None
     ) -> bool:
+        """De-dup via the persistent ``alert_logs`` table.
+
+        See ``EmailNotificationService._should_send_alert`` for the rationale.
         """
-        Check if we should send an alert based on rate limiting and database history.
-
-        Args:
-            device_id: Device identifier
-            alert_type: Type of alert (device_stopped, storage_warning, etc.)
-            run_id: Run ID for device_stopped alerts (prevents duplicates for same run)
-
-        Returns:
-            True if alert should be sent
-        """
-        # For device_stopped alerts, check database for duplicates based on run_id
-        if alert_type == "device_stopped" and run_id:
-            has_been_sent = self.db.hasAlertBeenSent(device_id, alert_type, run_id)
-            if has_been_sent:
-                self.logger.debug(
-                    f"Alert {device_id}:{alert_type}:{run_id} already sent - preventing duplicate"
-                )
-                return False
-        elif alert_type == "device_stopped" and not run_id:
-            # For alerts without run_id, use timestamp-based approach to prevent spam
-            self.logger.debug(
-                "No run_id provided for device_stopped alert - using cooldown only"
-            )
-
-        # For other alerts or when no run_id, use traditional cooldown
-        alert_config = self._get_alert_config()
-        cooldown = alert_config.get("cooldown_seconds", self._default_cooldown)
-
-        # Use run_id in key for device_stopped alerts, otherwise use traditional key
-        if alert_type == "device_stopped" and run_id:
-            key = f"{device_id}:{alert_type}:{run_id}"
-        else:
-            key = f"{device_id}:{alert_type}"
-
-        current_time = time.time()
-
-        if key in self._last_alert_times:
-            time_since_last = current_time - self._last_alert_times[key]
-            if time_since_last < cooldown:
-                self.logger.debug(
-                    f"Alert {key} suppressed due to cooldown ({time_since_last:.0f}s < {cooldown}s)"
-                )
-                return False
-
-        self._last_alert_times[key] = current_time
-        return True
+        if not self.db.hasAlertBeenSent(device_id, alert_type, run_id):
+            return True
+        self.logger.debug(
+            f"Alert {device_id}:{alert_type}:{run_id} already sent — suppressing"
+        )
+        return False
 
     def _send_message(self, blocks: list[dict[str, Any]], text: str = None) -> bool:
         """

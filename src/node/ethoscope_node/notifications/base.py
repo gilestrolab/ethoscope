@@ -133,12 +133,14 @@ class NotificationAnalyzer:
     def _select_run_for_analysis(
         self, device_id: str, run_id: str | None
     ) -> dict[str, Any] | None:
-        """Pick the run row to describe in an alert.
+        """Look up the run row that triggered this alert.
 
-        With a run_id (alert path) we look up that exact row — never guess.
-        Without one (UI inspection) we fall back to the device's most recent
-        run, skipping rows that look like abandoned 'running' sessions
-        (status='running' with no end_time, started >24h ago).
+        With ``run_id`` (the alert path; always supplied by the scanner now
+        that finalisation is run-centric) we read that exact row. Without
+        ``run_id`` (UI inspection paths) we fall back to the device's most
+        recent run by ``start_time``. The previous orphan-skipping heuristic
+        is gone — runs are now cleanly finalised by the scanner so an
+        ``end_time = 0`` row genuinely indicates a still-active session.
         """
         if run_id:
             rows = self.db.getRun(run_id, asdict=True)
@@ -156,21 +158,10 @@ class NotificationAnalyzer:
         ]
         if not device_runs:
             return None
-
-        fresh = [r for r in device_runs if not self._looks_orphaned(r)]
-        pool = fresh or device_runs
-        return max(pool, key=lambda r: self._parse_timestamp(r.get("start_time")) or 0)
-
-    def _looks_orphaned(self, run: dict[str, Any]) -> bool:
-        """A 'running' row with no end_time, started >24h ago — probably stale."""
-        if run.get("status") != "running":
-            return False
-        if run.get("end_time") not in _UNSET_TIMESTAMP_VALUES:
-            return False
-        start = self._parse_timestamp(run.get("start_time"))
-        if start is None:
-            return False
-        return (time.time() - start) > 24 * 3600
+        return max(
+            device_runs,
+            key=lambda r: self._parse_timestamp(r.get("start_time")) or 0,
+        )
 
     def _parse_timestamp(self, timestamp_value) -> float | None:
         """Parse a stored timestamp into a Unix epoch float, or None if unset.
