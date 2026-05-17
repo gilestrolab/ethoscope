@@ -885,8 +885,12 @@
                 }
             }
 
-            // Add sensor IP and light schedule based on selected incubator name
-            var hasLightSchedule = false;
+            // Add sensor IP and light schedule based on selected incubator name.
+            // Clock drift is handled by the auto-correct loop in
+            // updateTimestampDisplay (every refresh tick, max 3 attempts), which
+            // pushes the node's clock to the device via /update/<id>/datetime.
+            // The red warning icon in the status bar (ethoscope.html: delta_t_min > 3)
+            // still flags drift to the user.
             if (option.experimental_info && option.experimental_info.arguments && option.experimental_info.arguments.location) {
                 var selectedIncubatorName = option.experimental_info.arguments.location;
                 option.experimental_info.arguments.sensor = $scope.get_ip_of_sensor(selectedIncubatorName);
@@ -907,18 +911,8 @@
                             (incubator.light_cycle_anchor !== null && incubator.light_cycle_anchor !== undefined)
                                 ? String(incubator.light_cycle_anchor)
                                 : '';
-                        hasLightSchedule = true;
                     }
                 }
-            }
-
-            // Block start if light schedule is active but device clock is out of sync
-            if (hasLightSchedule && $scope.delta_t_min > 3) {
-                manageSpinner('stop');
-                alert('Cannot start experiment with light schedule: device clock is ' +
-                      Math.round($scope.delta_t_min) + ' minutes out of sync with the node. ' +
-                      'Please wait for time synchronization or reload this page to trigger a sync.');
-                return;
             }
 
             // Include stimulator sequence in the data sent to backend
