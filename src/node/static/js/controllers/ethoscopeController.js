@@ -1597,76 +1597,38 @@
          */
         function updateTimestampDisplay(deviceData) {
             // Initialize time display immediately - don't wait for node timestamp
+            // Compute drift against the BROWSER's clock, not the node's.
+            // The auto-correct below pushes the browser's epoch to the device,
+            // so the device can only ever converge to the browser's reference —
+            // measuring against /node/timestamp would leave a permanent residual
+            // whenever the node's hwclock/TZ is misconfigured (a common BST vs.
+            // UTC source of "all devices show out of sync" false positives).
+            // node_datetime is still shown for human reference but isn't used
+            // for the gate.
             if (deviceData.current_timestamp) {
                 $scope.device_timestamp = new Date(deviceData.current_timestamp * 1000);
                 $scope.device_datetime = $scope.device_timestamp.toUTCString();
 
-                // Show local node time immediately (no HTTP request needed)
                 var local_time = new Date();
                 $scope.node_datetime = local_time.toUTCString();
                 $scope.delta_t_min = Math.abs((local_time.getTime() / 1000 - deviceData.current_timestamp) / 60);
+
+                // Auto-correct device clock if drift > 3 min (max 3 attempts per page load)
+                if ($scope.delta_t_min > 3 && $attempt < 3) {
+                    $scope.ethoscope.update_machine({
+                        machine_options: {
+                            arguments: {
+                                datetime: local_time.getTime() / 1000
+                            },
+                            name: 'datetime'
+                        }
+                    });
+                    $attempt++;
+                    console.log("Auto-correcting device time. Attempt:", $attempt);
+                }
             } else {
                 $scope.node_datetime = "Node Time";
                 $scope.device_datetime = "Device Time";
-            }
-
-            // Check time synchronization with node asynchronously (don't block UI)
-            if (deviceData.current_timestamp) {
-                var now = new Date().getTime();
-                var useCache = nodeTimestampCache.timestamp &&
-                    (now - nodeTimestampCache.cachedAt) < nodeTimestampCache.maxAge;
-
-                if (useCache) {
-                    // Use cached timestamp - no HTTP request needed
-                    var node_t = nodeTimestampCache.timestamp;
-                    var node_time = new Date(node_t * 1000);
-                    $scope.node_datetime = node_time.toUTCString();
-                    $scope.delta_t_min = Math.abs((node_t - deviceData.current_timestamp) / 60);
-
-                    // Auto-correct time if difference > 3 minutes (max 3 attempts)
-                    if ($scope.delta_t_min > 3 && $attempt < 3) {
-                        $scope.ethoscope.update_machine({
-                            machine_options: {
-                                arguments: {
-                                    datetime: new Date().getTime() / 1000
-                                },
-                                name: 'datetime'
-                            }
-                        });
-                        $attempt++;
-                        console.log("Auto-correcting device time. Attempt:", $attempt);
-                    }
-                } else {
-                    // Fetch fresh timestamp
-                    $http.get('/node/timestamp')
-                        .then(function(node_response) {
-                            var node_t = node_response.data.timestamp;
-                            var node_time = new Date(node_t * 1000);
-                            $scope.node_datetime = node_time.toUTCString();
-                            $scope.delta_t_min = Math.abs((node_t - deviceData.current_timestamp) / 60);
-
-                            // Update cache
-                            nodeTimestampCache.timestamp = node_t;
-                            nodeTimestampCache.cachedAt = now;
-
-                            // Auto-correct time if difference > 3 minutes (max 3 attempts)
-                            if ($scope.delta_t_min > 3 && $attempt < 3) {
-                                $scope.ethoscope.update_machine({
-                                    machine_options: {
-                                        arguments: {
-                                            datetime: new Date().getTime() / 1000
-                                        },
-                                        name: 'datetime'
-                                    }
-                                });
-                                $attempt++;
-                                console.log("Auto-correcting device time. Attempt:", $attempt);
-                            }
-                        })
-                        .catch(function(error) {
-                            console.error('Failed to get node timestamp:', error);
-                        });
-                }
             }
         }
 
