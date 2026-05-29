@@ -125,7 +125,23 @@
                 <br>
                 <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
                 <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451
-                <p style="font-size: 1.1em;">Your video files will be saved as h264 chunks on the ethoscope itself and transferred to your node automatically if your video_backup service is running.</p>
+                <p style="font-size: 1.1em;">
+                    <span ng-if="videoBackupStatus.service == 'unified'">
+                        <i class="fa fa-check-circle" style="color: #28a745;"></i>
+                        Your video files are saved as h264 chunks on the ethoscope and will be transferred to the node automatically by the <strong>unified backup</strong> service.
+                    </span>
+                    <span ng-if="videoBackupStatus.service == 'video'">
+                        <i class="fa fa-check-circle" style="color: #28a745;"></i>
+                        Your video files are saved as h264 chunks on the ethoscope and will be transferred to the node automatically by the <strong>video backup</strong> service.
+                    </span>
+                    <span ng-if="videoBackupStatus.loaded && !videoBackupStatus.service">
+                        <i class="fa fa-exclamation-triangle" style="color: #d9534f;"></i>
+                        Your video files are being saved as h264 chunks on the ethoscope, but <strong>no rsync backup service is running</strong> on the node, so they will not be transferred automatically. Enable the <strong>unified</strong> (videos + SQLite) or the <strong>video</strong>-only backup service in <a href="#!/more/nodeManage">Node management &rarr; Services</a>.
+                    </span>
+                    <span ng-if="!videoBackupStatus.loaded">
+                        Your video files will be saved as h264 chunks on the ethoscope. Checking node backup service status&hellip;
+                    </span>
+                </p>
             </p>
         </div>
     </div>

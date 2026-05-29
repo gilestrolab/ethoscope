@@ -35,6 +35,11 @@
             incubators: {},
             sensors: {}
         };
+        $scope.videoBackupStatus = { // Which rsync backup covers video files
+            loaded: false,    // true once /node/daemons has been polled
+            service: null,    // 'unified' | 'video' | null
+            daemon: null      // exact systemd unit name, for messaging
+        };
         $scope.stimulatorSequence = []; // Array for stimulator sequence
 
         // Backup status cache
@@ -126,6 +131,43 @@
         // ===========================
         // DATA LOADING FUNCTIONS
         // ===========================
+
+        /**
+         * Poll daemon status to figure out which rsync service (if any)
+         * is currently covering video backup. The unified service covers
+         * both SQLite and video; ethoscope_backup_video is video-only.
+         */
+        function loadDaemons() {
+            $http.get('/node/daemons')
+                .then(function(response) {
+                    var daemons = response.data || {};
+                    var unified = daemons.ethoscope_backup_unified;
+                    var videoOnly = daemons.ethoscope_backup_video;
+
+                    if (unified && unified.active === 'active') {
+                        $scope.videoBackupStatus = {
+                            loaded: true,
+                            service: 'unified',
+                            daemon: 'ethoscope_backup_unified'
+                        };
+                    } else if (videoOnly && videoOnly.active === 'active') {
+                        $scope.videoBackupStatus = {
+                            loaded: true,
+                            service: 'video',
+                            daemon: 'ethoscope_backup_video'
+                        };
+                    } else {
+                        $scope.videoBackupStatus = {
+                            loaded: true,
+                            service: null,
+                            daemon: null
+                        };
+                    }
+                })
+                .catch(function(error) {
+                    console.warn('Failed to load daemon status:', error);
+                });
+        }
 
         /**
          * Load node-level data (users, incubators, sensors) - OPTIMIZED WITH CACHING
@@ -1756,6 +1798,7 @@
         loadNodeData();
         loadDeviceData();
         loadBackupInfo(true); // Load backup info (force on initial load)
+        loadDaemons();        // Determines which rsync service handles video backup
 
         /**
          * Formats raw database information into a simplified list of dictionaries.
