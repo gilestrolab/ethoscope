@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import datetime
+import json
 import logging
 import time
 from typing import Any
@@ -9,6 +10,10 @@ import requests
 
 from ..utils.configuration import EthoscopeConfiguration
 from ..utils.etho_db import ExperimentalDB
+
+# A run that's still active stores end_time as integer 0 in SQLite, but legacy
+# rows can carry "0" or empty strings. Treat all of these as "no end time yet".
+_UNSET_TIMESTAMP_VALUES = (None, 0, 0.0, "0", "")
 
 
 class NotificationAnalyzer:
@@ -38,18 +43,26 @@ class NotificationAnalyzer:
         self.db = db or ExperimentalDB()
         self.logger = logging.getLogger(self.__class__.__name__)
 
-    def analyze_device_failure(self, device_id: str) -> dict[str, Any]:
+    def analyze_device_failure(
+        self, device_id: str, run_id: str | None = None
+    ) -> dict[str, Any]:
         """
-        Analyze a device failure and gather comprehensive information.
+        Gather context about the run that triggered an alert, for the email body.
+
+        The orchestration layer (scanner) is the authority on whether to alert.
+        This function does not re-decide; it only assembles human-readable
+        information about the run.
 
         Args:
-            device_id: Device identifier
+            device_id: Device identifier.
+            run_id: The run that triggered the alert. Always supplied by the
+                alert path so the right row is analyzed. When omitted (UI
+                inspection, etc.) the most recent non-orphaned run is used.
 
         Returns:
-            Dictionary with device failure analysis
+            Dictionary with the analysis fields, or an "error" key on failure.
         """
         try:
-            # Get device information
             device_info = self.db.getEthoscope(device_id, asdict=True)
             if not device_info:
                 self.logger.warning(f"No device info found for {device_id}")
@@ -59,119 +72,44 @@ class NotificationAnalyzer:
                     "error": "Device not found in database",
                 }
 
-            # Get all runs for this device
-            all_runs = self.db.getRun("all", asdict=True)
-            device_runs = [
-                run for run in all_runs.values() if run.get("ethoscope_id") == device_id
-            ]
-
-            if not device_runs:
+            device_name = device_info.get("ethoscope_name", f"Device {device_id}")
+            run = self._select_run_for_analysis(device_id, run_id)
+            if run is None:
                 return {
                     "device_id": device_id,
-                    "device_name": device_info.get(
-                        "ethoscope_name", f"Device {device_id}"
-                    ),
+                    "device_name": device_name,
                     "last_seen": device_info.get("last_seen"),
                     "error": "No runs found for device",
                 }
 
-            # Filter out orphaned "running" sessions that are clearly stale
-            # These are runs with status='running' and end_time='0' that are older than 24 hours
-            current_time = time.time()
-            orphan_threshold = 24 * 3600  # 24 hours in seconds
-
-            filtered_runs = []
-            for run in device_runs:
-                start_time = self._parse_timestamp(run.get("start_time", 0))
-                end_time_raw = run.get("end_time")
-
-                # Check if this is an orphaned running session
-                is_orphaned = (
-                    run.get("status") == "running"
-                    and (
-                        end_time_raw == "0" or end_time_raw == 0 or end_time_raw is None
-                    )
-                    and start_time > 0
-                    and (current_time - start_time) > orphan_threshold
-                )
-
-                if is_orphaned:
-                    age_hours = (current_time - start_time) / 3600
-                    self.logger.debug(
-                        f"Filtering out orphaned running session {run.get('run_id')} "
-                        f"(age: {age_hours:.1f} hours, started: {datetime.datetime.fromtimestamp(start_time)})"
-                    )
-                else:
-                    filtered_runs.append(run)
-
-            if not filtered_runs:
-                # All runs were orphaned, log a warning
-                self.logger.warning(
-                    f"All {len(device_runs)} runs for device {device_id} were orphaned sessions. "
-                    "No recent valid runs found."
-                )
-                return {
-                    "device_id": device_id,
-                    "device_name": device_info.get(
-                        "ethoscope_name", f"Device {device_id}"
-                    ),
-                    "last_seen": device_info.get("last_seen"),
-                    "error": "No recent valid runs found (all runs were orphaned)",
-                    "orphaned_count": len(device_runs),
-                }
-
-            # Find last run (need to parse timestamps for comparison)
-            def get_run_start_time(run):
-                start_time_raw = run.get("start_time", 0)
-                return self._parse_timestamp(start_time_raw)
-
-            last_run = max(filtered_runs, key=get_run_start_time)
-
-            # Determine failure type and duration
-            current_time = time.time()
-            start_time_raw = last_run.get("start_time", 0)
-            end_time_raw = last_run.get("end_time")
-
-            # Convert datetime strings to timestamps
-            start_time = self._parse_timestamp(start_time_raw)
-            end_time = self._parse_timestamp(end_time_raw) if end_time_raw else None
+            start_time = self._parse_timestamp(run.get("start_time"))
+            end_time = self._parse_timestamp(run.get("end_time"))
 
             if end_time is None:
-                failure_type = "crashed_during_tracking"
-                duration = current_time - start_time
                 status = "Failed while running"
+                duration = time.time() - start_time if start_time else 0.0
             else:
-                # Check if ended recently (within last hour)
-                if current_time - end_time < 3600:
-                    failure_type = "stopped_recently"
-                    status = "Stopped recently"
-                else:
-                    failure_type = "completed_normally"
-                    status = "Completed normally"
-                duration = end_time - start_time
+                status = "Stopped"
+                duration = end_time - start_time if start_time else 0.0
 
-            # Get experiment type from experimental_data
-            experimental_data = last_run.get("experimental_data", {})
+            experimental_data = run.get("experimental_data", {})
             if isinstance(experimental_data, str):
                 try:
-                    import json
-
                     experimental_data = json.loads(experimental_data)
                 except Exception:
                     experimental_data = {}
 
             return {
                 "device_id": device_id,
-                "device_name": device_info.get("ethoscope_name", f"Device {device_id}"),
+                "device_name": device_name,
                 "last_seen": device_info.get("last_seen"),
-                "failure_type": failure_type,
                 "status": status,
                 "experiment_duration": duration,
                 "experiment_duration_str": self._format_duration(duration),
-                "user": last_run.get("user_name", "Unknown"),
-                "location": last_run.get("location", "Unknown"),
-                "run_id": last_run.get("run_id"),
-                "problems": last_run.get("problems", ""),
+                "user": run.get("user_name", "Unknown"),
+                "location": run.get("location", "Unknown"),
+                "run_id": run.get("run_id"),
+                "problems": run.get("problems", ""),
                 "experimental_data": experimental_data,
                 "experiment_type": experimental_data.get("type", "tracking"),
                 "start_time": (
@@ -192,65 +130,84 @@ class NotificationAnalyzer:
                 "error": str(e),
             }
 
-    def _parse_timestamp(self, timestamp_value):
-        """
-        Parse timestamp value which could be a string, float, or datetime object.
+    def _select_run_for_analysis(
+        self, device_id: str, run_id: str | None
+    ) -> dict[str, Any] | None:
+        """Look up the run row that triggered this alert.
 
-        Args:
-            timestamp_value: The timestamp value from database
-
-        Returns:
-            float: Unix timestamp, or 0 if parsing fails
+        With ``run_id`` (the alert path; always supplied by the scanner now
+        that finalisation is run-centric) we read that exact row. Without
+        ``run_id`` (UI inspection paths) we fall back to the device's most
+        recent run by ``start_time``. The previous orphan-skipping heuristic
+        is gone — runs are now cleanly finalised by the scanner so an
+        ``end_time = 0`` row genuinely indicates a still-active session.
         """
-        if timestamp_value is None:
-            return 0
+        if run_id:
+            rows = self.db.getRun(run_id, asdict=True)
+            run = rows.get(run_id) if rows else None
+            if run and run.get("ethoscope_id") == device_id:
+                return run
+            self.logger.warning(
+                f"run_id {run_id} not found for device {device_id}; "
+                "falling back to most recent run"
+            )
+
+        all_runs = self.db.getRun("all", asdict=True)
+        device_runs = [
+            r for r in all_runs.values() if r.get("ethoscope_id") == device_id
+        ]
+        if not device_runs:
+            return None
+        return max(
+            device_runs,
+            key=lambda r: self._parse_timestamp(r.get("start_time")) or 0,
+        )
+
+    def _parse_timestamp(self, timestamp_value) -> float | None:
+        """Parse a stored timestamp into a Unix epoch float, or None if unset.
+
+        SQLite holds these values as TEXT (datetime string), INTEGER (0 for
+        an unstarted/unfinished end_time), or rarely a float. Returns None
+        for any of the unset markers in `_UNSET_TIMESTAMP_VALUES` and on
+        parse failure, so callers can use `is None` consistently.
+        """
+        if timestamp_value in _UNSET_TIMESTAMP_VALUES:
+            return None
 
         try:
-            # If it's already a number, check for special case of 0 (which means no end_time)
             if isinstance(timestamp_value, (int, float)):
-                value = float(timestamp_value)
-                # Treat 0 as None/null for end_time fields
-                return 0 if value == 0 else value
+                return float(timestamp_value)
 
-            # If it's a string, check for special values first
             if isinstance(timestamp_value, str):
-                # Treat '0' as None/null (common for end_time when not set)
-                if timestamp_value == "0" or timestamp_value == "":
-                    return 0
-
-                # Try different datetime formats that might be stored in database
-                for fmt in [
-                    "%Y-%m-%d %H:%M:%S.%f",  # 2023-01-01 12:34:56.789123
-                    "%Y-%m-%d %H:%M:%S",  # 2023-01-01 12:34:56
-                    "%Y-%m-%d_%H-%M-%S",  # 2023-01-01_12-34-56
-                    "%Y%m%d_%H%M%S",  # 20230101_123456
-                ]:
+                for fmt in (
+                    "%Y-%m-%d %H:%M:%S.%f",
+                    "%Y-%m-%d %H:%M:%S",
+                    "%Y-%m-%d_%H-%M-%S",
+                    "%Y%m%d_%H%M%S",
+                ):
                     try:
-                        dt = datetime.datetime.strptime(timestamp_value, fmt)
-                        return dt.timestamp()
+                        return datetime.datetime.strptime(
+                            timestamp_value, fmt
+                        ).timestamp()
                     except ValueError:
                         continue
-
-                # If no format worked, try parsing as float
                 try:
-                    value = float(timestamp_value)
-                    # Treat 0 as None/null
-                    return 0 if value == 0 else value
+                    return float(timestamp_value) or None
                 except ValueError:
                     pass
 
-            # If it's a datetime object
             if hasattr(timestamp_value, "timestamp"):
                 return timestamp_value.timestamp()
 
             self.logger.warning(
-                f"Could not parse timestamp: {timestamp_value} (type: {type(timestamp_value)})"
+                f"Could not parse timestamp: {timestamp_value} "
+                f"(type: {type(timestamp_value)})"
             )
-            return 0
+            return None
 
         except Exception as e:
             self.logger.error(f"Error parsing timestamp '{timestamp_value}': {e}")
-            return 0
+            return None
 
     def get_device_logs(self, device_id: str, max_lines: int = 1000) -> str | None:
         """

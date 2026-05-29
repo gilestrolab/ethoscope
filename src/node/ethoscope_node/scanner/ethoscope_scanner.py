@@ -62,6 +62,16 @@ class Ethoscope(BaseDevice):
         "test_module": ["stopped"],
     }
 
+    # Instructions that cause the device to stop tracking. Recorded as user
+    # interventions so the scanner can attribute a subsequent run termination
+    # to a user action and suppress the alert.
+    _STOP_INTERVENTION_INSTRUCTIONS = {
+        "stop",
+        "poweroff",
+        "reboot",
+        "restart",
+    }
+
     def __init__(
         self,
         ip: str,
@@ -80,9 +90,14 @@ class Ethoscope(BaseDevice):
         self._ping_count = 0  # Initialize ping counter
         self._last_ssh_attempt = 0  # Timestamp of last SSH key setup attempt
 
-        # User action tracking for enhanced status management
-        self._last_user_action = None
-        self._last_user_instruction = None
+        # Run reconciliation state. ``_active_run_id`` is the run_id we last
+        # observed this device tracking; ``None`` means we have not seen a
+        # tracking session active. ``_unreached_since`` is the wall-clock
+        # timestamp when we started being unable to reach the device, used to
+        # decide if we have hit the unreachable timeout. Both are cleared on
+        # run finalisation. See ``_reconcile_run_state``.
+        self._active_run_id: str | None = None
+        self._unreached_since: float | None = None
 
         # Use provided configuration or create new one
         self._config = config or EthoscopeConfiguration()
@@ -125,24 +140,19 @@ class Ethoscope(BaseDevice):
             self._info.update(base_info)
 
     def send_instruction(self, instruction: str, post_data: dict | bytes | None = None):
-        """
-        Send instruction to ethoscope with validation and user action tracking.
+        """Send instruction to ethoscope with validation and intervention logging.
 
-        Args:
-            instruction: Instruction to send
-            post_data: Optional data to send with instruction (can be Dict or bytes)
+        Stop-like instructions are persisted as device interventions BEFORE the
+        device is touched, so that a concurrent polling thread observing the
+        ensuing ``running -> unreached -> stopped`` chain can attribute the
+        transition to the user and skip the alert. (Race window: a single poll
+        period, currently 5 s. The intervention row is written synchronously
+        before any HTTP call to the device.)
         """
+        if instruction in self._STOP_INTERVENTION_INSTRUCTIONS:
+            self._edb.recordIntervention(self._id, instruction)
+
         self._check_instruction_status(instruction)
-
-        # Determine trigger source and type
-
-        # Check if this is a graceful operation
-        if instruction in DeviceStatus.GRACEFUL_OPERATIONS:
-            pass
-
-        # Track user action timestamp for later status updates
-        self._last_user_action = time.time()
-        self._last_user_instruction = instruction
 
         # Handle post_data properly - it might already be bytes or need conversion
         json_data = None
@@ -250,10 +260,13 @@ class Ethoscope(BaseDevice):
         """Trigger firmware update on device (compile + upload).
 
         Uses a longer timeout (120s) since compilation and upload take time.
+        Records a user intervention so the run-termination it may trigger is
+        attributed to the user.
         """
         if not self._id:
             return {}
 
+        self._edb.recordIntervention(self._id, "update_firmware")
         try:
             url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['controls']}/{self._id}/update_firmware"
             return self._get_json(url, timeout=120, post_data=b"{}")
@@ -351,7 +364,7 @@ class Ethoscope(BaseDevice):
         super().stop()
 
     def _update_info(self):
-        """Enhanced info update with state management."""
+        """Poll the device, update local status, and reconcile run state."""
         previous_status_obj = self.get_device_status()
         previous_status = (
             previous_status_obj.status_name if previous_status_obj else "offline"
@@ -368,42 +381,8 @@ class Ethoscope(BaseDevice):
 
         new_status = self._info.get("status", "offline")
 
-        # Update device status using DeviceStatus system
-        is_user_triggered = self._is_user_initiated_stop()
-        trigger_source = "user" if is_user_triggered else "system"
-
-        # Special case: If device is found in an active tracking state, it must be user-initiated
-        # Tracking cannot start without user intervention
-        if (
-            new_status in ["running", "recording", "streaming"]
-            and previous_status == "offline"
-        ):
-            is_user_triggered = True
-            trigger_source = "user"
-            self._logger.info(
-                f"Device {self._id} found in tracking state {new_status} - marking as user-initiated"
-            )
-
-        # Check if this is a graceful operation
-        alert_config = self._config.get_custom("alerts") or {}
-        graceful_grace_minutes = alert_config.get("graceful_shutdown_grace_minutes", 5)
-        graceful_grace_seconds = graceful_grace_minutes * 60
-
-        if (
-            self._last_user_instruction in DeviceStatus.GRACEFUL_OPERATIONS
-            and self._last_user_action
-            and (time.time() - self._last_user_action) < graceful_grace_seconds
-        ):
-            trigger_source = "graceful"
-
-        # Update status if it changed
         if previous_status != new_status:
-            self._update_device_status(
-                new_status,
-                is_user_triggered,
-                trigger_source,
-                metadata={"previous_status": previous_status},
-            )
+            self._update_device_status(new_status)
 
             # Clean up stream manager when device stops streaming
             if previous_status == "streaming" and new_status != "streaming":
@@ -479,9 +458,10 @@ class Ethoscope(BaseDevice):
             # Track the backup_filename used for this backup_path
             self._last_backup_filename = current_backup_filename
 
-        # Only handle state transitions when status actually changes
-        if previous_status != new_status:
-            self._handle_state_transition(previous_status, new_status)
+        # Reconcile run lifecycle every poll, not just on status changes — that
+        # way an unreached/offline timeout fires even if status looks "stable".
+        current_run_id = self._observed_current_run_id(new_status)
+        self._reconcile_run_state(new_status, current_run_id, previous_status)
 
         # Check for storage warnings
         self._check_storage_warnings()
@@ -704,17 +684,6 @@ class Ethoscope(BaseDevice):
                 # Update device info with reorganized data
                 self._info.update(new_info)
 
-                # Cache run_id for use during interruptions when experimental_info is lost
-                current_experimental_info = new_info.get("experimental_info", {}).get(
-                    "current", {}
-                )
-                if current_experimental_info and current_experimental_info.get(
-                    "run_id"
-                ):
-                    self._info["cached_run_id"] = current_experimental_info["run_id"]
-                    self._logger.debug(
-                        f"Cached run_id: {current_experimental_info['run_id']}"
-                    )
                 self._info["last_seen"] = time.time()
 
                 # Update logger name if we have a valid device name
@@ -728,7 +697,7 @@ class Ethoscope(BaseDevice):
                 if did:
                     with self._lock:
                         self._info["last_seen"] = time.time()
-                        self._update_device_status("busy", trigger_source="network")
+                        self._update_device_status("busy")
 
                 self._logger.warning(
                     f"The device is online and responding but cannot communicate its status. Flagged as busy. {e}"
@@ -768,78 +737,67 @@ class Ethoscope(BaseDevice):
                 )
 
     def _handle_unreachable_state(self, previous_status: str):
-        """Handle unreachable device state with timeout logic."""
-        # Check if device is already unreachable and if timeout has been exceeded
-        current_status = self.get_device_status()
+        """Promote / demote the device status when polling fails.
 
-        # Get timeout from configuration
+        Pure UI-side concern. Alert decisions live in ``_reconcile_run_state``.
+
+        * busy device exceeding ``busy_timeout_minutes`` -> offline.
+        * busy device under that timeout -> stay busy.
+        * unreached device crossing ``unreachable_timeout_minutes`` or polling
+          backoff -> offline.
+        * unreached device under that timeout -> stay unreached.
+        * already-offline device -> stay offline (no flap back to unreached).
+        * anything else -> first transition to unreached.
+        """
+        current_status = self.get_device_status()
         alert_config = self._config.get_custom("alerts") or {}
         unreachable_timeout = alert_config.get("unreachable_timeout_minutes", 20)
+        busy_timeout = alert_config.get("busy_timeout_minutes", 10)
 
         if current_status.status_name == "busy":
-            # Check if busy device has exceeded timeout - if so, transition to offline
-            busy_timeout = alert_config.get(
-                "busy_timeout_minutes", 10
-            )  # Shorter timeout for busy devices
             if current_status.is_timeout_exceeded(busy_timeout):
                 self._logger.info(
-                    f"Device {self._id} busy timeout exceeded ({busy_timeout}m), marking as offline"
+                    f"Device {self._id} busy timeout exceeded ({busy_timeout}m), marking offline"
                 )
-                self._update_device_status(
-                    "offline",
-                    trigger_source="system",
-                    metadata={"reason": "busy_timeout"},
-                )
+                self._update_device_status("offline")
                 self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
-                return
             else:
                 self._logger.info(
-                    f"Device {self._id} has been busy for {current_status.get_age_minutes():.1f}m (timeout: {busy_timeout}m)"
-                )
-                self._update_device_status(
-                    "busy",
-                    trigger_source="system",
-                    metadata={"reason": "unreachable_timeout"},
+                    f"Device {self._id} busy for {current_status.get_age_minutes():.1f}m (timeout: {busy_timeout}m)"
                 )
                 self._edb.updateEthoscopes(ethoscope_id=self._id, status="busy")
-                return
+            return
 
-        elif current_status.status_name == "unreached":
-            # Device is already unreachable, check for timeout
-            if current_status.is_timeout_exceeded(unreachable_timeout):
-                self._logger.info(
-                    f"Device {self._id} unreachable timeout exceeded ({unreachable_timeout}m), marking as offline"
+        if current_status.status_name == "unreached":
+            crossed_error_threshold = (
+                self._consecutive_errors >= self._max_consecutive_errors
+            )
+            timeout_exceeded = current_status.is_timeout_exceeded(unreachable_timeout)
+            if crossed_error_threshold or timeout_exceeded:
+                reason = (
+                    "max_errors_reached"
+                    if crossed_error_threshold
+                    else "unreachable_timeout"
                 )
-                self._update_device_status(
-                    "offline",
-                    trigger_source="system",
-                    metadata={"reason": "unreachable_timeout"},
-                )
+                self._logger.info(f"Device {self._id} marked offline ({reason})")
+                self._update_device_status("offline")
                 self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
-                return
-        else:
-            # Device is becoming unreachable for the first time
-            self._logger.info(
-                f"Device {self._id} becoming unreachable (was {previous_status})"
-            )
-            self._update_device_status(
-                "unreached",
-                trigger_source="network",
-                metadata={"previous_status": previous_status},
-            )
+            return
 
-        # Handle running experiments
-        experimental_info_nested = self._info.get("experimental_info", {})
-        current_experimental_info = experimental_info_nested.get("current", {})
-        if current_experimental_info and "run_id" in current_experimental_info:
-            run_id = current_experimental_info["run_id"]
-            self._edb.flagProblem(run_id=run_id, message="unreached")
+        if previous_status == "offline":
+            # Already offline and still unreachable — stay there. Without this,
+            # the next poll would re-create "unreached" and the pair would
+            # ping-pong every cycle.
+            return
 
-            if previous_status == "running":
-                self._edb.updateEthoscopes(ethoscope_id=self._id, status="unreached")
-        elif previous_status == "stopped":
+        self._logger.info(
+            f"Device {self._id} becoming unreachable (was {previous_status})"
+        )
+        self._update_device_status("unreached")
+        if previous_status == "stopped":
             self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
-
+        else:
+            self._edb.updateEthoscopes(ethoscope_id=self._id, status="unreached")
         self._reset_info()
 
     def _handle_device_coming_online(self):
@@ -896,251 +854,199 @@ class Ethoscope(BaseDevice):
         except Exception as e:
             self._logger.error(f"Error updating device info: {e}")
 
-    def _is_user_initiated_stop(self) -> bool:
+    # ------------------------------------------------------------------ run state
+    #
+    # Alerting is driven by the lifecycle of a *run*, not by chains of device
+    # status transitions. The model:
+    #
+    #   1. The first time we observe the device in an ACTIVE state (running/
+    #      recording/streaming) with a run_id X, we set ``_active_run_id = X``
+    #      and ``addRun(X)`` if it isn't already in the DB.
+    #
+    #   2. While ``_active_run_id == X`` and the device keeps reporting an
+    #      active state with the same run_id, nothing happens.
+    #
+    #   3. The moment the device reports a non-active state (stopped/offline),
+    #      OR has been unreached/busy for longer than the configured timeout,
+    #      we finalise X. The termination_reason is ``user_stop`` if a recent
+    #      ``device_interventions`` row exists for this device, otherwise
+    #      ``crash`` (for an immediate stop) or ``unreached_timeout`` (for the
+    #      timeout path). Alerts fire only for the latter two reasons.
+    #
+    #   4. If the device begins reporting an active state with a DIFFERENT
+    #      run_id, the old one is finalised as ``superseded`` (no alert) and
+    #      the new one starts the cycle.
+    #
+    # Key non-properties of this model that the previous implementation got
+    # wrong:
+    #   - A device that was never observed active (e.g. idle the whole time
+    #     and momentarily unreachable during a firmware update) has
+    #     ``_active_run_id == None`` and therefore CANNOT fire an alert.
+    #     This is the regression case behind the 11 false-positive emails on
+    #     2026-05-15 — the old "any system-triggered transition to stopped"
+    #     branch fired without ever needing to see the device run.
+    #   - Run state is tied to a specific scanner session. A run that was
+    #     active when the scanner shut down has its row left open in the DB;
+    #     when the scanner restarts and re-observes the device active, the
+    #     same run_id is reattached. If the run silently expired across the
+    #     restart, ``_active_run_id`` stays ``None`` and no alert fires for
+    #     events we did not observe.
+    #   - The grace window is a single configurable knob
+    #     ``user_action_grace_seconds`` (default 600). No more separate
+    #     "user_action_timeout_seconds", "graceful_shutdown_grace_minutes",
+    #     and in-memory ``_last_user_action`` to keep in sync.
+
+    def _observed_current_run_id(self, status: str) -> str | None:
+        """Return the run_id the device claims to be tracking *right now*,
+        only if its status genuinely puts it in an active tracking state.
+
+        Trusting ``experimental_info.current.run_id`` while the device reports
+        ``stopped`` was the source of the stale-run-id bug: the device kept
+        leaking a previous run's id into ``current`` even after it stopped.
+        Status is the canonical signal — if it isn't an active state, there
+        is no current run.
         """
-        Check if a recent status change was user-initiated.
-
-        Returns:
-            True if the status change was likely user-initiated
-        """
-        if not self._last_user_action:
-            return False
-
-        # Get timeout from configuration
-        alert_config = self._config.get_custom("alerts") or {}
-        timeout_seconds = alert_config.get("user_action_timeout_seconds", 30)
-
-        # Check if user action was recent
-        time_since_action = time.time() - self._last_user_action
-        if time_since_action > timeout_seconds:
-            return False
-
-        # Check if the last instruction was a stop command
-        if self._last_user_instruction in ["stop", "poweroff", "reboot", "restart"]:
-            return True
-
-        return False
-
-    def _handle_state_transition(self, previous_status: str, new_status: str):
-        """Handle state transitions for experiment tracking."""
-        try:
-            self._logger.debug(
-                f"Handling state transition: {previous_status} -> {new_status}"
-            )
-
-            # Always check for alerts regardless of experimental info
-            experimental_info_nested = self._info.get("experimental_info", {})
-            current_experimental_info = experimental_info_nested.get("current", {})
-            run_id = (
-                current_experimental_info.get("run_id")
-                if current_experimental_info
-                else None
-            )
-
-            # If no current run_id, try to get cached run_id from device info
-            if not run_id:
-                run_id = self._info.get("cached_run_id")
-
-            current_status = self.get_device_status()
-            is_interrupted = (
-                current_status.is_interrupted_tracking_session()
-                if current_status
-                else False
-            )
-
-            self._logger.info(
-                f"Alert info: run_id={run_id} (from {'experimental_info' if current_experimental_info and current_experimental_info.get('run_id') else 'cache' if run_id else 'none'}), "
-                f"new_status={new_status}, is_interrupted={is_interrupted}"
-            )
-
-            # Send alerts
-            self._send_state_transition_alerts(previous_status, new_status, run_id)
-
-            # Handle device status transitions that don't require experimental info
-            device_transitions = {
-                ("running", "unreached"): lambda: self._edb.updateEthoscopes(
-                    ethoscope_id=self._id, status="unreached"
-                ),
-                ("stopped", "unreached"): lambda: self._edb.updateEthoscopes(
-                    ethoscope_id=self._id, status="offline"
-                ),
-            }
-
-            transition_key = (previous_status, new_status)
-            if transition_key in device_transitions:
-                device_transitions[transition_key]()
-
-            # Handle experiment-specific transitions only if we have experimental info
-            if current_experimental_info and run_id:
-                user_name = current_experimental_info.get("name", "")
-                location = current_experimental_info.get("location", "")
-
-                experiment_transitions = {
-                    ("initialising", "running"): lambda: self._edb.addRun(
-                        run_id=run_id,
-                        experiment_type="tracking",
-                        ethoscope_name=self._info.get("name", ""),
-                        ethoscope_id=self._id,
-                        username=user_name,
-                        user_id="",
-                        location=location,
-                        alert=True,
-                        comments="",
-                        experimental_data=self._info.get("backup_path", ""),
-                    ),
-                    ("initialising", "stopping"): lambda: self._edb.flagProblem(
-                        run_id=run_id, message="self-stopped"
-                    ),
-                    ("running", "stopped"): lambda: self._edb.stopRun(run_id=run_id),
-                }
-
-                if transition_key in experiment_transitions:
-                    experiment_transitions[transition_key]()
-
-        except Exception as e:
-            self._logger.error(f"Error handling state transition: {e}")
-
-    def _get_recent_run_id(self) -> str | None:
-        """
-        Get the most recent run_id for this device from the database.
-        Used to recover run_id for interrupted tracking sessions.
-
-        Returns:
-            The most recent run_id for this device, or None if not found
-        """
-        try:
-            # Query for the most recent run for this device
-            sql = """
-            SELECT run_id FROM runs
-            WHERE ethoscope_id = ?
-            ORDER BY start_time DESC
-            LIMIT 1
-            """
-
-            self._logger.info(f"Executing database query for device {self._id}: {sql}")
-            result = self._edb.exec(sql, (self._id,))
-            self._logger.info(f"Database query result: {result}")
-
-            if result and len(result) > 0:
-                recent_run_id = result[0]["run_id"]
-                self._logger.info(
-                    f"Recovered run_id for interrupted session: {recent_run_id}"
-                )
-                return recent_run_id
-            else:
-                self._logger.warning(
-                    f"Could not find recent run_id for device {self._id} - query returned empty"
-                )
-                return None
-
-        except Exception as e:
-            self._logger.error(f"Error recovering run_id for device {self._id}: {e}")
+        if status not in DeviceStatus.ACTIVE_TRACKING_STATUSES:
             return None
+        current = self._info.get("experimental_info", {}).get("current", {}) or {}
+        return current.get("run_id") or None
 
-    def _send_state_transition_alerts(
-        self, previous_status: str, new_status: str, run_id: str
-    ):
-        """Send alerts for state transitions using DeviceStatus logic."""
+    def _user_action_grace_seconds(self) -> int:
+        cfg = self._config.get_custom("alerts") or {}
+        # Default 10 minutes — bigger than the typical firmware-update window
+        # (~2-3 min) and smaller than the unreachable timeout (20 min) so a
+        # genuinely dead Pi after a reboot still alerts.
+        return int(cfg.get("user_action_grace_seconds", 600))
+
+    def _finalise_active_run(self, reason: str):
+        """Close the currently active run in the DB and emit alert if needed."""
+        run_id = self._active_run_id
+        if run_id is None:
+            return
+        self._active_run_id = None
+
+        try:
+            self._edb.stopRun(run_id=run_id, termination_reason=reason)
+        except Exception as e:
+            self._logger.error(f"Failed to stop run {run_id}: {e}")
+            return
+
+        self._logger.info(f"Run {run_id} finalised: {reason}")
+        if reason not in ("crash", "unreached_timeout"):
+            return
+
+        # Fire the alert. ``send_device_stopped_alert`` is itself idempotent
+        # (alert_logs keyed on device_id+alert_type+run_id) so a transient
+        # observation we somehow processed twice can't double-send.
         try:
             device_name = self._info.get("name", self._id)
-            current_status = self.get_device_status()
-
-            # Get timeout from configuration
-            alert_config = self._config.get_custom("alerts") or {}
-            unreachable_timeout = alert_config.get("unreachable_timeout_minutes", 20)
-
-            # Use DeviceStatus logic to determine if alert should be sent
-            should_alert = current_status.should_send_alert(unreachable_timeout)
-            is_interrupted = (
-                current_status.is_interrupted_tracking_session()
-                if hasattr(current_status, "is_interrupted_tracking_session")
-                else False
-            )
-
-            # Additional check: Don't alert for legacy devices without run_id
-            # All new runs have run_id, so missing run_id indicates legacy device
-            if should_alert and new_status in ["stopped", "offline"] and not run_id:
-                self._logger.info(
-                    f"Suppressing alert for device {self._id} - legacy device without run_id"
-                )
-                should_alert = False
-
-            # Get debug info if available
-            debug_chain = getattr(current_status, "_debug_chain", "N/A")
-            debug_active_session = getattr(
-                current_status, "_debug_found_active_session", "N/A"
-            )
-            debug_intermediates = getattr(
-                current_status, "_debug_went_through_intermediates", "N/A"
-            )
-
-            self._logger.info(
-                f"Alert decision for {previous_status} -> {new_status}: "
-                f"should_alert={should_alert}, is_interrupted={is_interrupted}, "
-                f"user_triggered={current_status.is_user_triggered}, "
-                f"graceful={current_status.is_graceful_operation()}, "
-                f"trigger_source={current_status.trigger_source}"
-            )
-
-            if is_interrupted:
-                # Get experimental_info within this function scope
-                experimental_info_nested = self._info.get("experimental_info", {})
-                current_experimental_info = experimental_info_nested.get("current", {})
-                run_id_source = (
-                    "recovered from database"
-                    if run_id and not current_experimental_info.get("run_id")
-                    else "from experiment info" if run_id else "not available"
-                )
-                self._logger.info(
-                    f"Interrupted tracking analysis: "
-                    f"chain='{debug_chain}', "
-                    f"found_active_session={debug_active_session}, "
-                    f"went_through_intermediates={debug_intermediates}, "
-                    f"run_id={run_id} ({run_id_source})"
-                )
-
-            if not should_alert:
-                self._logger.debug(
-                    f"Alert suppressed for status change {previous_status} -> {new_status}"
-                )
-                return
-
-            # Send appropriate alerts based on status transition
             last_seen = datetime.datetime.fromtimestamp(
                 self._info.get("last_seen", time.time())
             )
-
-            if new_status == "stopped":
-                # Send stopped alert (DeviceStatus already filtered out tracking->stopped transitions)
-                self._logger.info(
-                    f"Sending device stopped alert for {device_name} (run_id: {run_id})"
-                )
-                success = self._notification_manager.send_device_stopped_alert(
-                    device_id=self._id,
-                    device_name=device_name,
-                    run_id=run_id,
-                    last_seen=last_seen,
-                )
-                if success:
-                    self._logger.info(
-                        f"Device stopped alert sent successfully for {device_name}"
-                    )
-                else:
-                    self._logger.error(
-                        f"Failed to send device stopped alert for {device_name}"
-                    )
-            elif new_status == "unreached":
-                # Send unreachable alert (DeviceStatus already checked timeout)
-                success = self._notification_manager.send_device_unreachable_alert(
-                    device_id=self._id, device_name=device_name, last_seen=last_seen
-                )
-                if not success:
-                    self._logger.error(
-                        f"Failed to send device unreachable alert for {device_name}"
-                    )
-
+            self._logger.info(
+                f"Sending device stopped alert for {device_name} "
+                f"(run_id: {run_id}, reason: {reason})"
+            )
+            self._notification_manager.send_device_stopped_alert(
+                device_id=self._id,
+                device_name=device_name,
+                run_id=run_id,
+                last_seen=last_seen,
+            )
         except Exception as e:
-            self._logger.error(f"Error sending state transition alerts: {e}")
+            self._logger.error(f"Error dispatching stopped alert for {run_id}: {e}")
+
+    def _reconcile_run_state(
+        self, status: str, current_run_id: str | None, previous_status: str
+    ):
+        """Drive the run lifecycle from a poll observation.
+
+        Called every poll. Cheap when nothing changes.
+        """
+        is_active = status in DeviceStatus.ACTIVE_TRACKING_STATUSES
+
+        if is_active and current_run_id:
+            # Reset unreached timer; we have a fresh successful contact.
+            self._unreached_since = None
+
+            if self._active_run_id != current_run_id:
+                if self._active_run_id is not None:
+                    # Different run started without us seeing the old one stop.
+                    # Close the orphan, then attach to the new run.
+                    self._logger.info(
+                        f"Active run changed: {self._active_run_id} -> {current_run_id}"
+                    )
+                    self._finalise_active_run("superseded")
+                self._active_run_id = current_run_id
+                self._ensure_run_in_db(current_run_id, previous_status)
+            return
+
+        if status == "stopped":
+            # The device explicitly says it's idle. If we had an active run,
+            # decide whether the stop was user-initiated.
+            self._unreached_since = None
+            if self._active_run_id is not None:
+                grace = self._user_action_grace_seconds()
+                if self._edb.recent_intervention(self._id, within_seconds=grace):
+                    self._finalise_active_run("user_stop")
+                else:
+                    self._finalise_active_run("crash")
+            return
+
+        if status in ("unreached", "offline", "busy"):
+            # Start (or continue) the unreachable timer. Only finalise once we
+            # have been unreached for longer than the configured timeout —
+            # transient blips do not close a live run.
+            if self._unreached_since is None:
+                self._unreached_since = time.time()
+            if self._active_run_id is not None:
+                cfg = self._config.get_custom("alerts") or {}
+                timeout_minutes = int(cfg.get("unreachable_timeout_minutes", 20))
+                if time.time() - self._unreached_since > timeout_minutes * 60:
+                    grace = self._user_action_grace_seconds()
+                    if self._edb.recent_intervention(self._id, within_seconds=grace):
+                        self._finalise_active_run("user_stop")
+                    else:
+                        self._finalise_active_run("unreached_timeout")
+            return
+
+        # initialising / stopping / online — no run lifecycle event.
+
+    def _ensure_run_in_db(self, run_id: str, previous_status: str):
+        """Insert a runs row for ``run_id`` if it isn't already there.
+
+        Idempotent: re-attaching to a run we started in a previous scanner
+        session is a no-op.
+        """
+        try:
+            existing = self._edb.getRun(run_id)
+        except Exception:
+            existing = []
+        if existing:
+            return
+
+        current = self._info.get("experimental_info", {}).get("current", {}) or {}
+        user_name = current.get("name", "")
+        location = current.get("location", "")
+        self._logger.info(
+            f"Recording new run {run_id} for device {self._id} "
+            f"(was {previous_status})"
+        )
+        try:
+            self._edb.addRun(
+                run_id=run_id,
+                experiment_type="tracking",
+                ethoscope_name=self._info.get("name", ""),
+                ethoscope_id=self._id,
+                username=user_name,
+                user_id="",
+                location=location,
+                alert=True,
+                comments="",
+                experimental_data=self._info.get("backup_path", ""),
+            )
+        except Exception as e:
+            self._logger.error(f"Failed to addRun({run_id}): {e}")
 
     def _check_storage_warnings(self):
         """Check for storage warnings and send alerts if necessary."""
@@ -1592,9 +1498,10 @@ class EthoscopeScanner(DeviceScanner):
                     devices_info[device_id] = {
                         "name": device_name,
                         "id": device_id,
-                        "status": device_data.get(
-                            "status", "offline"
-                        ),  # Default to offline for database-only devices
+                        # Reason: a stored NULL status would otherwise leak
+                        # through .get()'s default; treat any falsy value as
+                        # offline for DB-only devices.
+                        "status": device_data.get("status") or "offline",
                         "ip": device_ip,
                         "last_ip": device_ip,
                         "time": device_data.get("last_seen", 0),
@@ -1696,11 +1603,8 @@ class EthoscopeScanner(DeviceScanner):
                         f"{ip}:{port} (was {existing_device.ip()}:{existing_device._port})"
                     )
                     existing_device._update_address(ip, port)
-                    existing_device.skip_scanning(False)
                     with existing_device._lock:
-                        existing_device._update_device_status(
-                            "offline", trigger_source="system"
-                        )
+                        existing_device._update_device_status("offline")
                         existing_device._info.update({"last_seen": time.time()})
                     return
 
@@ -1708,19 +1612,20 @@ class EthoscopeScanner(DeviceScanner):
             with self._lock:
                 for existing_device in self.devices:
                     if existing_device.ip() == ip:
-                        was_skipping = existing_device._skip_scanning
                         device_status = existing_device._device_status.status_name
+                        prev_errors = existing_device._consecutive_errors
 
                         self._logger.info(
-                            f"Ethoscope at {ip} already exists (was skipping: {was_skipping}, status: {device_status}), updating zeroconf info"
+                            f"Ethoscope at {ip} already exists "
+                            f"(status: {device_status}, errors: {prev_errors}), "
+                            f"updating zeroconf info"
                         )
 
                         if hasattr(existing_device, "zeroconf_name"):
                             existing_device.zeroconf_name = name
 
-                        # Reset error state and re-enable scanning in case it was offline
+                        # Reset error state so the next poll fires immediately
                         existing_device.reset_error_state()
-                        existing_device.skip_scanning(False)
 
                         # Force ID update to handle device renaming (ETHOSCOPE_000 -> new name)
                         # This is critical when devices are renamed via webUI
@@ -1749,14 +1654,9 @@ class EthoscopeScanner(DeviceScanner):
 
                         # Explicitly reset status to allow device info to be updated
                         with existing_device._lock:
-                            existing_device._update_device_status(
-                                "offline", trigger_source="system"
-                            )
+                            existing_device._update_device_status("offline")
                             existing_device._info.update({"last_seen": time.time()})
 
-                        self._logger.info(
-                            f"Re-enabled scanning for ethoscope at {ip} (was skipping: {was_skipping})"
-                        )
                         return
 
             # Create device with minimal blocking

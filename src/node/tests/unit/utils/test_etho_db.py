@@ -550,6 +550,70 @@ class TestIncubatorCRUD:
         incubator = populated_db.getIncubatorByName("Incubator_01", asdict=True)
         assert incubator["active"] == 0
 
+    def test_incubator_has_period_and_anchor_columns(self, test_db):
+        """Newly created incubators table includes the T-cycle columns."""
+        import sqlite3
+
+        conn = sqlite3.connect(test_db._db_name)
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({test_db._incubators_table_name})")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "light_period_minutes" in cols
+        assert "light_cycle_anchor" in cols
+
+    def test_add_incubator_with_period_and_anchor(self, test_db):
+        """Period and anchor round-trip through addIncubator."""
+        result = test_db.addIncubator(
+            name="T21_box",
+            location="Room T",
+            light_period_minutes=1260,
+            light_cycle_anchor=1715000000.5,
+        )
+        assert result > 0
+
+        inc = test_db.getIncubatorByName("T21_box", asdict=True)
+        assert inc["light_period_minutes"] == 1260
+        assert inc["light_cycle_anchor"] == 1715000000.5
+
+    def test_add_incubator_default_period_no_anchor(self, test_db):
+        """Defaults: period 1440 and NULL anchor when not supplied."""
+        result = test_db.addIncubator(name="Default_box")
+        assert result > 0
+
+        inc = test_db.getIncubatorByName("Default_box", asdict=True)
+        assert inc["light_period_minutes"] == 1440
+        assert inc["light_cycle_anchor"] is None
+
+    def test_update_incubator_set_period_and_anchor(self, populated_db):
+        """Update can set both period and anchor."""
+        result = populated_db.updateIncubator(
+            name="Incubator_01",
+            light_period_minutes=1680,
+            light_cycle_anchor=1715000000.0,
+        )
+        assert result >= 0
+
+        inc = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert inc["light_period_minutes"] == 1680
+        assert inc["light_cycle_anchor"] == 1715000000.0
+
+    def test_update_incubator_clear_anchor_with_none(self, populated_db):
+        """Passing anchor=None clears it back to NULL."""
+        populated_db.updateIncubator(
+            name="Incubator_01",
+            light_cycle_anchor=1715000000.0,
+        )
+        result = populated_db.updateIncubator(
+            name="Incubator_01",
+            light_cycle_anchor=None,
+        )
+        assert result >= 0
+
+        inc = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert inc["light_cycle_anchor"] is None
+
 
 class TestDeviceManagement:
     """Test ethoscope device management."""
@@ -753,6 +817,40 @@ class TestAlertOperations:
         # Filter by type
         alerts = test_db.getAlertHistory(alert_type="type1", asdict=False)
         assert len(alerts) == 2
+
+
+class TestDeviceInterventions:
+    """``device_interventions`` is the persisted audit log of user-originated
+    actions that should suppress run-termination alerts (web-UI stop, firmware
+    update, bulk updater operations). The scanner consults it on every run
+    finalisation. These tests cover the two methods that interact with it.
+    """
+
+    def test_record_intervention_inserts_row(self, test_db):
+        rowid = test_db.recordIntervention("device_001", "stop")
+        assert rowid > 0
+
+    def test_recent_intervention_returns_true_within_window(self, test_db):
+        test_db.recordIntervention("device_001", "reboot")
+        assert test_db.recent_intervention("device_001", within_seconds=60) is True
+
+    def test_recent_intervention_returns_false_outside_window(self, test_db):
+        # Insert with a backdated created_at, then query a tighter window.
+        import datetime
+
+        backdated = datetime.datetime.now() - datetime.timedelta(seconds=120)
+        test_db.executeSQL(
+            "INSERT INTO device_interventions (device_id, action, created_at) "
+            "VALUES (?, ?, ?)",
+            ("device_001", "reboot", backdated),
+        )
+        assert test_db.recent_intervention("device_001", within_seconds=30) is False
+        assert test_db.recent_intervention("device_001", within_seconds=300) is True
+
+    def test_recent_intervention_is_per_device(self, test_db):
+        test_db.recordIntervention("device_A", "stop")
+        assert test_db.recent_intervention("device_A", within_seconds=60) is True
+        assert test_db.recent_intervention("device_B", within_seconds=60) is False
 
 
 class TestPINAuthentication:
@@ -1232,6 +1330,42 @@ class TestDatabaseMigrations:
             incubators = db.getAllIncubators()
             assert len(incubators) >= 2
 
+    def test_migrate_incubators_add_period_and_anchor(self, temp_config_dir):
+        """Migration adds period+anchor columns to pre-existing incubators table."""
+        db_path = os.path.join(temp_config_dir, "ethoscope-node.db")
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            CREATE TABLE incubators (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                location TEXT,
+                owner TEXT,
+                description TEXT,
+                created TIMESTAMP NOT NULL,
+                active INTEGER DEFAULT 1,
+                lights_on TEXT DEFAULT '',
+                lights_off TEXT DEFAULT ''
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+
+        # Instantiating ExperimentalDB triggers migrations.
+        _ = ExperimentalDB(config_dir=temp_config_dir)
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("PRAGMA table_info(incubators)")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "light_period_minutes" in cols
+        assert "light_cycle_anchor" in cols
+
 
 class TestExperimentOperations:
     """Test experiment management operations."""
@@ -1600,8 +1734,17 @@ class TestAdvancedCleanupOperations:
             status="offline",
         )
 
-        # Create old running session
+        # Force last_seen to be genuinely old. updateEthoscopes always bumps
+        # last_seen to "now"; cleanup now requires the device to actually be
+        # stale before orphaning a running session.
         old_time = datetime.datetime.now() - datetime.timedelta(hours=3)
+        populated_db.executeSQL(
+            f"UPDATE {populated_db._ethoscopes_table_name} "
+            "SET last_seen = ? WHERE ethoscope_id = ?",
+            (old_time, "offline_device"),
+        )
+
+        # Create old running session
         populated_db.executeSQL(
             f"INSERT INTO {populated_db._runs_table_name} "
             "(run_id, type, ethoscope_name, ethoscope_id, user_name, user_id, "
@@ -1630,6 +1773,46 @@ class TestAdvancedCleanupOperations:
         run = populated_db.getRun("orphan_run", asdict=False)
         assert run[0]["status"] == "stopped"
         assert "Orphaned session cleanup" in run[0]["problems"]
+
+    def test_cleanup_skips_recently_seen_devices(self, populated_db):
+        """A device whose last_seen is fresh must not have its run orphaned.
+
+        Reason: at node startup the cached status can read 'offline' even for
+        a device that is actually still tracking. Closing such a run poisons
+        end_time and silently suppresses the eventual real stop alert.
+        """
+        populated_db.updateEthoscopes(
+            ethoscope_id="recently_seen_device",
+            ethoscope_name="RECENT_DEVICE",
+            status="offline",
+        )
+
+        # last_seen is "now" by virtue of updateEthoscopes — leave it fresh.
+        old_start = datetime.datetime.now() - datetime.timedelta(hours=3)
+        populated_db.executeSQL(
+            f"INSERT INTO {populated_db._runs_table_name} "
+            "(run_id, type, ethoscope_name, ethoscope_id, user_name, user_id, "
+            "location, start_time, end_time, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "live_run",
+                "tracking",
+                "RECENT_DEVICE",
+                "recently_seen_device",
+                "test_user",
+                1,
+                "Room A",
+                old_start,
+                0,
+                "running",
+            ),
+        )
+
+        populated_db.cleanup_orphaned_running_sessions(min_age_hours=1)
+
+        run = populated_db.getRun("live_run", asdict=False)
+        assert run[0]["status"] == "running"
+        assert run[0]["end_time"] in (0, "0", None)
 
     def test_parse_session_time_various_formats(self, test_db):
         """Test parsing session times in various formats."""

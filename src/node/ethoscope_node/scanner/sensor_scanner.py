@@ -109,7 +109,7 @@ class Sensor(BaseDevice):
 
             with self._lock:
                 self._info.update(resp)
-                self._update_device_status("online", trigger_source="system")
+                self._update_device_status("online")
                 self._info["last_seen"] = time.time()
 
             # Save to CSV if enabled

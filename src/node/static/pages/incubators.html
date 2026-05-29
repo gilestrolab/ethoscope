@@ -90,6 +90,11 @@
                       ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
                     <i class="fa fa-sun"></i>
                     {{formatTime(incubator.lights_on)}} &ndash; {{formatTime(incubator.lights_off)}}
+                    <span ng-if="incubator.light_period_minutes && incubator.light_period_minutes !== 1440"
+                          style="font-size: 0.85em; color: #888; margin-left: 4px;"
+                          title="Cycle length">
+                        T{{incubator.light_period_minutes / 60}}h
+                    </span>
                 </span>
                 <span ng-if="!incubator.lights_on || !incubator.lights_off" style="color: grey;">
                     —
@@ -145,7 +150,8 @@
                                        name="name"
                                        ng-model="selectedIncubator.name"
                                        placeholder="Incubator 1"
-                                       required>
+                                       required
+                                       ng-disabled="isIncubatorLocked()">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -191,42 +197,104 @@
                                 <i class="fa fa-sun"></i> Light Regime (LD Cycle)
                             </label>
                             <small class="form-text text-muted" style="margin-top: -5px; margin-bottom: 10px;">
-                                Set the daily light on/off times for this incubator (node/device UTC time). Experiments will not start if the device clock is out of sync. Leave empty for no light control.
+                                <span ng-if="selectedIncubator.light_period_hours == 24 || !selectedIncubator.light_period_hours">
+                                    24 h cycle: lights on/off are wall-clock times (UTC). Experiments will not start if the device clock is out of sync.
+                                </span>
+                                <span ng-if="selectedIncubator.light_period_hours && selectedIncubator.light_period_hours != 24">
+                                    T-cycle: lights on/off are offsets from the cycle anchor (ZT0). All devices in this incubator share the same anchor so they stay phase-locked.
+                                </span>
+                                Leave times empty for no light control.
                             </small>
                         </div>
-                        <div class="col-md-4">
+
+                        <!-- Lock banner shown when devices are running in this incubator -->
+                        <div class="col-12" ng-if="isIncubatorLocked()">
+                            <div class="alert alert-warning" style="padding: 8px 12px;">
+                                <i class="fa fa-lock"></i>
+                                <strong>Light schedule locked.</strong>
+                                {{runningDevicesInIncubator(selectedIncubator._originalName).length}}
+                                device(s) running here:
+                                {{runningDevicesInIncubator(selectedIncubator._originalName).join(', ')}}.
+                                Stop these experiments to edit the light schedule.
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label class="form-label">Period (hours)</label>
+                                <input type="number"
+                                       class="form-control"
+                                       name="light_period_hours"
+                                       ng-model="selectedIncubator.light_period_hours"
+                                       min="1"
+                                       max="48"
+                                       step="1"
+                                       placeholder="24"
+                                       ng-disabled="isIncubatorLocked()">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
                             <div class="form-group">
                                 <label class="form-label">Lights On</label>
                                 <input type="time"
                                        class="form-control"
                                        name="lights_on"
                                        ng-model="selectedIncubator.lights_on"
-                                       placeholder="07:00">
+                                       placeholder="07:00"
+                                       ng-disabled="isIncubatorLocked()">
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="form-group">
                                 <label class="form-label">Lights Off</label>
                                 <input type="time"
                                        class="form-control"
                                        name="lights_off"
                                        ng-model="selectedIncubator.lights_off"
-                                       placeholder="19:00">
+                                       placeholder="19:00"
+                                       ng-disabled="isIncubatorLocked()">
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="form-group">
                                 <label class="form-label">Preview</label>
                                 <div class="form-control-plaintext" style="padding-top: 7px;">
                                     <span ng-if="selectedIncubator.lights_on && selectedIncubator.lights_off">
                                         <i class="fa fa-sun" style="color: #f0ad4e;"></i>
                                         {{formatTime(selectedIncubator.lights_on)}} &ndash; {{formatTime(selectedIncubator.lights_off)}}
+                                        <span ng-if="selectedIncubator.light_period_hours && selectedIncubator.light_period_hours != 24"
+                                              style="font-size: 0.85em; color: #888;">
+                                            T{{selectedIncubator.light_period_hours}}h
+                                        </span>
                                     </span>
                                     <span ng-if="!selectedIncubator.lights_on || !selectedIncubator.lights_off" style="color: grey;">
                                         No light regime set
                                     </span>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Cycle phase / anchor (T-cycles only) -->
+                        <div class="col-12"
+                             ng-if="selectedIncubator.light_period_hours && selectedIncubator.light_period_hours != 24"
+                             style="margin-top: 10px;">
+                            <div class="form-group" style="display: flex; align-items: center; gap: 12px;">
+                                <label class="form-label" style="margin: 0;">Cycle anchor (ZT0):</label>
+                                <span style="font-family: monospace;">
+                                    {{formatAnchor(selectedIncubator.light_cycle_anchor)}}
+                                </span>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        ng-click="resetIncubatorAnchor()"
+                                        ng-disabled="isIncubatorLocked() || !selectedIncubator._editing"
+                                        title="Re-stamp the cycle anchor to the current moment. Use to phase-lock the cycle to 'now'.">
+                                    <i class="fa fa-rotate-right"></i> Reset to now
+                                </button>
+                            </div>
+                            <small class="form-text text-muted">
+                                All devices started in this incubator will be phase-locked to this anchor.
+                                Editing it (or the period) requires that no device is currently running here.
+                            </small>
                         </div>
                     </div>
 
@@ -237,7 +305,8 @@
                                     <input type="checkbox"
                                            class="toggle-check-input"
                                            name="active"
-                                           ng-model="selectedIncubator.active">
+                                           ng-model="selectedIncubator.active"
+                                           ng-disabled="isIncubatorLocked()">
                                     <span class="toggle-check-text"></span>
                                 </label>
                             </div>

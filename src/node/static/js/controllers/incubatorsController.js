@@ -1,9 +1,14 @@
 (function(){
     var incubatorsController = function($scope, $http, $timeout){
 
+        // Statuses that count as "device is currently running an experiment"
+        // for the purpose of locking incubator edits. Mirrors the API.
+        var RUNNING_STATUSES = ['running', 'recording', 'streaming', 'initialising'];
+
         // Initialize scope variables
         $scope.incubators = {};
         $scope.sensors = {};
+        $scope.devices = {};       // keyed by device id; carries status + experimental_info
         $scope.activeUsers = [];
         $scope.selectedIncubator = {};
         $scope.incubatorToDelete = null;
@@ -82,6 +87,43 @@
                 });
         };
 
+        // Load device list so the modal can show a "locked while running" banner.
+        var loadDevices = function() {
+            $http.get('/node/ethoscopes')
+                .then(function(response) {
+                    $scope.devices = response.data || {};
+                })
+                .catch(function(error) {
+                    console.error('Error loading ethoscopes:', error);
+                });
+        };
+
+        // Return the array of device names currently running in the given
+        // incubator (matched by experimental_info.current.location).
+        $scope.runningDevicesInIncubator = function(incubatorName) {
+            var matches = [];
+            if (!incubatorName || !$scope.devices) return matches;
+            for (var id in $scope.devices) {
+                var dev = $scope.devices[id];
+                if (!dev) continue;
+                var status = (dev.status || '').toLowerCase();
+                if (RUNNING_STATUSES.indexOf(status) === -1) continue;
+                var expInfo = dev.experimental_info || {};
+                var current = expInfo.current || expInfo;
+                if (current && current.location === incubatorName) {
+                    matches.push(dev.name || dev.id || id);
+                }
+            }
+            return matches;
+        };
+
+        // True if the currently selected incubator has running devices.
+        $scope.isIncubatorLocked = function() {
+            if (!$scope.selectedIncubator || !$scope.selectedIncubator._editing) return false;
+            var name = $scope.selectedIncubator._originalName || $scope.selectedIncubator.name;
+            return $scope.runningDevicesInIncubator(name).length > 0;
+        };
+
         // Get sensor associated with an incubator (matched by location field)
         $scope.getSensorForIncubator = function(incubatorName) {
             if (!incubatorName || !$scope.sensors) return null;
@@ -126,6 +168,8 @@
                 active: true,
                 lights_on: null,
                 lights_off: null,
+                light_period_hours: 24,
+                light_cycle_anchor: null,
                 owner: ''
             };
         };
@@ -142,6 +186,49 @@
             // Convert time strings ("HH:MM") to Date objects for input[type=time]
             $scope.selectedIncubator.lights_on = timeStringToDate(incubator.lights_on);
             $scope.selectedIncubator.lights_off = timeStringToDate(incubator.lights_off);
+
+            // Period: stored in minutes, edited in whole hours.
+            var periodMin = parseInt(incubator.light_period_minutes, 10);
+            if (!Number.isFinite(periodMin) || periodMin <= 0) periodMin = 1440;
+            $scope.selectedIncubator.light_period_hours = Math.round(periodMin / 60);
+
+            // Anchor: keep raw unix timestamp (REAL in DB); template renders it.
+            $scope.selectedIncubator.light_cycle_anchor =
+                (incubator.light_cycle_anchor !== undefined && incubator.light_cycle_anchor !== null)
+                    ? Number(incubator.light_cycle_anchor)
+                    : null;
+        };
+
+        // Format a unix timestamp for display in the modal. Returns '—' if absent.
+        $scope.formatAnchor = function(ts) {
+            if (ts === null || ts === undefined || ts === '') return '—';
+            var d = new Date(Number(ts) * 1000);
+            if (isNaN(d.getTime())) return '—';
+            return d.toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
+        };
+
+        // Re-stamp the cycle anchor on the server. Used to phase-lock a
+        // T-cycle (or a 24 h cycle) to "now". Blocked server-side if devices
+        // are running in this incubator.
+        $scope.resetIncubatorAnchor = function() {
+            var name = $scope.selectedIncubator._originalName || $scope.selectedIncubator.name;
+            if (!name) return;
+            $http.post('/setup/reset-incubator-anchor', { name: name })
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        $scope.selectedIncubator.light_cycle_anchor =
+                            Number(response.data.light_cycle_anchor);
+                        loadIncubators();
+                    } else if (response.data.code === 'incubator_busy') {
+                        alert('Cannot reset cycle: device(s) currently running — '
+                              + (response.data.devices || []).join(', '));
+                    } else {
+                        alert('Error resetting cycle anchor: ' + (response.data.message || 'Unknown error'));
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error resetting cycle anchor:', error);
+                });
         };
 
         // Save incubator (add or update)
@@ -152,10 +239,20 @@
             var lightsOn = dateToTimeString(data.lights_on);
             var lightsOff = dateToTimeString(data.lights_off);
 
+            // Period in hours → minutes. Reject NaN/non-finite back to 24h.
+            var hours = parseInt(data.light_period_hours, 10);
+            if (!Number.isFinite(hours) || hours <= 0) hours = 24;
+            var periodMinutes = hours * 60;
+
             var onSuccess = function() {
                 $('#incubatorModal').modal('hide');
                 loadIncubators();
                 $scope.clearSelectedIncubator();
+            };
+
+            var onLocked = function(devices) {
+                alert('Cannot save: light schedule is locked because device(s) '
+                      + 'currently running in this incubator: ' + (devices || []).join(', '));
             };
 
             if (data._editing) {
@@ -167,13 +264,22 @@
                     description: data.description || '',
                     lights_on: lightsOn,
                     lights_off: lightsOff,
+                    light_period_minutes: periodMinutes,
                     active: data.active ? 1 : 0
                 };
+                // Anchor is server-managed when period changes; only emit it
+                // explicitly if the user has one (so we don't accidentally
+                // clear an existing T-cycle anchor by omission).
+                if (data.light_cycle_anchor !== null && data.light_cycle_anchor !== undefined) {
+                    updatePayload.light_cycle_anchor = Number(data.light_cycle_anchor);
+                }
 
                 $http.post('/setup/update-incubator', updatePayload)
                     .then(function(response) {
                         if (response.data.result === 'success') {
                             onSuccess();
+                        } else if (response.data.code === 'incubator_busy') {
+                            onLocked(response.data.devices);
                         } else {
                             alert('Error updating incubator: ' + (response.data.message || 'Unknown error'));
                         }
@@ -189,7 +295,8 @@
                     owner: data.owner || '',
                     description: data.description || '',
                     lights_on: lightsOn,
-                    lights_off: lightsOff
+                    lights_off: lightsOff,
+                    light_period_minutes: periodMinutes
                 };
 
                 $http.post('/setup/add-incubator', addPayload)
@@ -267,6 +374,7 @@
         loadIncubators();
         loadUsers();
         loadSensors();
+        loadDevices();
     };
 
     angular.module('flyApp').controller('incubatorsController', incubatorsController);

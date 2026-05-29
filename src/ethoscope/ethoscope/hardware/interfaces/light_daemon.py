@@ -109,29 +109,67 @@ class LightController:
             Tuple of (lights_on, lights_off, active) where times are
             strings in HH:MM format and active is a boolean.
             Returns ("", "", False) on any error.
+
+        Note: kept as a 3-tuple for backwards compatibility. For the full
+        schedule including period and anchor, use ``read_schedule_full()``.
+        """
+        full = self.read_schedule_full()
+        if not full.get("active"):
+            return ("", "", False)
+        return (full["lights_on"], full["lights_off"], True)
+
+    def read_schedule_full(self):
+        """
+        Read and parse the schedule config file, including T-cycle fields.
+
+        Returns:
+            Dict with keys:
+              - active (bool)
+              - lights_on, lights_off (HH:MM strings)
+              - period_minutes (int, 1440 = wall-clock 24h)
+              - anchor (float unix ts, or None for wall-clock midnight mode)
+            Returns ``{"active": False}`` on any error or inactive schedule.
         """
         try:
             if not os.path.exists(self.config_file):
-                return ("", "", False)
+                return {"active": False}
 
             with open(self.config_file) as f:
                 data = json.load(f)
 
-            active = data.get("active", False)
-            if not active:
-                return ("", "", False)
+            if not data.get("active", False):
+                return {"active": False}
 
             lights_on = data.get("lights_on", "")
             lights_off = data.get("lights_off", "")
-
             if not lights_on or not lights_off:
-                return ("", "", False)
+                return {"active": False}
 
-            return (lights_on, lights_off, True)
+            period_raw = data.get("period_minutes")
+            try:
+                period_minutes = int(period_raw) if period_raw is not None else 1440
+            except (TypeError, ValueError):
+                period_minutes = 1440
+            if period_minutes <= 0:
+                period_minutes = 1440
+
+            anchor_raw = data.get("anchor")
+            try:
+                anchor = float(anchor_raw) if anchor_raw is not None else None
+            except (TypeError, ValueError):
+                anchor = None
+
+            return {
+                "active": True,
+                "lights_on": lights_on,
+                "lights_off": lights_off,
+                "period_minutes": period_minutes,
+                "anchor": anchor,
+            }
 
         except (json.JSONDecodeError, OSError) as e:
             logging.warning("Failed to read schedule config: %s", e)
-            return ("", "", False)
+            return {"active": False}
 
     @staticmethod
     def parse_time(time_str):
@@ -151,39 +189,91 @@ class LightController:
             return None
 
     @staticmethod
-    def should_light_be_on(lights_on_str, lights_off_str, now=None):
+    def should_light_be_on(
+        lights_on_str,
+        lights_off_str,
+        now=None,
+        period_minutes=None,
+        anchor=None,
+    ):
         """
-        Determine if the light should be on based on current time and schedule.
+        Determine if the light should be on for the given schedule.
 
-        Handles schedules that cross midnight (e.g., on at 22:00, off at 06:00).
+        Two modes, picked automatically:
+
+        - **Wall-clock mode** (default, used when ``anchor`` is None and
+          period_minutes is None or 1440): lights_on/lights_off are HH:MM
+          times of day, cycle repeats every 24 h anchored to local midnight.
+          Handles schedules that cross midnight (e.g. 22:00–06:00).
+        - **Anchored / T-cycle mode**: lights_on/lights_off are HH:MM
+          *offsets* into a cycle of length ``period_minutes`` starting at
+          unix timestamp ``anchor``. Used for non-24 h cycles or to
+          phase-lock a 24 h cycle to a chosen wall-clock moment.
 
         Args:
-            lights_on_str: HH:MM string for lights-on time.
-            lights_off_str: HH:MM string for lights-off time.
-            now: Optional datetime.time for testing. Defaults to current local time.
+            lights_on_str: HH:MM string for lights-on.
+            lights_off_str: HH:MM string for lights-off.
+            now: Optional override for the current moment. In wall-clock
+                mode accepts a ``datetime.time``; in anchored mode accepts a
+                ``datetime.datetime`` or a unix timestamp (float).
+            period_minutes: Cycle length in minutes. None or 1440 with no
+                anchor → wall-clock mode.
+            anchor: Unix timestamp marking the start of the cycle (ZT0).
+                Required for non-24 h periods.
 
         Returns:
-            True if light should be on, False otherwise.
-            Returns False if times cannot be parsed.
+            True if the light should be on, False otherwise (including any
+            unparseable inputs).
         """
         on_time = LightController.parse_time(lights_on_str)
         off_time = LightController.parse_time(lights_off_str)
-
         if on_time is None or off_time is None:
             return False
 
-        if now is None:
-            now = datetime.datetime.now().time()
+        on_seconds = on_time.hour * 3600 + on_time.minute * 60
+        off_seconds = off_time.hour * 3600 + off_time.minute * 60
 
-        if on_time == off_time:
-            # Same on/off time means always on (24h light)
-            return True
-        elif on_time < off_time:
-            # Normal schedule (e.g., 07:00-19:00)
-            return on_time <= now < off_time
+        # Pick mode. Anchored mode is used iff an anchor is supplied or the
+        # period is non-24 h. A non-24 h period without an anchor is invalid
+        # — refuse rather than silently fall back to a phase nobody asked for.
+        use_anchored = anchor is not None or (
+            period_minutes is not None and int(period_minutes) != 1440
+        )
+
+        if use_anchored:
+            if anchor is None:
+                return False
+            try:
+                period_s = int(period_minutes) * 60 if period_minutes else 86400
+            except (TypeError, ValueError):
+                return False
+            if period_s <= 0:
+                return False
+            if isinstance(now, datetime.datetime):
+                now_ts = now.timestamp()
+            elif isinstance(now, (int, float)):
+                now_ts = float(now)
+            else:
+                now_ts = time.time()
+            phase = (now_ts - float(anchor)) % period_s
+            current_seconds = phase
         else:
-            # Midnight-crossing schedule (e.g., 22:00-06:00)
-            return now >= on_time or now < off_time
+            if isinstance(now, datetime.datetime):
+                t = now.time()
+            elif isinstance(now, datetime.time):
+                t = now
+            else:
+                t = datetime.datetime.now().time()
+            current_seconds = t.hour * 3600 + t.minute * 60 + t.second
+
+        if on_seconds == off_seconds:
+            # Same on/off time means always on (24h light).
+            return True
+        if on_seconds < off_seconds:
+            return on_seconds <= current_seconds < off_seconds
+        # Wrap-around (crosses cycle end): e.g. 22:00 → 06:00 in 24 h mode,
+        # or 18:00 → 02:00 within a 21 h cycle.
+        return current_seconds >= on_seconds or current_seconds < off_seconds
 
     def set_force(self, value):
         """
@@ -199,14 +289,16 @@ class LightController:
         with self._lock:
             force = self._force
             led = self._current_state
-        lights_on, lights_off, active = self.read_schedule()
+        sched = self.read_schedule_full()
         return {
             "led": "on" if led is True else "off" if led is False else "unknown",
             "mode": "forced" if force is not None else "schedule",
             "force": None if force is None else ("on" if force else "off"),
-            "schedule_active": active,
-            "lights_on": lights_on,
-            "lights_off": lights_off,
+            "schedule_active": sched.get("active", False),
+            "lights_on": sched.get("lights_on", ""),
+            "lights_off": sched.get("lights_off", ""),
+            "period_minutes": sched.get("period_minutes"),
+            "anchor": sched.get("anchor"),
         }
 
     def _handle_command(self, cmd):
@@ -263,7 +355,7 @@ class LightController:
         while self._running and self._server_sock is not None:
             try:
                 conn, _ = self._server_sock.accept()
-            except socket.timeout:
+            except TimeoutError:
                 continue
             except OSError:
                 break
@@ -321,12 +413,16 @@ class LightController:
                 if force is not None:
                     desired = force
                 else:
-                    lights_on, lights_off, active = self.read_schedule()
-                    desired = (
-                        self.should_light_be_on(lights_on, lights_off)
-                        if active
-                        else False
-                    )
+                    sched = self.read_schedule_full()
+                    if sched.get("active"):
+                        desired = self.should_light_be_on(
+                            sched["lights_on"],
+                            sched["lights_off"],
+                            period_minutes=sched.get("period_minutes"),
+                            anchor=sched.get("anchor"),
+                        )
+                    else:
+                        desired = False
 
                 self.set_led(desired)
 
@@ -379,7 +475,7 @@ class LightDaemonClient:
                 sock.close()
         except (FileNotFoundError, ConnectionRefusedError) as e:
             raise LightDaemonUnavailable(str(e)) from e
-        except socket.timeout as e:
+        except TimeoutError as e:
             raise LightDaemonUnavailable("timeout talking to light daemon") from e
         except OSError as e:
             raise LightDaemonUnavailable(str(e)) from e

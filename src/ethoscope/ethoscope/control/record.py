@@ -315,6 +315,7 @@ class GeneralVideoRecorder(DescribedObject):
             bitrate,
             quality,
             stream,
+            record_video=record_video,
         )
 
     def start_recording(self):

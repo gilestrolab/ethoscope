@@ -104,19 +104,51 @@ repos:
         args:
           - -c
           - |
-            if [ -f .venv/bin/activate ]; then
-              source .venv/bin/activate
-              for file in "$@"; do
-                python -c "import sys; import importlib.util; spec = importlib.util.spec_from_file_location('module', '$file'); module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)" 2>&1 && echo "✓ $file" || {
-                  echo "✗ $file: Import failed"
-                  echo "  Hint: Check if all imports can resolve - may be missing dependencies or cross-package imports"
-                  exit 1
-                }
-              done
-            else
+            # Verify each staged Python file imports cleanly. Files using
+            # relative imports (`from ..foo import bar`) cannot be loaded via
+            # spec_from_file_location — they have to be imported by their
+            # dotted module path from the appropriate package root.
+            if [ ! -f .venv/bin/activate ]; then
               echo "⚠ Skipping import check (venv not found at .venv)"
               echo "  Hint: Create venv with: python -m venv .venv && source .venv/bin/activate && pip install -e src/ethoscope[dev] && pip install -e src/node[dev]"
+              exit 0
             fi
+            source .venv/bin/activate
+            failed=0
+            for file in "$@"; do
+              case "$file" in
+                src/node/*)      pkg_root=src/node ;;
+                src/ethoscope/*) pkg_root=src/ethoscope ;;
+                src/updater/*)   pkg_root=src/updater ;;
+                *)               pkg_root="" ;;
+              esac
+              if [ -n "$pkg_root" ]; then
+                rel=${file#"$pkg_root"/}
+                module=${rel%.py}
+                module=${module//\//.}
+                # Reason: standalone scripts (src/*/scripts/*.py) often
+                # import sibling modules by bare name (e.g. `from
+                # ethoclient import ...`), which works at runtime because
+                # systemd invokes them with cwd in their own directory.
+                # Add that directory to PYTHONPATH so the import check
+                # mirrors runtime behaviour. ONLY do this for scripts/
+                # files — for regular package modules, adding the file's
+                # directory shadows stdlib packages that happen to share
+                # a name (e.g. notifications/email.py vs stdlib email).
+                extra_path=""
+                case "$file" in
+                  */scripts/*) extra_path="$OLDPWD/$(dirname "$file"):" ;;
+                esac
+                (cd "$pkg_root" && PYTHONPATH="${extra_path}$PYTHONPATH" python -c "import importlib; importlib.import_module('$module')") 2>&1 \
+                  && echo "✓ $file" \
+                  || { echo "✗ $file: Import failed"; failed=1; }
+              else
+                python -c "import sys; import importlib.util; spec = importlib.util.spec_from_file_location('module', '$file'); module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)" 2>&1 \
+                  && echo "✓ $file" \
+                  || { echo "✗ $file: Import failed"; failed=1; }
+              fi
+            done
+            exit $failed
         files: ^(src/|scripts/).*\.py$
         exclude: (__init__\.py$)
         pass_filenames: true

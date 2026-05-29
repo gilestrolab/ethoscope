@@ -5,6 +5,7 @@ Handles installation wizard and first-time setup functionality.
 """
 
 import os
+import time
 from pathlib import Path
 
 import bottle
@@ -12,6 +13,25 @@ import bottle
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
 from .base import BaseAPI, error_decorator
+
+# Statuses indicating a device is actively running an experiment. Schedule
+# edits to the device's incubator are locked while any device in the
+# incubator is in one of these states.
+_RUNNING_STATUSES = frozenset({"running", "recording", "streaming", "initialising"})
+
+# Incubator fields that affect any running experiment's light cycle, the
+# incubator's identity, or its data flow. These cannot be edited while any
+# device in the incubator is active.
+_LOCKED_INCUBATOR_FIELDS = frozenset(
+    {
+        "name",
+        "active",
+        "lights_on",
+        "lights_off",
+        "light_period_minutes",
+        "light_cycle_anchor",
+    }
+)
 
 
 class SetupAPI(BaseAPI):
@@ -56,6 +76,8 @@ class SetupAPI(BaseAPI):
             return self._setup_update_incubator()
         elif action == "delete-incubator":
             return self._setup_delete_incubator()
+        elif action == "reset-incubator-anchor":
+            return self._setup_reset_incubator_anchor()
         elif action == "add-sensor":
             return self._setup_add_sensor()
         elif action == "update-sensor":
@@ -433,6 +455,83 @@ class SetupAPI(BaseAPI):
             self.logger.error(f"Error updating user: {e}")
             return {"result": "error", "message": str(e)}
 
+    def _devices_running_in_incubator(self, incubator_name):
+        """
+        Return a list of machine names whose current experiment is hosted in
+        the named incubator.
+
+        A device counts as 'running in this incubator' when its last-known
+        status is one of _RUNNING_STATUSES and the `location` field on its
+        current experimental_info matches `incubator_name`. Using last-known
+        state means a device that was running and is now briefly offline
+        still counts — exactly the conservative semantics we want for an
+        edit-lock.
+
+        Returns an empty list if no scanner is available or no match.
+        """
+        if not incubator_name or self.device_scanner is None:
+            return []
+        try:
+            devices = self.device_scanner.get_all_devices_info(include_inactive=True)
+        except Exception as e:
+            self.logger.warning(f"Could not query device scanner: {e}")
+            return []
+
+        matching = []
+        for info in devices.values():
+            status = (info.get("status") or "").lower()
+            if status not in _RUNNING_STATUSES:
+                continue
+
+            exp_info = info.get("experimental_info") or {}
+            # experimental_info may be flat or nested-with-current; handle both.
+            current = exp_info.get("current", exp_info)
+            if not isinstance(current, dict):
+                continue
+            if current.get("location") == incubator_name:
+                matching.append(info.get("name") or info.get("id", "?"))
+        return matching
+
+    def _busy_error(self, devices):
+        """Standard 409-style payload for a locked incubator edit."""
+        bottle.response.status = 409
+        return {
+            "result": "error",
+            "code": "incubator_busy",
+            "message": (
+                f"Cannot edit light schedule: {len(devices)} device(s) "
+                f"currently running in this incubator."
+            ),
+            "devices": devices,
+        }
+
+    @staticmethod
+    def _normalise_period_and_anchor(period_minutes, anchor):
+        """
+        Apply coherence rules between period and anchor.
+
+        - period 1440 (24h) implies anchor=None (legacy wall-clock midnight).
+        - period != 1440 with no anchor → stamp anchor=now (so all devices in
+          this incubator share the same ZT0 from this moment on).
+        - any other combination passes through unchanged.
+        """
+        try:
+            period = int(period_minutes) if period_minutes is not None else 1440
+        except (TypeError, ValueError):
+            period = 1440
+        if period <= 0:
+            period = 1440
+
+        if period == 1440:
+            return period, None
+
+        if anchor is None:
+            return period, time.time()
+        try:
+            return period, float(anchor)
+        except (TypeError, ValueError):
+            return period, time.time()
+
     def _setup_add_incubator(self):
         """Add incubator."""
         data = self.get_request_json()
@@ -440,7 +539,11 @@ class SetupAPI(BaseAPI):
         try:
             db = ExperimentalDB()
 
-            # Get incubator data
+            period, anchor = self._normalise_period_and_anchor(
+                data.get("light_period_minutes"),
+                data.get("light_cycle_anchor"),
+            )
+
             incubator_data = {
                 "name": data.get("name", "").strip(),
                 "location": data.get("location", "").strip(),
@@ -449,13 +552,13 @@ class SetupAPI(BaseAPI):
                 "active": 1,
                 "lights_on": data.get("lights_on", "").strip(),
                 "lights_off": data.get("lights_off", "").strip(),
+                "light_period_minutes": period,
+                "light_cycle_anchor": anchor,
             }
 
-            # Validate required fields
             if not incubator_data["name"]:
                 return {"result": "error", "message": "Incubator name is required"}
 
-            # Add incubator
             result = db.addIncubator(**incubator_data)
 
             if result > 0:
@@ -472,13 +575,13 @@ class SetupAPI(BaseAPI):
             return {"result": "error", "message": str(e)}
 
     def _setup_update_incubator(self):
-        """Update incubator."""
+        """Update incubator. Light-schedule edits are rejected if any device
+        in the incubator is currently running."""
         data = self.get_request_json()
 
         try:
             db = ExperimentalDB()
 
-            # Get the original name to identify the incubator
             original_name = data.get("original_name", "").strip()
             if not original_name:
                 return {
@@ -486,7 +589,7 @@ class SetupAPI(BaseAPI):
                     "message": "Original incubator name is required for update",
                 }
 
-            # Get updated incubator data
+            # Build the patch from request payload.
             update_data = {}
             new_name = None
             if "name" in data and data["name"].strip():
@@ -506,16 +609,41 @@ class SetupAPI(BaseAPI):
             if "active" in data:
                 update_data["active"] = int(data["active"])
 
-            # Validate required fields
-            if new_name and not new_name:
-                return {"result": "error", "message": "Incubator name cannot be empty"}
+            # Period / anchor: merge with current row, then normalise so the
+            # period↔anchor invariant holds regardless of which field the user
+            # touched.
+            current = db.getIncubatorByName(original_name, asdict=True) or {}
+            period_supplied = "light_period_minutes" in data
+            anchor_supplied = "light_cycle_anchor" in data
+            if period_supplied or anchor_supplied:
+                period_in = (
+                    data["light_period_minutes"]
+                    if period_supplied
+                    else current.get("light_period_minutes", 1440)
+                )
+                anchor_in = (
+                    data["light_cycle_anchor"]
+                    if anchor_supplied
+                    else current.get("light_cycle_anchor")
+                )
+                period, anchor = self._normalise_period_and_anchor(period_in, anchor_in)
+                # Only emit fields that actually change to keep update minimal.
+                if period != current.get("light_period_minutes", 1440):
+                    update_data["light_period_minutes"] = period
+                if anchor != current.get("light_cycle_anchor"):
+                    update_data["light_cycle_anchor"] = anchor
 
-            # Update incubator by name
+            # Busy guard: if any locked field is in the patch and devices are
+            # running, reject the whole update.
+            touched_locked = _LOCKED_INCUBATOR_FIELDS & set(update_data.keys())
+            if touched_locked:
+                busy = self._devices_running_in_incubator(original_name)
+                if busy:
+                    return self._busy_error(busy)
+
             result = db.updateIncubator(name=original_name, **update_data)
 
-            if (
-                result >= 0
-            ):  # 0 means no changes needed, >= 1 means rows updated, -1 means error
+            if result >= 0:
                 return {
                     "result": "success",
                     "message": "Incubator updated successfully",
@@ -528,7 +656,7 @@ class SetupAPI(BaseAPI):
             return {"result": "error", "message": str(e)}
 
     def _setup_delete_incubator(self):
-        """Delete incubator permanently."""
+        """Delete incubator permanently. Blocked while devices are running."""
         data = self.get_request_json()
 
         try:
@@ -537,6 +665,10 @@ class SetupAPI(BaseAPI):
             name = data.get("name", "").strip()
             if not name:
                 return {"result": "error", "message": "Incubator name is required"}
+
+            busy = self._devices_running_in_incubator(name)
+            if busy:
+                return self._busy_error(busy)
 
             result = db.deleteIncubator(name=name)
 
@@ -550,6 +682,36 @@ class SetupAPI(BaseAPI):
 
         except Exception as e:
             self.logger.error(f"Error deleting incubator: {e}")
+            return {"result": "error", "message": str(e)}
+
+    def _setup_reset_incubator_anchor(self):
+        """Re-stamp the incubator's light_cycle_anchor to time.time().
+        Use to re-phase a T-cycle without changing on/off offsets. Blocked
+        while devices are running in the incubator."""
+        data = self.get_request_json()
+
+        try:
+            name = data.get("name", "").strip()
+            if not name:
+                return {"result": "error", "message": "Incubator name is required"}
+
+            busy = self._devices_running_in_incubator(name)
+            if busy:
+                return self._busy_error(busy)
+
+            db = ExperimentalDB()
+            now_ts = time.time()
+            result = db.updateIncubator(name=name, light_cycle_anchor=now_ts)
+            if result >= 0:
+                return {
+                    "result": "success",
+                    "message": f"Cycle anchor reset for {name}",
+                    "light_cycle_anchor": now_ts,
+                }
+            return {"result": "error", "message": "Failed to reset cycle anchor"}
+
+        except Exception as e:
+            self.logger.error(f"Error resetting cycle anchor: {e}")
             return {"result": "error", "message": str(e)}
 
     def _setup_add_sensor(self):

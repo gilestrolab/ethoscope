@@ -35,6 +35,11 @@
             incubators: {},
             sensors: {}
         };
+        $scope.videoBackupStatus = { // Which rsync backup covers video files
+            loaded: false,    // true once /node/daemons has been polled
+            service: null,    // 'unified' | 'video' | null
+            daemon: null      // exact systemd unit name, for messaging
+        };
         $scope.stimulatorSequence = []; // Array for stimulator sequence
 
         // Backup status cache
@@ -126,6 +131,43 @@
         // ===========================
         // DATA LOADING FUNCTIONS
         // ===========================
+
+        /**
+         * Poll daemon status to figure out which rsync service (if any)
+         * is currently covering video backup. The unified service covers
+         * both SQLite and video; ethoscope_backup_video is video-only.
+         */
+        function loadDaemons() {
+            $http.get('/node/daemons')
+                .then(function(response) {
+                    var daemons = response.data || {};
+                    var unified = daemons.ethoscope_backup_unified;
+                    var videoOnly = daemons.ethoscope_backup_video;
+
+                    if (unified && unified.active === 'active') {
+                        $scope.videoBackupStatus = {
+                            loaded: true,
+                            service: 'unified',
+                            daemon: 'ethoscope_backup_unified'
+                        };
+                    } else if (videoOnly && videoOnly.active === 'active') {
+                        $scope.videoBackupStatus = {
+                            loaded: true,
+                            service: 'video',
+                            daemon: 'ethoscope_backup_video'
+                        };
+                    } else {
+                        $scope.videoBackupStatus = {
+                            loaded: true,
+                            service: null,
+                            daemon: null
+                        };
+                    }
+                })
+                .catch(function(error) {
+                    console.warn('Failed to load daemon status:', error);
+                });
+        }
 
         /**
          * Load node-level data (users, incubators, sensors) - OPTIMIZED WITH CACHING
@@ -885,8 +927,12 @@
                 }
             }
 
-            // Add sensor IP and light schedule based on selected incubator name
-            var hasLightSchedule = false;
+            // Add sensor IP and light schedule based on selected incubator name.
+            // Clock drift is handled by the auto-correct loop in
+            // updateTimestampDisplay (every refresh tick, max 3 attempts), which
+            // pushes the node's clock to the device via /update/<id>/datetime.
+            // The red warning icon in the status bar (ethoscope.html: delta_t_min > 3)
+            // still flags drift to the user.
             if (option.experimental_info && option.experimental_info.arguments && option.experimental_info.arguments.location) {
                 var selectedIncubatorName = option.experimental_info.arguments.location;
                 option.experimental_info.arguments.sensor = $scope.get_ip_of_sensor(selectedIncubatorName);
@@ -897,18 +943,18 @@
                     if (incubator.lights_on && incubator.lights_off) {
                         option.experimental_info.arguments.lights_on = incubator.lights_on;
                         option.experimental_info.arguments.lights_off = incubator.lights_off;
-                        hasLightSchedule = true;
+                        // Period defaults to 1440 (24h, wall-clock) when absent.
+                        option.experimental_info.arguments.light_period_minutes =
+                            parseInt(incubator.light_period_minutes, 10) || 1440;
+                        // Anchor is per-incubator and pushed verbatim so all
+                        // devices in this incubator share the same ZT0.
+                        // Empty string means "wall-clock midnight" mode.
+                        option.experimental_info.arguments.light_cycle_anchor =
+                            (incubator.light_cycle_anchor !== null && incubator.light_cycle_anchor !== undefined)
+                                ? String(incubator.light_cycle_anchor)
+                                : '';
                     }
                 }
-            }
-
-            // Block start if light schedule is active but device clock is out of sync
-            if (hasLightSchedule && $scope.delta_t_min > 3) {
-                manageSpinner('stop');
-                alert('Cannot start experiment with light schedule: device clock is ' +
-                      Math.round($scope.delta_t_min) + ' minutes out of sync with the node. ' +
-                      'Please wait for time synchronization or reload this page to trigger a sync.');
-                return;
             }
 
             // Include stimulator sequence in the data sent to backend
@@ -1239,6 +1285,12 @@
                     if (incubator.lights_on && incubator.lights_off) {
                         option.experimental_info.arguments.lights_on = incubator.lights_on;
                         option.experimental_info.arguments.lights_off = incubator.lights_off;
+                        option.experimental_info.arguments.light_period_minutes =
+                            parseInt(incubator.light_period_minutes, 10) || 1440;
+                        option.experimental_info.arguments.light_cycle_anchor =
+                            (incubator.light_cycle_anchor !== null && incubator.light_cycle_anchor !== undefined)
+                                ? String(incubator.light_cycle_anchor)
+                                : '';
                     }
                 }
             }
@@ -1587,76 +1639,38 @@
          */
         function updateTimestampDisplay(deviceData) {
             // Initialize time display immediately - don't wait for node timestamp
+            // Compute drift against the BROWSER's clock, not the node's.
+            // The auto-correct below pushes the browser's epoch to the device,
+            // so the device can only ever converge to the browser's reference —
+            // measuring against /node/timestamp would leave a permanent residual
+            // whenever the node's hwclock/TZ is misconfigured (a common BST vs.
+            // UTC source of "all devices show out of sync" false positives).
+            // node_datetime is still shown for human reference but isn't used
+            // for the gate.
             if (deviceData.current_timestamp) {
                 $scope.device_timestamp = new Date(deviceData.current_timestamp * 1000);
                 $scope.device_datetime = $scope.device_timestamp.toUTCString();
 
-                // Show local node time immediately (no HTTP request needed)
                 var local_time = new Date();
                 $scope.node_datetime = local_time.toUTCString();
                 $scope.delta_t_min = Math.abs((local_time.getTime() / 1000 - deviceData.current_timestamp) / 60);
+
+                // Auto-correct device clock if drift > 3 min (max 3 attempts per page load)
+                if ($scope.delta_t_min > 3 && $attempt < 3) {
+                    $scope.ethoscope.update_machine({
+                        machine_options: {
+                            arguments: {
+                                datetime: local_time.getTime() / 1000
+                            },
+                            name: 'datetime'
+                        }
+                    });
+                    $attempt++;
+                    console.log("Auto-correcting device time. Attempt:", $attempt);
+                }
             } else {
                 $scope.node_datetime = "Node Time";
                 $scope.device_datetime = "Device Time";
-            }
-
-            // Check time synchronization with node asynchronously (don't block UI)
-            if (deviceData.current_timestamp) {
-                var now = new Date().getTime();
-                var useCache = nodeTimestampCache.timestamp &&
-                    (now - nodeTimestampCache.cachedAt) < nodeTimestampCache.maxAge;
-
-                if (useCache) {
-                    // Use cached timestamp - no HTTP request needed
-                    var node_t = nodeTimestampCache.timestamp;
-                    var node_time = new Date(node_t * 1000);
-                    $scope.node_datetime = node_time.toUTCString();
-                    $scope.delta_t_min = Math.abs((node_t - deviceData.current_timestamp) / 60);
-
-                    // Auto-correct time if difference > 3 minutes (max 3 attempts)
-                    if ($scope.delta_t_min > 3 && $attempt < 3) {
-                        $scope.ethoscope.update_machine({
-                            machine_options: {
-                                arguments: {
-                                    datetime: new Date().getTime() / 1000
-                                },
-                                name: 'datetime'
-                            }
-                        });
-                        $attempt++;
-                        console.log("Auto-correcting device time. Attempt:", $attempt);
-                    }
-                } else {
-                    // Fetch fresh timestamp
-                    $http.get('/node/timestamp')
-                        .then(function(node_response) {
-                            var node_t = node_response.data.timestamp;
-                            var node_time = new Date(node_t * 1000);
-                            $scope.node_datetime = node_time.toUTCString();
-                            $scope.delta_t_min = Math.abs((node_t - deviceData.current_timestamp) / 60);
-
-                            // Update cache
-                            nodeTimestampCache.timestamp = node_t;
-                            nodeTimestampCache.cachedAt = now;
-
-                            // Auto-correct time if difference > 3 minutes (max 3 attempts)
-                            if ($scope.delta_t_min > 3 && $attempt < 3) {
-                                $scope.ethoscope.update_machine({
-                                    machine_options: {
-                                        arguments: {
-                                            datetime: new Date().getTime() / 1000
-                                        },
-                                        name: 'datetime'
-                                    }
-                                });
-                                $attempt++;
-                                console.log("Auto-correcting device time. Attempt:", $attempt);
-                            }
-                        })
-                        .catch(function(error) {
-                            console.error('Failed to get node timestamp:', error);
-                        });
-                }
             }
         }
 
@@ -1784,6 +1798,7 @@
         loadNodeData();
         loadDeviceData();
         loadBackupInfo(true); // Load backup info (force on initial load)
+        loadDaemons();        // Determines which rsync service handles video backup
 
         /**
          * Formats raw database information into a simplified list of dictionaries.

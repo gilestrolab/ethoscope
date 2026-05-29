@@ -115,9 +115,6 @@ class TestSlackNotificationService:
         from ethoscope_node.notifications.base import NotificationAnalyzer
 
         assert isinstance(slack_service_webhook, NotificationAnalyzer)
-        assert hasattr(slack_service_webhook, "_last_alert_times")
-        assert hasattr(slack_service_webhook, "_default_cooldown")
-        assert slack_service_webhook._default_cooldown == 3600
 
     def test_get_slack_config_webhook(self, slack_service_webhook):
         """Test Slack configuration retrieval for webhook method."""
@@ -146,45 +143,19 @@ class TestSlackNotificationService:
 
         assert config["cooldown_seconds"] == 300
 
-    def test_should_send_alert_first_time(self, slack_service_webhook):
-        """Test that alert should be sent the first time."""
-        result = slack_service_webhook._should_send_alert(
-            "device_001", "device_stopped"
+    def test_should_send_alert_when_not_in_log(self, slack_service_webhook):
+        """Alert proceeds when ``alert_logs`` has no matching row."""
+        slack_service_webhook.db.hasAlertBeenSent.return_value = False
+        assert slack_service_webhook._should_send_alert(
+            "device_001", "device_stopped", run_id="run-A"
         )
 
-        assert result
-        assert "device_001:device_stopped" in slack_service_webhook._last_alert_times
-
-    def test_should_send_alert_cooldown_active(self, slack_service_webhook):
-        """Test that alert should not be sent during cooldown period."""
-        device_id = "device_001"
-        alert_type = "device_stopped"
-
-        # Send first alert
-        slack_service_webhook._should_send_alert(device_id, alert_type)
-
-        # Try to send again immediately - should be blocked
-        result = slack_service_webhook._should_send_alert(device_id, alert_type)
-
-        assert not result
-
-    def test_should_send_alert_cooldown_expired(self, slack_service_webhook):
-        """Test that alert should be sent after cooldown expires."""
-        device_id = "device_001"
-        alert_type = "device_stopped"
-
-        # Send first alert
-        slack_service_webhook._should_send_alert(device_id, alert_type)
-
-        # Manually set last alert time to past (simulate cooldown expiry)
-        slack_service_webhook._last_alert_times[f"{device_id}:{alert_type}"] = (
-            time.time() - 400
+    def test_should_not_send_alert_when_already_logged(self, slack_service_webhook):
+        """Alert suppressed when ``alert_logs`` shows the alert was sent."""
+        slack_service_webhook.db.hasAlertBeenSent.return_value = True
+        assert not slack_service_webhook._should_send_alert(
+            "device_001", "device_stopped", run_id="run-A"
         )
-
-        # Should be allowed now
-        result = slack_service_webhook._should_send_alert(device_id, alert_type)
-
-        assert result
 
     def test_should_send_alert_with_run_id(self, slack_service_webhook, mock_db):
         """Test alert with run_id uses database check."""
@@ -351,7 +322,7 @@ class TestSlackNotificationService:
         )
 
         assert result
-        mock_analyze.assert_called_once_with("device_001")
+        mock_analyze.assert_called_once_with("device_001", run_id="run123")
         mock_get_logs.assert_called_once_with("device_001", max_lines=10)
         mock_send.assert_called_once()
 
@@ -364,28 +335,30 @@ class TestSlackNotificationService:
         assert call_args[4] == "run123"
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
-    def test_send_device_stopped_alert_cooldown(self, mock_send, slack_service_webhook):
-        """Test device stopped alert blocked by cooldown."""
-        # First alert should work
+    def test_send_device_stopped_alert_dedups_via_alert_logs(
+        self, mock_send, slack_service_webhook
+    ):
+        """A second alert for the same (device, alert_type, run_id) is
+        suppressed by the persistent ``alert_logs`` table — the only de-dup
+        layer after the in-memory cooldown was removed."""
         mock_send.return_value = True
-        result1 = slack_service_webhook.send_device_stopped_alert(
+
+        slack_service_webhook.db.hasAlertBeenSent.return_value = False
+        assert slack_service_webhook.send_device_stopped_alert(
             device_id="device_001",
             device_name="Test Device",
             run_id="run123",
             last_seen=datetime.datetime.now(),
         )
-        assert result1
 
-        # Second alert immediately should be blocked
-        result2 = slack_service_webhook.send_device_stopped_alert(
+        slack_service_webhook.db.hasAlertBeenSent.return_value = True
+        assert not slack_service_webhook.send_device_stopped_alert(
             device_id="device_001",
             device_name="Test Device",
             run_id="run123",
             last_seen=datetime.datetime.now(),
         )
-        assert not result2
 
-        # Should only be called once due to cooldown
         assert mock_send.call_count == 1
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
@@ -661,15 +634,21 @@ class TestSlackNotificationService:
     @patch(
         "ethoscope_node.notifications.slack.SlackNotificationService.analyze_device_failure"
     )
-    def test_send_device_stopped_alert_completed_normally(
+    def test_send_device_stopped_alert_sends_even_when_analysis_says_completed_normally(
         self, mock_analyze, mock_send, slack_service_webhook
     ):
-        """Test device stopped alert suppressed when run completed normally."""
+        """Slack service must not suppress on stored failure_type.
+
+        analyze_device_failure can mis-classify as 'completed_normally' when
+        end_time has been overwritten by orphan cleanup. The scanner's
+        should_alert=True decision is authoritative.
+        """
         mock_analyze.return_value = {
             "user": "test_user",
             "status": "Completed",
             "failure_type": "completed_normally",
         }
+        mock_send.return_value = True
 
         result = slack_service_webhook.send_device_stopped_alert(
             device_id="device_001",
@@ -678,9 +657,9 @@ class TestSlackNotificationService:
             last_seen=datetime.datetime.now(),
         )
 
-        assert not result
-        mock_analyze.assert_called_once_with("device_001")
-        mock_send.assert_not_called()
+        assert result
+        mock_analyze.assert_called_once_with("device_001", run_id="run123")
+        mock_send.assert_called_once()
 
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
     @patch(

@@ -107,7 +107,6 @@ class TestNotificationAnalyzer:
 
         assert result["device_id"] == device_id
         assert result["device_name"] == "Test Ethoscope 001"
-        assert result["failure_type"] == "crashed_during_tracking"
         assert result["status"] == "Failed while running"
         assert result["user"] == "test_user"
         assert result["location"] == "Incubator_A"
@@ -151,12 +150,12 @@ class TestNotificationAnalyzer:
         assert "error" in result
         assert result["error"] == "No runs found for device"
 
-    def test_analyze_device_failure_completed_experiment(self, analyzer):
-        """Test device failure analysis for completed experiment."""
+    def test_analyze_device_failure_run_with_end_time(self, analyzer):
+        """A run that has an end_time is described as 'Stopped'."""
         device_id = "test_device_001"
         current_time = time.time()
-        start_time = current_time - 7200  # 2 hours ago
-        end_time = current_time - 3600  # 1 hour ago (more than 1 hour ago)
+        start_time = current_time - 7200
+        end_time = current_time - 3600
 
         device_info = {
             "ethoscope_name": "Test Ethoscope 001",
@@ -180,9 +179,46 @@ class TestNotificationAnalyzer:
 
         result = analyzer.analyze_device_failure(device_id)
 
-        assert result["failure_type"] == "completed_normally"
-        assert result["status"] == "Completed normally"
+        assert result["status"] == "Stopped"
         assert result["experiment_duration"] == (end_time - start_time)
+
+    def test_analyze_device_failure_uses_provided_run_id(self, analyzer):
+        """When run_id is given, that exact run is analyzed.
+
+        Reason: max(start_time) heuristic could pick the wrong row when orphan
+        cleanup writes a closing end_time on a different running session for
+        the same device. The alert path knows the run_id; honor it.
+        """
+        device_id = "test_device_001"
+        current_time = time.time()
+        target_start = current_time - 1800  # 30 min ago
+        stale_start = current_time - 3600  # 1 hour ago (would win max())
+
+        device_info = {
+            "ethoscope_name": "Test Ethoscope 001",
+            "last_seen": current_time,
+        }
+        target_run = {
+            "ethoscope_id": device_id,
+            "run_id": "target_run",
+            "start_time": target_start,
+            "end_time": None,
+            "user_name": "target_user",
+            "location": "Room A",
+            "experimental_data": "{}",
+        }
+
+        analyzer.db.getEthoscope.return_value = device_info
+        analyzer.db.getRun.return_value = {"target_run": target_run}
+
+        result = analyzer.analyze_device_failure(device_id, run_id="target_run")
+
+        assert result["run_id"] == "target_run"
+        assert result["user"] == "target_user"
+        assert result["status"] == "Failed while running"
+        # The targeted lookup should not need a full table scan.
+        analyzer.db.getRun.assert_called_once_with("target_run", asdict=True)
+        _ = stale_start  # documents the intent of the test
 
     def test_analyze_device_failure_exception(self, analyzer):
         """Test device failure analysis when an exception occurs."""
@@ -484,29 +520,22 @@ class TestNotificationAnalyzer:
         assert result == []
 
     def test_parse_timestamp_none(self, analyzer):
-        """Test timestamp parsing with None value."""
-        result = analyzer._parse_timestamp(None)
-        assert result == 0
+        """None is unset → returns None."""
+        assert analyzer._parse_timestamp(None) is None
 
     def test_parse_timestamp_zero_int(self, analyzer):
-        """Test timestamp parsing with zero integer."""
-        result = analyzer._parse_timestamp(0)
-        assert result == 0
+        """SQLite stores end_time=0 for live runs; that's 'unset', not epoch 0."""
+        assert analyzer._parse_timestamp(0) is None
 
     def test_parse_timestamp_zero_float(self, analyzer):
-        """Test timestamp parsing with zero float."""
-        result = analyzer._parse_timestamp(0.0)
-        assert result == 0
+        assert analyzer._parse_timestamp(0.0) is None
 
     def test_parse_timestamp_zero_string(self, analyzer):
-        """Test timestamp parsing with zero string."""
-        result = analyzer._parse_timestamp("0")
-        assert result == 0
+        """String '0' from legacy rows is also 'unset' (caused a real bug)."""
+        assert analyzer._parse_timestamp("0") is None
 
     def test_parse_timestamp_empty_string(self, analyzer):
-        """Test timestamp parsing with empty string."""
-        result = analyzer._parse_timestamp("")
-        assert result == 0
+        assert analyzer._parse_timestamp("") is None
 
     def test_parse_timestamp_valid_float(self, analyzer):
         """Test timestamp parsing with valid float."""
@@ -569,34 +598,29 @@ class TestNotificationAnalyzer:
         assert result == dt.timestamp()
 
     def test_parse_timestamp_invalid_format(self, analyzer):
-        """Test timestamp parsing with invalid format triggers warning."""
-        result = analyzer._parse_timestamp("invalid-format")
-        assert result == 0
+        """Unparseable strings are treated as unset."""
+        assert analyzer._parse_timestamp("invalid-format") is None
 
     def test_parse_timestamp_exception(self, analyzer):
-        """Test timestamp parsing with exception scenario."""
+        """Exceptions during parsing are treated as unset."""
 
-        # Create an object that will raise exception when accessing timestamp
         class BadTimestamp:
             @property
             def timestamp(self):
                 raise ValueError("Cannot convert to timestamp")
 
-        result = analyzer._parse_timestamp(BadTimestamp())
-        assert result == 0
+        assert analyzer._parse_timestamp(BadTimestamp()) is None
 
-    def test_analyze_device_failure_orphaned_sessions(self, analyzer):
-        """Test device failure analysis with orphaned running sessions."""
+    def test_analyze_device_failure_orphaned_sessions_fall_back(self, analyzer):
+        """Without run_id and only orphaned-looking rows: best-effort, no error."""
         device_id = "test_device_001"
         current_time = time.time()
-        old_start_time = current_time - (25 * 3600)  # 25 hours ago (orphaned)
+        old_start_time = current_time - (25 * 3600)
 
         device_info = {
             "ethoscope_name": "Test Ethoscope 001",
             "last_seen": current_time - 60,
         }
-
-        # All runs are orphaned (status='running', end_time='0', >24h old)
         runs_data = {
             "run_123": {
                 "ethoscope_id": device_id,
@@ -604,39 +628,6 @@ class TestNotificationAnalyzer:
                 "end_time": "0",
                 "status": "running",
                 "user_name": "test_user",
-                "run_id": "run_123",
-            }
-        }
-
-        analyzer.db.getEthoscope.return_value = device_info
-        analyzer.db.getRun.return_value = runs_data
-
-        result = analyzer.analyze_device_failure(device_id)
-
-        assert result["device_id"] == device_id
-        assert "error" in result
-        assert "orphaned" in result["error"].lower()
-        assert result["orphaned_count"] == 1
-
-    def test_analyze_device_failure_stopped_recently(self, analyzer):
-        """Test device failure analysis for experiment stopped recently."""
-        device_id = "test_device_001"
-        current_time = time.time()
-        start_time = current_time - 1800  # 30 minutes ago
-        end_time = current_time - 600  # 10 minutes ago (within last hour)
-
-        device_info = {
-            "ethoscope_name": "Test Ethoscope 001",
-            "last_seen": current_time - 60,
-        }
-
-        runs_data = {
-            "run_123": {
-                "ethoscope_id": device_id,
-                "start_time": start_time,
-                "end_time": end_time,
-                "user_name": "test_user",
-                "location": "Incubator_A",
                 "run_id": "run_123",
                 "experimental_data": "{}",
             }
@@ -647,8 +638,9 @@ class TestNotificationAnalyzer:
 
         result = analyzer.analyze_device_failure(device_id)
 
-        assert result["failure_type"] == "stopped_recently"
-        assert result["status"] == "Stopped recently"
+        assert "error" not in result
+        assert result["run_id"] == "run_123"
+        assert result["status"] == "Failed while running"
 
     def test_analyze_device_failure_invalid_experimental_data(self, analyzer):
         """Test device failure analysis with invalid JSON in experimental_data."""

@@ -1,24 +1,22 @@
 {
     "images": [{
-            "title": "Ethoscope000, rPI2/3",
-            "filename": "20260417_ethoscope000_PI3.img.zip",
-            "url": "https://imperialcollegelondon.box.com/shared/static/fy6b5fqli3juc2eqyag622fxx3x3cswn.zip",
-            "date": "17 Apr 2026",
-            "md5sum": "8f2ece9c9a71da3ebaf5ad357812ef6c",
+            "title": "Ethoscope000 for PI3",
+            "filename": "20260428_ethoscope000_PI3.img.zip",
+            "url": "https://imperialcollegelondon.box.com/shared/static/pjq35c7dtimlfi51urbt6inc944yl2po.zip",
+            "date": "28 Apr 2026",
+            "md5sum": "88b8545633b7158b73825d917594a0f4",
             "SDsize": "32Gb",
             "tested_on": "SD"
         },
-
         {
-            "title": "Ethoscope000, rPI4",
-            "filename": "20250719_ethoscope_PI4_000.img.zip",
-            "url": "https://imperialcollegelondon.box.com/shared/static/7mzfy5gf8ac50gyr36d11erm8n5xk52g.zip",
-            "date": "19 Jul 2025",
-            "md5sum": "",
+            "title": "Ethoscope000 for PI4",
+            "filename": "20260511_ethoscope000_PI4.img.zip",
+            "url": "https://imperialcollegelondon.box.com/shared/static/vp4pjpb4ws2fmd582ojblndj0lr9gzwt.zip",
+            "date": "11 May 2026",
+            "md5sum": "2a5f185912c833cb446e71ecdd77bbea",
             "SDsize": "32Gb",
             "tested_on": "SD"
         },
-
         {
             "title": "Ethoscope Node, LiveCD",
             "filename": "manjaro-ethoscope-25.1.0-minimal-251014-linux66.iso",

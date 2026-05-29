@@ -199,8 +199,26 @@ class ExperimentalDB(multiprocessing.Process):
                                 created TIMESTAMP NOT NULL,
                                 active INTEGER DEFAULT 1,
                                 lights_on TEXT DEFAULT '',
-                                lights_off TEXT DEFAULT ''
+                                lights_off TEXT DEFAULT '',
+                                light_period_minutes INTEGER DEFAULT 1440,
+                                light_cycle_anchor REAL
                             );"""
+
+        # device_interventions: append-only log of user-originated mutating actions
+        # against a device (stop/reboot/poweroff via web UI, firmware update via
+        # updater, etc.). Used to decide whether a run's termination was user-
+        # initiated, replacing the in-memory _last_user_action / trigger_source /
+        # graceful-window heuristics that did not survive node restarts.
+        sql_create_interventions_table = """CREATE TABLE IF NOT EXISTS device_interventions (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                device_id TEXT NOT NULL,
+                                action TEXT NOT NULL,
+                                created_at TIMESTAMP NOT NULL
+                            );"""
+        sql_create_interventions_index = (
+            "CREATE INDEX IF NOT EXISTS idx_device_interventions_device_time "
+            "ON device_interventions(device_id, created_at)"
+        )
 
         self.executeSQL(sql_create_runs_table)
         self.executeSQL(sql_create_experiments_table)
@@ -208,6 +226,8 @@ class ExperimentalDB(multiprocessing.Process):
         self.executeSQL(sql_create_ethoscopes_table)
         self.executeSQL(sql_create_alert_logs_table)
         self.executeSQL(sql_create_incubators_table)
+        self.executeSQL(sql_create_interventions_table)
+        self.executeSQL(sql_create_interventions_index)
 
         # Run database migrations
         self._migrate_database()
@@ -231,8 +251,33 @@ class ExperimentalDB(multiprocessing.Process):
             self._migrate_incubators_from_config()
             # Migration 7: Add light schedule columns to incubators table
             self._migrate_incubators_add_light_schedule()
+            # Migration 8: Add T-cycle period and anchor columns to incubators table
+            self._migrate_incubators_add_period_and_anchor()
+            # Migration 9: Add termination_reason column to runs table
+            self._migrate_runs_add_termination_reason()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
+
+    def _migrate_runs_add_termination_reason(self):
+        """Add termination_reason column to runs.
+
+        Stores why a run ended: user_stop, crash, unreached_timeout, superseded,
+        terminated_unobserved. Used both for forensics and so the alert decision
+        in the scanner has a single column to query against.
+        """
+        try:
+            table_info = self.executeSQL(f"PRAGMA table_info({self._runs_table_name})")
+            if not isinstance(table_info, list):
+                return
+            if any(col[1] == "termination_reason" for col in table_info):
+                return
+            logging.info("Adding termination_reason column to runs table")
+            self.executeSQL(
+                f"ALTER TABLE {self._runs_table_name} "
+                "ADD COLUMN termination_reason TEXT"
+            )
+        except Exception as e:
+            logging.error(f"Error migrating runs table (termination_reason): {e}")
 
     def _migrate_ethoscopes_primary_key(self):
         """
@@ -621,6 +666,40 @@ class ExperimentalDB(multiprocessing.Process):
                 f"Error migrating incubators table (adding light schedule): {e}"
             )
 
+    def _migrate_incubators_add_period_and_anchor(self):
+        """
+        Add light_period_minutes and light_cycle_anchor columns to incubators
+        table if absent. Period stores cycle length in minutes (default 1440 =
+        24h). Anchor is a unix timestamp marking ZT0 of the cycle; NULL means
+        wall-clock midnight (legacy 24h behaviour).
+        """
+        try:
+            check_columns = f"PRAGMA table_info({self._incubators_table_name})"
+            table_info = self.executeSQL(check_columns)
+
+            if not isinstance(table_info, list):
+                return
+
+            has_period = any(col[1] == "light_period_minutes" for col in table_info)
+            has_anchor = any(col[1] == "light_cycle_anchor" for col in table_info)
+
+            if not has_period:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN light_period_minutes INTEGER DEFAULT 1440"
+                )
+                logging.info("Added light_period_minutes to incubators table")
+
+            if not has_anchor:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN light_cycle_anchor REAL"
+                )
+                logging.info("Added light_cycle_anchor to incubators table")
+
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (period/anchor): {e}")
+
     def getRun(self, run_id, asdict=False):
         """
         Gather runs with given ID if provided, if run_id equals 'all', it will collect all available runs
@@ -688,6 +767,9 @@ class ExperimentalDB(multiprocessing.Process):
         problems = ""
 
         sql_enter_new_experiment = f"""INSERT INTO {self._runs_table_name}
+            (run_id, type, ethoscope_name, ethoscope_id, user_name, user_id,
+             location, start_time, end_time, alert, problems, experimental_data,
+             comments, status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
         return self.executeSQL(
@@ -710,19 +792,39 @@ class ExperimentalDB(multiprocessing.Process):
             ),
         )
 
-    def stopRun(self, run_id):
-        """
-        Stop the experiment with the provided id
+    def stopRun(self, run_id, termination_reason: str | None = None):
+        """Stop the experiment with the provided id.
+
         :param run_id: the ID of the run to be stopped
-        :param ethoscope_id: the ethoscope id of the run to be stopped
-        :return status: the new status of the experiment
+        :param termination_reason: why the run ended — one of user_stop, crash,
+            unreached_timeout, superseded, terminated_unobserved. ``None`` is
+            allowed for callers that don't know (legacy code paths).
+        :return: the new status, or ``None`` if the row no longer exists.
         """
         end_time = datetime.datetime.now()
         status = "stopped"
 
-        sql_update_experiment = f"UPDATE {self._runs_table_name} SET end_time = ?, status = ? WHERE run_id = ?"
-        self.executeSQL(sql_update_experiment, (end_time, status, run_id))
-        return self.getRun(run_id)[0]["status"]
+        if termination_reason is None:
+            sql_update_experiment = (
+                f"UPDATE {self._runs_table_name} "
+                "SET end_time = ?, status = ? WHERE run_id = ?"
+            )
+            self.executeSQL(sql_update_experiment, (end_time, status, run_id))
+        else:
+            sql_update_experiment = (
+                f"UPDATE {self._runs_table_name} "
+                "SET end_time = ?, status = ?, termination_reason = ? "
+                "WHERE run_id = ?"
+            )
+            self.executeSQL(
+                sql_update_experiment,
+                (end_time, status, termination_reason, run_id),
+            )
+
+        row = self.getRun(run_id)
+        if not row:
+            return None
+        return row[0]["status"]
 
     def flagProblem(self, run_id, message=""):
         """ """
@@ -1292,6 +1394,8 @@ class ExperimentalDB(multiprocessing.Process):
         active: int = 1,
         lights_on: str = "",
         lights_off: str = "",
+        light_period_minutes: int = 1440,
+        light_cycle_anchor: float = None,
     ):
         """
         Add a new incubator to the database.
@@ -1303,6 +1407,10 @@ class ExperimentalDB(multiprocessing.Process):
             description: Description of the incubator
             created: Creation timestamp (uses current time if None)
             active: Whether incubator is active (1) or not (0)
+            lights_on: Lights-on time HH:MM
+            lights_off: Lights-off time HH:MM
+            light_period_minutes: Cycle length in minutes (default 1440 = 24h)
+            light_cycle_anchor: Unix timestamp marking ZT0; None = wall-clock midnight
 
         Returns:
             ID of the inserted incubator or -1 if error
@@ -1328,13 +1436,19 @@ class ExperimentalDB(multiprocessing.Process):
             escaped_description = description.replace("'", "''")
             escaped_lights_on = lights_on.replace("'", "''")
             escaped_lights_off = lights_off.replace("'", "''")
+            period_sql = int(light_period_minutes) if light_period_minutes else 1440
+            anchor_sql = (
+                "NULL" if light_cycle_anchor is None else f"{float(light_cycle_anchor)}"
+            )
 
             sql_add_incubator = f"""
             INSERT INTO {self._incubators_table_name}
-            (name, location, owner, description, created, active, lights_on, lights_off)
+            (name, location, owner, description, created, active,
+             lights_on, lights_off, light_period_minutes, light_cycle_anchor)
             VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}',
                     '{escaped_description}', '{created}', {active},
-                    '{escaped_lights_on}', '{escaped_lights_off}')
+                    '{escaped_lights_on}', '{escaped_lights_off}',
+                    {period_sql}, {anchor_sql})
             """
 
             result = self.executeSQL(sql_add_incubator)
@@ -1393,6 +1507,14 @@ class ExperimentalDB(multiprocessing.Process):
                     set_clauses.append(f"{field} = '{escaped_value}'")
                 elif field in ["active"]:
                     set_clauses.append(f"{field} = {int(value)}")
+                elif field == "light_period_minutes":
+                    set_clauses.append(f"{field} = {int(value)}")
+                elif field == "light_cycle_anchor":
+                    # Explicit None clears the anchor (returns cycle to legacy wall-clock mode).
+                    if value is None:
+                        set_clauses.append(f"{field} = NULL")
+                    else:
+                        set_clauses.append(f"{field} = {float(value)}")
                 elif field == "created":
                     set_clauses.append(f"{field} = '{value}'")
                 else:
@@ -1556,6 +1678,57 @@ class ExperimentalDB(multiprocessing.Process):
             return result
         else:
             return rows
+
+    def recordIntervention(self, device_id: str, action: str) -> int:
+        """Record a user-originated mutating action against a device.
+
+        Every node-side code path that may cause a device to leave a tracking
+        state — web-UI ``send_instruction`` (stop/reboot/poweroff/restart),
+        firmware updates, and the bulk updater's update/restart/branch_switch
+        — calls this. The scanner consults ``recent_intervention`` when a run
+        finalises to decide whether the termination was user-initiated.
+        """
+        try:
+            return self.executeSQL(
+                "INSERT INTO device_interventions (device_id, action, created_at) "
+                "VALUES (?, ?, ?)",
+                (device_id, action, datetime.datetime.now()),
+            )
+        except Exception as e:
+            logging.error(f"Error recording intervention for {device_id}: {e}")
+            return -1
+
+    def recent_intervention(self, device_id: str, within_seconds: int) -> bool:
+        """Has any intervention been recorded for this device in the last N seconds?"""
+        try:
+            cutoff = datetime.datetime.now() - datetime.timedelta(
+                seconds=within_seconds
+            )
+            rows = self.executeSQL(
+                "SELECT 1 FROM device_interventions "
+                "WHERE device_id = ? AND created_at >= ? LIMIT 1",
+                (device_id, cutoff),
+            )
+            return isinstance(rows, list) and len(rows) > 0
+        except Exception as e:
+            logging.error(f"Error checking recent intervention for {device_id}: {e}")
+            return False
+
+    def getOpenRunsForDevice(self, device_id: str) -> list[str]:
+        """Return run_ids of any runs for this device that are not yet finalised."""
+        try:
+            rows = self.executeSQL(
+                f"SELECT run_id FROM {self._runs_table_name} "
+                "WHERE ethoscope_id = ? AND status = 'running' "
+                "AND (end_time = '0' OR end_time = 0 OR end_time IS NULL)",
+                (device_id,),
+            )
+            if not isinstance(rows, list):
+                return []
+            return [r[0] for r in rows]
+        except Exception as e:
+            logging.error(f"Error fetching open runs for {device_id}: {e}")
+            return []
 
     def logAlert(
         self,
@@ -2123,17 +2296,35 @@ class ExperimentalDB(multiprocessing.Process):
                 }
             )
 
-        # Get current device statuses from ethoscopes table
+        # Get current device statuses + last_seen from ethoscopes table
         sql_device_status = (
-            f"SELECT ethoscope_id, status FROM {self._ethoscopes_table_name}"
+            f"SELECT ethoscope_id, status, last_seen "
+            f"FROM {self._ethoscopes_table_name}"
         )
         device_statuses = self.executeSQL(sql_device_status)
         device_status_map = {}
+        device_last_seen_map = {}
         if isinstance(device_statuses, list):
             for status_row in device_statuses:
                 device_status_map[status_row[0]] = status_row[1]
+                device_last_seen_map[status_row[0]] = (
+                    status_row[2] if len(status_row) > 2 else None
+                )
 
         orphans_to_cleanup = []
+
+        # Reason: at node startup the cached `status` reflects the last shutdown,
+        # which may say "offline" even for a device that is actually still
+        # tracking. Closing such a run here poisons end_time and causes the real
+        # stop alert (hours later) to be silently suppressed. Require last_seen
+        # to be older than min_age_cutoff before treating a session as orphaned.
+        def _is_device_genuinely_stale(ethoscope_id: str) -> bool:
+            last_seen_dt = self._parse_session_time(
+                device_last_seen_map.get(ethoscope_id)
+            )
+            if not last_seen_dt:
+                return True
+            return last_seen_dt < min_age_cutoff
 
         # Analyze each device's running sessions
         for ethoscope_id, sessions in device_sessions.items():
@@ -2153,9 +2344,12 @@ class ExperimentalDB(multiprocessing.Process):
                 # Only mark as orphaned if:
                 # 1. Device is not currently in 'running' status
                 # 2. Session is older than minimum age threshold
+                # 3. Device hasn't been seen recently (guards against routine
+                #    node restarts where cached status is stale)
                 if (
                     current_device_status not in ["running", "recording", "streaming"]
                     and start_dt < min_age_cutoff
+                    and _is_device_genuinely_stale(ethoscope_id)
                 ):
                     age_days = (datetime.datetime.now() - start_dt).days
                     orphans_to_cleanup.append(

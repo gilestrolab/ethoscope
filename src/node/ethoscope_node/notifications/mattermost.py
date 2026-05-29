@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 
 import datetime
-import time
 from typing import Any
 
 import requests
 
-from ..utils.configuration import EthoscopeConfiguration
-from ..utils.etho_db import ExperimentalDB
 from .base import NotificationAnalyzer
 
 
@@ -22,24 +19,6 @@ class MattermostNotificationService(NotificationAnalyzer):
     - Long-running experiments
     """
 
-    def __init__(
-        self,
-        config: EthoscopeConfiguration | None = None,
-        db: ExperimentalDB | None = None,
-    ):
-        """
-        Initialize Mattermost notification service.
-
-        Args:
-            config: Configuration instance, will create new one if None
-            db: Database instance, will create new one if None
-        """
-        super().__init__(config, db)
-
-        # Rate limiting: track last alert time per device/type
-        self._last_alert_times = {}
-        self._default_cooldown = 3600  # 1 hour between similar alerts
-
     def _get_mattermost_config(self) -> dict[str, Any]:
         """Get Mattermost configuration from settings."""
         return self.config.content.get("mattermost", {})
@@ -49,55 +28,21 @@ class MattermostNotificationService(NotificationAnalyzer):
         return self.config.content.get("alerts", {})
 
     def _should_send_alert(
-        self, device_id: str, alert_type: str, run_id: str = None
+        self, device_id: str, alert_type: str, run_id: str | None = None
     ) -> bool:
+        """De-dup via the persistent ``alert_logs`` table.
+
+        See ``EmailNotificationService._should_send_alert`` for the rationale —
+        we used to maintain an in-memory cooldown here too, which produced
+        silent false-negatives across scanner restarts. Single source of truth
+        for "already sent" is the DB.
         """
-        Check if we should send an alert based on rate limiting and database history.
-
-        Args:
-            device_id: Device identifier
-            alert_type: Type of alert (device_stopped, storage_warning, etc.)
-            run_id: Run ID for device_stopped alerts (prevents duplicates for same run)
-
-        Returns:
-            True if alert should be sent
-        """
-        # For device_stopped alerts, check database for duplicates based on run_id
-        if alert_type == "device_stopped" and run_id:
-            has_been_sent = self.db.hasAlertBeenSent(device_id, alert_type, run_id)
-            if has_been_sent:
-                self.logger.debug(
-                    f"Alert {device_id}:{alert_type}:{run_id} already sent - preventing duplicate"
-                )
-                return False
-        elif alert_type == "device_stopped" and not run_id:
-            # For alerts without run_id, use timestamp-based approach to prevent spam
-            self.logger.debug(
-                "No run_id provided for device_stopped alert - using cooldown only"
-            )
-
-        # For other alerts or when no run_id, use traditional cooldown
-        alert_config = self._get_alert_config()
-        cooldown = alert_config.get("cooldown_seconds", self._default_cooldown)
-
-        # Use run_id in key for device_stopped alerts, otherwise use traditional key
-        if alert_type == "device_stopped" and run_id:
-            key = f"{device_id}:{alert_type}:{run_id}"
-        else:
-            key = f"{device_id}:{alert_type}"
-
-        current_time = time.time()
-
-        if key in self._last_alert_times:
-            time_since_last = current_time - self._last_alert_times[key]
-            if time_since_last < cooldown:
-                self.logger.debug(
-                    f"Alert {key} suppressed due to cooldown ({time_since_last:.0f}s < {cooldown}s)"
-                )
-                return False
-
-        self._last_alert_times[key] = current_time
-        return True
+        if not self.db.hasAlertBeenSent(device_id, alert_type, run_id):
+            return True
+        self.logger.debug(
+            f"Alert {device_id}:{alert_type}:{run_id} already sent — suppressing"
+        )
+        return False
 
     def _send_message(
         self, message: str, attachments: list[dict[str, Any]] | None = None
@@ -182,16 +127,9 @@ class MattermostNotificationService(NotificationAnalyzer):
             return False
 
         try:
-            # Get comprehensive device failure analysis
-            failure_analysis = self.analyze_device_failure(device_id)
-
-            # Don't send alert if the run completed normally
-            failure_type = failure_analysis.get("failure_type", "")
-            if failure_type == "completed_normally":
-                self.logger.info(
-                    f"Suppressing alert for device {device_id} - run {run_id} completed normally"
-                )
-                return False
+            # Get comprehensive device failure analysis. Pass run_id so we
+            # analyze the exact run that triggered the alert.
+            failure_analysis = self.analyze_device_failure(device_id, run_id=run_id)
 
             # Format alert message
             message_parts = [

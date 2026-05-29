@@ -7,12 +7,43 @@ import json
 import logging
 import os
 import random
+import sqlite3
 import subprocess
 import time
 import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
+
+# Where the node keeps its SQLite. The updater runs on the same machine as the
+# node when ``is_node`` is true, so a direct write is the simplest way to record
+# a user intervention without coupling the updater package to ethoscope_node.
+NODE_DB_PATH = "/etc/ethoscope/ethoscope-node.db"
+
+
+def record_device_intervention(device_id: str, action: str) -> bool:
+    """Record a user-originated mutating action against a device.
+
+    Mirror of ``ExperimentalDB.recordIntervention`` so that the updater can
+    write to the same audit log without importing the node package. The node's
+    scanner consults this table to decide whether a run termination was
+    user-initiated. Best-effort: returns False on any error (the worst case is
+    one false-positive alert, which is preferable to a crashing updater).
+    """
+    try:
+        with sqlite3.connect(NODE_DB_PATH, timeout=5) as conn:
+            conn.execute(
+                "INSERT INTO device_interventions (device_id, action, created_at) "
+                "VALUES (?, ?, ?)",
+                (device_id, action, datetime.datetime.now()),
+            )
+            conn.commit()
+        return True
+    except Exception as e:
+        logging.warning(
+            f"Could not record intervention {action!r} for {device_id}: {e}"
+        )
+        return False
 
 
 class WrongMachineID(Exception):

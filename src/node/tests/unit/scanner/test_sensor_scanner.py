@@ -361,7 +361,6 @@ class _FakeSensor:
         self._port = port
         _FakeSensor._next_id += 1
         self._id = f"fake_sensor_{_FakeSensor._next_id}"
-        self._skip_scanning = False
         self.zeroconf_name = None
         self._temperature_callback = None
         self._started = False
@@ -393,9 +392,6 @@ class _FakeSensor:
 
     def reset_error_state(self):
         pass
-
-    def skip_scanning(self, value):
-        self._skip_scanning = value
 
 
 class TestSensorScannerTemperatureCallback:
