@@ -26,6 +26,7 @@ class TestFileAPI(unittest.TestCase):
         self.mock_server.sensor_scanner = Mock()
         self.mock_server.database = Mock()
         self.mock_server.results_dir = "/tmp/results"
+        self.mock_server.videos_dir = "/tmp/videos"
         self.mock_server.sensors_dir = "/tmp/sensors"
         self.mock_server.roi_templates_dir = "/tmp/templates"
         self.mock_server.tmp_imgs_dir = "/tmp/imgs"
@@ -136,17 +137,40 @@ class TestFileAPI(unittest.TestCase):
     @patch("os.walk")
     @patch("os.path.getsize")
     @patch("os.path.getmtime")
-    def test_browse_specific_folder(self, mock_mtime, mock_getsize, mock_walk):
-        """Test browsing specific folder."""
-        mock_walk.return_value = [("/custom/path", [], ["file.txt"])]
+    def test_browse_videos_root(self, mock_mtime, mock_getsize, mock_walk):
+        """Test browsing the videos root uses videos_dir."""
+        mock_walk.return_value = [("/tmp/videos", [], ["clip.h264"])]
         mock_getsize.return_value = 500
         mock_mtime.return_value = 1234567890.0
 
-        result = self.api._browse("custom/path")
+        result = self.api._browse("videos")
 
-        # Should use specified folder with leading slash
-        mock_walk.assert_called_once_with("/custom/path")
-        self.assertIn("file.txt", result["files"])
+        mock_walk.assert_called_once_with("/tmp/videos")
+        self.assertIn("clip.h264", result["files"])
+
+    @patch("os.walk")
+    @patch("os.path.getsize")
+    @patch("os.path.getmtime")
+    def test_browse_sensors_root(self, mock_mtime, mock_getsize, mock_walk):
+        """Test browsing the sensors root uses sensors_dir."""
+        mock_walk.return_value = [("/tmp/sensors", [], ["sensor.csv"])]
+        mock_getsize.return_value = 500
+        mock_mtime.return_value = 1234567890.0
+
+        result = self.api._browse("sensors")
+
+        mock_walk.assert_called_once_with("/tmp/sensors")
+        self.assertIn("sensor.csv", result["files"])
+
+    @patch("os.walk")
+    def test_browse_unknown_folder_rejected(self, mock_walk):
+        """Test browsing an unknown root does not walk an arbitrary path."""
+        result = self.api._browse("etc")
+
+        # Must not walk the filesystem for an unknown selector
+        mock_walk.assert_not_called()
+        self.assertEqual(result["files"], {})
+        self.assertIn("error", result)
 
     @patch("os.walk")
     @patch("os.path.getsize")

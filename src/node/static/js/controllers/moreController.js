@@ -114,12 +114,15 @@ function maxLengthCheck(object) {
         ///Browse Functions
 
 
-        $scope.browse=function(folder){
-            folder = folder || "/null"
-            var prev_folder= folder.split("/");
-            prev_folder.pop();
-            $scope.prev_dir = prev_folder.join('/');
-            $http.get("/browse"+folder)
+        // The browsable data roots on the node. Each maps to a directory the
+        // backend exposes via /browse/<root> (see file_api.py:_browse_roots).
+        $scope.browse_roots = ['results', 'videos', 'sensors'];
+        $scope.current_root = 'results';
+
+        $scope.browse=function(root){
+            root = root || 'results'
+            $scope.current_root = root;
+            $http.get("/browse/"+root)
                      .then(function(response) { var res = response.data;
                         var filesObj =[];
                         for (var key in res.files){
@@ -138,9 +141,6 @@ function maxLengthCheck(object) {
                         $scope.files = res;
                         $scope.filesObj = filesObj;
                         $scope.abs_path = res.absolute_path;
-                //$scope.browse_table.clear();
-                //$scope.browse_table.rows.add(filesObj).draw();
-                //console.log($scope.filesObj);
                      })
         };
         $scope.browse.download = function(){

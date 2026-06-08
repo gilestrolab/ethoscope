@@ -40,10 +40,27 @@ class FileAPI(BaseAPI):
 
         return {"files": matches}
 
+    def _browse_roots(self):
+        """Map browsable root names to their on-disk directories."""
+        return {
+            "results": self.results_dir,
+            "videos": self.videos_dir,
+            "sensors": self.sensors_dir,
+            # Backwards compatibility: the legacy frontend asked for "null".
+            "null": self.results_dir,
+        }
+
     @error_decorator
     def _browse(self, folder):
-        """Browse directory contents."""
-        directory = self.results_dir if folder == "null" else f"/{folder}"
+        """Browse the contents of a known data root (results, videos, sensors).
+
+        Only the predefined roots are browsable; an unknown selector returns an
+        empty listing rather than walking an arbitrary path on disk.
+        """
+        directory = self._browse_roots().get(folder)
+        if directory is None:
+            return {"files": {}, "error": f"Unknown folder '{folder}'"}
+
         files = {}
 
         for dirpath, _dirnames, filenames in os.walk(directory):

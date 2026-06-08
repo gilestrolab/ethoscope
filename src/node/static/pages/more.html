@@ -80,13 +80,30 @@
         <div class="row">
             <div class="col-12">
     <h2>Files on the node</h2>
-    <div class="alert alert-info ">
-        <p>Actions for selected files:</p>
-        <button  class="btn btn-success" ng-click="browse.dowload()"  data-target="#downloadModal">Download</button>
-        <button class="btn btn-danger" data-target="#deleteModal" data-toggle="modal">Delete</button>
-        <button ng-if="selected_all == false" class="right btn btn-info" ng-click="browse.toggleAll()">Select All</button>
-        <button ng-if="selected_all == true" class="right btn btn-warning" ng-click="browse.toggleAll()">Deselect All</button>
-
+    <div class="btn-group mb-3" role="group" aria-label="Data folder">
+        <button ng-repeat="root in browse_roots"
+                ng-click="browse(root)"
+                class="btn" style="text-transform:capitalize"
+                ng-class="current_root == root ? 'btn-primary' : 'btn-outline-primary'">
+            {{root}}
+        </button>
+    </div>
+    <div class="alert alert-info">
+        <p class="mb-2">Actions for selected files:</p>
+        <div class="btn-toolbar" role="toolbar" aria-label="File actions">
+            <button class="btn btn-success mr-2" ng-click="browse.download()" data-target="#downloadModal">
+                <span class="fa fa-download"></span> Download
+            </button>
+            <button class="btn btn-danger mr-2" data-target="#deleteModal" data-toggle="modal">
+                <span class="fa fa-trash"></span> Delete
+            </button>
+            <button ng-if="selected_all == false" class="btn btn-info ml-auto" ng-click="browse.toggleAll()">
+                <span class="fa fa-check-square-o"></span> Select All
+            </button>
+            <button ng-if="selected_all == true" class="btn btn-warning ml-auto" ng-click="browse.toggleAll()">
+                <span class="fa fa-square-o"></span> Deselect All
+            </button>
+        </div>
     </div>
     <div>
     <span>Total files: <strong>{{filesObj.length}}</strong></span>

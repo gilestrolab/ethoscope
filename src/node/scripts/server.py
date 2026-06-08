@@ -143,6 +143,7 @@ class EthoscopeNodeServer:
         self.tmp_imgs_dir: str | None = None
         self.ethoscope_data_dir: str | None = ethoscope_data_dir
         self.results_dir: str | None = os.path.join(ethoscope_data_dir, "results")
+        self.videos_dir: str | None = os.path.join(ethoscope_data_dir, "videos")
         self.sensors_dir: str | None = os.path.join(ethoscope_data_dir, "sensors")
         self.roi_templates_dir: str | None = os.path.join(
             ethoscope_data_dir, "roi_templates"

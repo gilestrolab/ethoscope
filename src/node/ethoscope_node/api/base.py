@@ -63,6 +63,7 @@ class BaseAPI:
 
         # Common directories
         self.results_dir = server_instance.results_dir
+        self.videos_dir = server_instance.videos_dir
         self.sensors_dir = server_instance.sensors_dir
         self.roi_templates_dir = server_instance.roi_templates_dir
         self.tmp_imgs_dir = server_instance.tmp_imgs_dir
