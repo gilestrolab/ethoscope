@@ -121,13 +121,14 @@ class SetupAPI(BaseAPI):
             hostname = "unknown"
             fqdn = "unknown"
 
-        # Get CLI-provided directories (or defaults)
-        cli_data_dir = getattr(self.server, "ethoscope_data_dir", None)
-        cli_config_dir = getattr(self.server, "config_dir", None)
+        # Get the server's resolved directories, falling back to the same
+        # resolution logic used at startup (explicit -> env -> {data}/config).
+        from ethoscope_node.utils.paths import resolve_config_dir, resolve_data_dir
 
-        # Use CLI values or fall back to defaults
-        data_dir = cli_data_dir if cli_data_dir else "/ethoscope_data"
-        config_dir = cli_config_dir if cli_config_dir else "/etc/ethoscope"
+        data_dir = resolve_data_dir(getattr(self.server, "ethoscope_data_dir", None))
+        config_dir = resolve_config_dir(
+            explicit=getattr(self.server, "config_dir", None), data_dir=data_dir
+        )
 
         # Get disk usage for important paths
         disk_info = {}
@@ -276,12 +277,62 @@ class SetupAPI(BaseAPI):
             self.config._settings["folders"] = current_folders
             self.config.save()
 
-        # Mark step as completed
+        # Mark step as completed (writes the current config file at the OLD path,
+        # so migration below moves the up-to-date file).
         self.config.mark_setup_step_completed("basic_info")
+
+        # Handle config-directory selection. The config dir is a bootstrap path
+        # (resolved before the config file is read), so it cannot be stored in the
+        # config file itself: instead we persist it to the bootstrap env file and
+        # migrate existing config content. It only takes effect on the next restart
+        # because the running server already holds its config/db open.
+        restart_required = False
+        requested_config_dir = (data.get("config_dir") or "").strip()
+        if requested_config_dir:
+            from ethoscope_node.utils.paths import (
+                migrate_config_dir,
+                resolve_config_dir,
+                resolve_data_dir,
+                write_bootstrap_env,
+            )
+
+            data_dir = (data.get("data_dir") or "").strip() or None
+            current_config_dir = resolve_config_dir(
+                explicit=getattr(self.server, "config_dir", None), data_dir=data_dir
+            )
+            resolved_data_dir = resolve_data_dir(
+                data_dir or getattr(self.server, "ethoscope_data_dir", None)
+            )
+            try:
+                os.makedirs(requested_config_dir, exist_ok=True)
+                if os.path.abspath(requested_config_dir) != os.path.abspath(
+                    current_config_dir
+                ):
+                    moved = migrate_config_dir(current_config_dir, requested_config_dir)
+                    self.logger.info(
+                        f"Migrated config to {requested_config_dir} (moved: {moved})"
+                    )
+                    restart_required = True
+                # Persist the choice so every service picks it up on next start.
+                write_bootstrap_env(resolved_data_dir, requested_config_dir)
+            except OSError as e:
+                self.logger.error(f"Failed to set config directory: {e}")
+                return {
+                    "result": "error",
+                    "message": f"Could not set config directory {requested_config_dir}: {e}",
+                }
+
+        message = "Basic configuration updated successfully"
+        if restart_required:
+            message += (
+                ". Config files were moved to the new location; "
+                "restart the node service for the change to take effect."
+            )
 
         return {
             "result": "success",
-            "message": "Basic configuration updated successfully",
+            "message": message,
+            "restart_required": restart_required,
         }
 
     def _setup_admin_user(self):

@@ -55,11 +55,15 @@ def main():
         default=90,
         help='Number of days after which to retire inactive devices (default: 90)'
     )
+    # Resolve config dir like the node: ETHOSCOPE_CONFIG_DIR -> {data}/config.
+    default_config_dir = os.environ.get('ETHOSCOPE_CONFIG_DIR') or os.path.join(
+        os.environ.get('ETHOSCOPE_DATA_DIR', '/ethoscope_data'), 'config'
+    )
     parser.add_argument(
         '--config-dir',
         type=str,
-        default='/etc/ethoscope',
-        help='Path to configuration directory (default: /etc/ethoscope)'
+        default=default_config_dir,
+        help=f'Path to configuration directory (default: {default_config_dir})'
     )
     parser.add_argument(
         '--dry-run',

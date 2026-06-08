@@ -14,7 +14,7 @@
         $scope.basicInfo = {
             hostname: '',
             dataDir: '/ethoscope_data',
-            configDir: '/etc/ethoscope'
+            configDir: '/ethoscope_data/config'
         };
 
         $scope.adminUser = {
@@ -390,6 +390,8 @@
 
             $scope.isLoading = true;
             var data = {
+                data_dir: $scope.basicInfo.dataDir,
+                config_dir: $scope.basicInfo.configDir,
                 folders: {
                     results: $scope.basicInfo.dataDir + '/results',
                     video: $scope.basicInfo.dataDir + '/videos',
@@ -400,7 +402,14 @@
             $http.post('/setup/basic-info', data)
                 .then(function(response) {
                     if (response.data.result === 'success') {
-                        $scope.showMessage('Basic configuration saved successfully.', 'success');
+                        if (response.data.restart_required) {
+                            // Config files were relocated; the change only applies
+                            // after the node service restarts.
+                            $scope.showMessage(response.data.message ||
+                                'Configuration saved. Restart the node service to apply the new config location.', 'success');
+                        } else {
+                            $scope.showMessage('Basic configuration saved successfully.', 'success');
+                        }
                         $scope.nextStep();
                     } else {
                         $scope.showMessage('Error: ' + (response.data.message || 'Unknown error'), 'error');

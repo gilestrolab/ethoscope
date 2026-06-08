@@ -14,6 +14,7 @@ import bottle
 from ethoscope_node.backup.helpers import GenericBackupWrapper
 from ethoscope_node.backup.mysql import get_backup_path_from_database
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
+from ethoscope_node.utils.paths import resolve_config_dir
 
 # Global variables
 app = bottle.Bottle()
@@ -271,7 +272,7 @@ def parse_arguments():
         "-c",
         "--configuration",
         dest="config_dir",
-        help="Path to configuration directory (default: /etc/ethoscope)",
+        help=f"Path to configuration directory (default: {resolve_config_dir()})",
     )
 
     (options, args) = parser.parse_args()

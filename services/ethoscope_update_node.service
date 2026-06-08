@@ -7,6 +7,7 @@ Type=simple
 #User=git
 #Group=git
 WorkingDirectory=/opt/ethoscope/src/updater/
+EnvironmentFile=-/etc/ethoscope/environment
 ExecStart=/usr/bin/python3 /opt/ethoscope/src/updater/update_server.py -g /opt/ethoscope -b /srv/git/ethoscope.git
 Restart=always
 RestartSec=5s

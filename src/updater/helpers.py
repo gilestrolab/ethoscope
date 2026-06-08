@@ -18,7 +18,14 @@ import urllib.request
 # Where the node keeps its SQLite. The updater runs on the same machine as the
 # node when ``is_node`` is true, so a direct write is the simplest way to record
 # a user intervention without coupling the updater package to ethoscope_node.
-NODE_DB_PATH = "/etc/ethoscope/ethoscope-node.db"
+# Resolve the config dir the same way the node does (ETHOSCOPE_CONFIG_DIR ->
+# {ETHOSCOPE_DATA_DIR or /ethoscope_data}/config). The logic is duplicated rather
+# than imported to keep the updater package independent; systemd supplies these
+# vars via the bootstrap env file (/etc/ethoscope/environment).
+_node_config_dir = os.environ.get("ETHOSCOPE_CONFIG_DIR") or os.path.join(
+    os.environ.get("ETHOSCOPE_DATA_DIR", "/ethoscope_data"), "config"
+)
+NODE_DB_PATH = os.path.join(_node_config_dir, "ethoscope-node.db")
 
 
 def record_device_intervention(device_id: str, action: str) -> bool:

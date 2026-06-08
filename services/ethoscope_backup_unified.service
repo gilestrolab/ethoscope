@@ -8,6 +8,7 @@ Conflicts=ethoscope_backup_video.service ethoscope_backup_sqlite.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/ethoscope/src/node/scripts/
+EnvironmentFile=-/etc/ethoscope/environment
 ExecStart=/usr/bin/python /opt/ethoscope/src/node/scripts/rsync_backup_tool.py --unified
 RestartSec=5
 Restart=always

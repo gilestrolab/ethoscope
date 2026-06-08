@@ -26,8 +26,8 @@
                         <div class="form-group">
                             <label for="configDir">Configuration Directory *</label>
                             <input type="text" class="form-control" id="configDir"
-                                   ng-model="basicInfo.configDir" placeholder="/etc/ethoscope" required>
-                            <small class="form-text text-muted">Directory where configuration files will be stored</small>
+                                   ng-model="basicInfo.configDir" placeholder="/ethoscope_data/config" required>
+                            <small class="form-text text-muted">Directory where configuration files will be stored. Changing this moves existing config files and requires a node service restart.</small>
                         </div>
 
                         <div class="disk-usage" ng-if="systemInfo.disk_usage">

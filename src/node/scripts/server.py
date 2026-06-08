@@ -148,18 +148,20 @@ class EthoscopeNodeServer:
             ethoscope_data_dir, "roi_templates"
         )
 
-        self.config_dir: str | None = config_dir
+        # Resolve the config dir once (explicit CLI arg -> $ETHOSCOPE_CONFIG_DIR ->
+        # {data_dir}/config) and propagate to the module-level defaults that
+        # EthoscopeConfiguration / ExperimentalDB read. Single source of truth, so
+        # downstream code can rely on self.config_dir always being a real path.
+        from ethoscope_node.utils.configuration import set_default_config_file
+        from ethoscope_node.utils.etho_db import set_default_config_dir
+        from ethoscope_node.utils.paths import resolve_config_dir
 
-        # Set module-level defaults for configuration and database paths if custom config_dir provided
-        if config_dir:
-            from ethoscope_node.utils.configuration import set_default_config_file
-            from ethoscope_node.utils.etho_db import set_default_config_dir
-
-            set_default_config_dir(config_dir)
-            set_default_config_file(os.path.join(config_dir, "ethoscope.conf"))
-            self.logger.info(
-                f"Set module-level defaults to use config directory: {config_dir}"
-            )
+        self.config_dir: str = resolve_config_dir(
+            explicit=config_dir, data_dir=ethoscope_data_dir
+        )
+        set_default_config_dir(self.config_dir)
+        set_default_config_file(os.path.join(self.config_dir, "ethoscope.conf"))
+        self.logger.info(f"Using config directory: {self.config_dir}")
 
         # System configuration
         self.is_dockerized = os.path.exists("/.dockerenv")
@@ -271,11 +273,7 @@ class EthoscopeNodeServer:
 
             # Ensure SSH keys exist
             try:
-                keys_dir = (
-                    os.path.join(self.config_dir, "keys")
-                    if self.config_dir
-                    else "/etc/ethoscope/keys"
-                )
+                keys_dir = os.path.join(self.config_dir, "keys")
                 private_key_path, public_key_path = ensure_ssh_keys(keys_dir)
                 self.logger.info(
                     f"SSH keys ready: {private_key_path}, {public_key_path}"
@@ -349,7 +347,7 @@ class EthoscopeNodeServer:
                 # Pass config_dir explicitly to scanner as it needs it for SSH key management
                 self.device_scanner = EthoscopeScanner(
                     results_dir=self.results_dir,
-                    config_dir=self.config_dir or "/etc/ethoscope",
+                    config_dir=self.config_dir,
                     config=self.config,
                 )
                 self.device_scanner.start()
@@ -632,12 +630,15 @@ def parse_command_line():
         default=env_data_dir,
         help=f'Root directory for all result files (default: "{env_data_dir}")',
     )
+    from ethoscope_node.utils.paths import resolve_config_dir
+
+    default_config_dir = env_config_dir or resolve_config_dir(data_dir=env_data_dir)
     parser.add_argument(
         "-c",
         "--configuration",
         dest="config_dir",
         default=env_config_dir,
-        help=f"Path to configuration directory (default: {env_config_dir or '/etc/ethoscope'})",
+        help=f"Path to configuration directory (default: {default_config_dir})",
     )
 
     return parser.parse_args()

@@ -7,6 +7,7 @@ After=ntpd.service clock.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/ethoscope/src/node/scripts/
+EnvironmentFile=-/etc/ethoscope/environment
 ExecStart=/usr/bin/python /opt/ethoscope/src/node/scripts/backup_tool.py
 RestartSec=5
 Restart=always

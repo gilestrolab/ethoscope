@@ -8,6 +8,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from ethoscope_node.utils.paths import resolve_config_dir
+
 # Configuration validation constants
 USERS_KEYS = [
     "name",
@@ -22,8 +24,11 @@ USERS_KEYS = [
 ]
 INCUBATORS_KEYS = ["id", "name", "location", "owner", "description"]
 
-# Module-level default configuration file path
-_default_config_file = "/etc/ethoscope/ethoscope.conf"
+# Module-level default configuration file path.
+# Resolved from ETHOSCOPE_CONFIG_DIR / {ETHOSCOPE_DATA_DIR}/config at import time
+# (systemd sets these from the bootstrap env file before the process starts).
+# server.py overrides this via set_default_config_file() with the CLI-resolved path.
+_default_config_file = os.path.join(resolve_config_dir(), "ethoscope.conf")
 
 
 def set_default_config_file(path: str) -> None:
@@ -52,7 +57,7 @@ class ConfigurationValidationError(ConfigurationError):
     pass
 
 
-def migrate_conf_file(file_path: str, destination: str = "/etc/ethoscope") -> bool:
+def migrate_conf_file(file_path: str, destination: str | None = None) -> bool:
     """
     Migrate configuration file to new location.
 
@@ -66,6 +71,8 @@ def migrate_conf_file(file_path: str, destination: str = "/etc/ethoscope") -> bo
     Raises:
         ConfigurationError: If migration fails
     """
+    if destination is None:
+        destination = resolve_config_dir()
     try:
         if not os.path.isfile(file_path):
             return False

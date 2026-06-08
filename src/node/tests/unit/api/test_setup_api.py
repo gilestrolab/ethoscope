@@ -320,6 +320,64 @@ class TestSetupAPI(unittest.TestCase):
         self.assertEqual(result["result"], "error")
         self.assertIn("Could not create folder", result["message"])
 
+    @patch("ethoscope_node.utils.paths.write_bootstrap_env")
+    @patch("ethoscope_node.utils.paths.migrate_config_dir")
+    @patch("bottle.request")
+    def test_setup_basic_info_config_dir_unchanged_persists_no_restart(
+        self, mock_request, mock_migrate, mock_write_env
+    ):
+        """Selecting the current config dir persists it but needs no restart/migration."""
+        config_dir = f"{self.temp_dir.name}/config"
+        self.mock_server.config_dir = config_dir
+        self.mock_server.ethoscope_data_dir = self.temp_dir.name
+        mock_request.json = {"config_dir": config_dir, "data_dir": self.temp_dir.name}
+
+        result = self.api._setup_basic_info()
+
+        self.assertEqual(result["result"], "success")
+        self.assertFalse(result["restart_required"])
+        mock_migrate.assert_not_called()
+        mock_write_env.assert_called_once()
+
+    @patch("ethoscope_node.utils.paths.write_bootstrap_env")
+    @patch("ethoscope_node.utils.paths.migrate_config_dir")
+    @patch("bottle.request")
+    def test_setup_basic_info_config_dir_change_migrates_and_restarts(
+        self, mock_request, mock_migrate, mock_write_env
+    ):
+        """Choosing a new config dir migrates files, persists, and flags restart."""
+        old_dir = f"{self.temp_dir.name}/old_config"
+        new_dir = f"{self.temp_dir.name}/new_config"
+        self.mock_server.config_dir = old_dir
+        self.mock_server.ethoscope_data_dir = self.temp_dir.name
+        mock_migrate.return_value = ["ethoscope.conf", "ethoscope-node.db"]
+        mock_request.json = {"config_dir": new_dir, "data_dir": self.temp_dir.name}
+
+        result = self.api._setup_basic_info()
+
+        self.assertEqual(result["result"], "success")
+        self.assertTrue(result["restart_required"])
+        mock_migrate.assert_called_once_with(old_dir, new_dir)
+        mock_write_env.assert_called_once_with(self.temp_dir.name, new_dir)
+        self.assertIn("restart", result["message"].lower())
+
+    @patch("ethoscope_node.utils.paths.write_bootstrap_env")
+    @patch("os.makedirs")
+    @patch("bottle.request")
+    def test_setup_basic_info_config_dir_error(
+        self, mock_request, mock_makedirs, mock_write_env
+    ):
+        """A failure creating/persisting the config dir returns an error."""
+        self.mock_server.config_dir = f"{self.temp_dir.name}/old"
+        self.mock_server.ethoscope_data_dir = self.temp_dir.name
+        mock_makedirs.side_effect = PermissionError("denied")
+        mock_request.json = {"config_dir": "/root/forbidden"}
+
+        result = self.api._setup_basic_info()
+
+        self.assertEqual(result["result"], "error")
+        mock_write_env.assert_not_called()
+
     # ============================================================================
     # POST Endpoints - Admin User Tests
     # ============================================================================

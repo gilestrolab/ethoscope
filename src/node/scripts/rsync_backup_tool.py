@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from ethoscope_node.backup.helpers import GenericBackupWrapper, UnifiedRsyncBackupClass
 from ethoscope_node.utils.configuration import EthoscopeConfiguration
+from ethoscope_node.utils.paths import resolve_config_dir
 
 gbw = None  # This will be initialized later
 
@@ -346,7 +347,7 @@ def main():
             "-c",
             "--configuration",
             dest="config_dir",
-            help="Path to configuration directory (default: /etc/ethoscope)",
+            help=f"Path to configuration directory (default: {resolve_config_dir()})",
         )
 
         (options, args) = parser.parse_args()

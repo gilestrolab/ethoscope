@@ -34,9 +34,12 @@ import string
 import traceback
 
 from ethoscope_node.utils.configuration import migrate_conf_file
+from ethoscope_node.utils.paths import resolve_config_dir
 
-# Module-level default configuration directory
-_default_config_dir = "/etc/ethoscope"
+# Module-level default configuration directory.
+# Resolved from ETHOSCOPE_CONFIG_DIR / {ETHOSCOPE_DATA_DIR}/config at import time;
+# server.py overrides this via set_default_config_dir() with the CLI-resolved path.
+_default_config_dir = resolve_config_dir()
 
 
 def set_default_config_dir(path: str) -> None:

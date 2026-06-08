@@ -39,7 +39,15 @@ def _stable_mac_address():
 MAC_ADDRESS = _stable_mac_address()
 PORT = 8001
 DEFAULT_JSONFILE = "config_sensor.json"
-DEFAULT_ETHOSCOPE_CONF = "/etc/ethoscope/ethoscope.conf"
+
+# Resolve the node config dir the same way the node does (ETHOSCOPE_CONFIG_DIR ->
+# {ETHOSCOPE_DATA_DIR or /ethoscope_data}/config). Duplicated rather than imported
+# to keep this standalone accessory independent of the node package; systemd
+# supplies these vars via the bootstrap env file (/etc/ethoscope/environment).
+_NODE_CONFIG_DIR = os.environ.get("ETHOSCOPE_CONFIG_DIR") or os.path.join(
+    os.environ.get("ETHOSCOPE_DATA_DIR", "/ethoscope_data"), "config"
+)
+DEFAULT_ETHOSCOPE_CONF = os.path.join(_NODE_CONFIG_DIR, "ethoscope.conf")
 
 # Global config variable - will be loaded after parsing command line arguments
 config = None

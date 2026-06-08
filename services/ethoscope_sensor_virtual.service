@@ -7,7 +7,9 @@ Wants=network.target
 Type=simple
 User=node
 Group=node
-# Config is read from the [virtual_sensor] section of /etc/ethoscope/ethoscope.conf
+# Config is read from the [virtual_sensor] section of <config_dir>/ethoscope.conf,
+# where <config_dir> resolves from ETHOSCOPE_CONFIG_DIR / {ETHOSCOPE_DATA_DIR}/config
+EnvironmentFile=-/etc/ethoscope/environment
 ExecStart=/usr/bin/python3 /opt/ethoscope/accessories/hardware/etho_sensor/virtual_sensor.py
 WorkingDirectory=/opt/ethoscope/accessories/hardware/etho_sensor
 Restart=always

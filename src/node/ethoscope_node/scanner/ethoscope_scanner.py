@@ -21,6 +21,7 @@ from ethoscope_node.scanner.base_scanner import (
 from ethoscope_node.scanner.ethoscope_streaming import EthoscopeStreamManager
 from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
 from ethoscope_node.utils.etho_db import ExperimentalDB
+from ethoscope_node.utils.paths import resolve_config_dir
 
 # Constants
 STREAMING_PORT = 8887
@@ -78,13 +79,13 @@ class Ethoscope(BaseDevice):
         port: int = ETHOSCOPE_PORT,
         refresh_period: float = 5,
         results_dir: str = "/ethoscope_data/results",
-        config_dir: str = "/etc/ethoscope",
+        config_dir: str | None = None,
         config: EthoscopeConfiguration | None = None,
     ):
         # Initialize ethoscope-specific attributes BEFORE calling parent
         self._results_dir = results_dir
-        self._config_dir = config_dir
-        self._edb = ExperimentalDB(config_dir)
+        self._config_dir = config_dir or resolve_config_dir()
+        self._edb = ExperimentalDB(self._config_dir)
         self._last_db_info = 0
         self._device_controller_created = time.time()
         self._ping_count = 0  # Initialize ping counter
@@ -1453,14 +1454,14 @@ class EthoscopeScanner(DeviceScanner):
         device_refresh_period: float = 5,
         results_dir: str = "/ethoscope_data/results",
         device_class=Ethoscope,
-        config_dir: str = "/etc/ethoscope",
+        config_dir: str | None = None,
         config: EthoscopeConfiguration | None = None,
     ):
         super().__init__(device_refresh_period, device_class)
         self.results_dir = results_dir
-        self.config_dir = config_dir
+        self.config_dir = config_dir or resolve_config_dir()
         self.config = config  # Store config to pass to devices
-        self._edb = ExperimentalDB(config_dir)
+        self._edb = ExperimentalDB(self.config_dir)
         self.timestarted = (
             datetime.datetime.now()
         )  # Keep original name for compatibility

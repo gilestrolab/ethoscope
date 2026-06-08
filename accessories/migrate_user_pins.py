@@ -11,6 +11,7 @@ Usage:
     python migrate_user_pins.py --config-dir /etc/ethoscope
 """
 
+import os
 import sys
 import logging
 import argparse
@@ -65,10 +66,14 @@ Examples:
     python migrate_user_pins.py --config-dir /custom/path
         """
     )
+    # Resolve config dir like the node: ETHOSCOPE_CONFIG_DIR -> {data}/config.
+    default_config_dir = os.environ.get('ETHOSCOPE_CONFIG_DIR') or os.path.join(
+        os.environ.get('ETHOSCOPE_DATA_DIR', '/ethoscope_data'), 'config'
+    )
     parser.add_argument(
         '--config-dir',
-        default='/etc/ethoscope',
-        help='Configuration directory path (default: /etc/ethoscope)'
+        default=default_config_dir,
+        help=f'Configuration directory path (default: {default_config_dir})'
     )
     parser.add_argument(
         '--dry-run',
