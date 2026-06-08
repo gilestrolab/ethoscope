@@ -1411,7 +1411,7 @@ Host {ip_pattern} ethoscope*
         logger.error(f"Failed to setup system SSH config: {e}")
 
 
-def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> tuple[str, str]:
+def ensure_ssh_keys(keys_dir: str | None = None) -> tuple[str, str]:
     """
     Ensure SSH keys exist for ethoscope node authentication.
 
@@ -1419,7 +1419,10 @@ def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> tuple[str, str]:
     and returns paths to the private and public keys.
 
     Args:
-        keys_dir: Directory to store SSH keys
+        keys_dir: Directory to store SSH keys. When omitted, defaults to the
+            ``keys`` subdirectory of the active configuration directory
+            (e.g. ``{ETHOSCOPE_DATA}/config/keys``) so that all callers —
+            scanner, server, and backup tools — resolve to the same location.
 
     Returns:
         Tuple of (private_key_path, public_key_path)
@@ -1428,6 +1431,12 @@ def ensure_ssh_keys(keys_dir: str = "/etc/ethoscope/keys") -> tuple[str, str]:
         ConfigurationError: If key generation or setup fails
     """
     logger = logging.getLogger(__name__)
+
+    # Reason: backup helpers call this without an explicit keys_dir. Resolving
+    # from the config dir keeps them aligned with the scanner/server, which
+    # install the key into {config_dir}/keys after the config move.
+    if keys_dir is None:
+        keys_dir = os.path.join(resolve_config_dir(), "keys")
 
     try:
         # Ensure keys directory exists

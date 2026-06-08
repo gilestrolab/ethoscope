@@ -1661,6 +1661,36 @@ class TestSSHKeyManagement:
                     assert private_key == str(keys_dir / "id_rsa")
                     assert public_key == str(keys_dir / "id_rsa.pub")
 
+    def test_ensure_ssh_keys_defaults_to_config_dir(self):
+        """Without an explicit keys_dir, keys resolve under the config dir.
+
+        Regression: backup helpers call ensure_ssh_keys() with no argument.
+        The default must track resolve_config_dir() so it stays aligned with
+        the scanner/server, which install keys into {config_dir}/keys.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            expected_keys_dir = Path(tmpdir) / "keys"
+
+            def mock_ssh_keygen(*args, **kwargs):
+                private_key_file = expected_keys_dir / "id_rsa"
+                public_key_file = expected_keys_dir / "id_rsa.pub"
+                private_key_file.write_text("fake private key")
+                public_key_file.write_text("fake public key")
+                return Mock(stdout="Key generated")
+
+            with patch(
+                "ethoscope_node.utils.configuration.resolve_config_dir",
+                return_value=tmpdir,
+            ):
+                with patch("subprocess.run", side_effect=mock_ssh_keygen):
+                    with patch(
+                        "ethoscope_node.utils.configuration._setup_system_ssh_config"
+                    ):
+                        private_key, public_key = ensure_ssh_keys()
+
+                        assert private_key == str(expected_keys_dir / "id_rsa")
+                        assert public_key == str(expected_keys_dir / "id_rsa.pub")
+
     def test_ensure_ssh_keys_returns_existing(self):
         """Test ensure_ssh_keys returns existing keys."""
         with tempfile.TemporaryDirectory() as tmpdir:
