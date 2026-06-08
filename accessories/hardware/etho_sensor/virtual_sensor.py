@@ -15,16 +15,28 @@ from zeroconf import ServiceInfo, Zeroconf, ServiceBrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import socket
 import random
+import hashlib
 import json
 import urllib.request
 import urllib.error
 import time
 import os
-import threading
 
 from optparse import OptionParser
 
-MAC_ADDRESS = ':'.join('%02x'%random.randint(0,255) for x in range(6))
+
+def _stable_mac_address():
+    """Derive a stable pseudo-MAC from the hostname.
+
+    Reason: the sensor's /id must be stable across restarts. A random value
+    re-rolled per process (with systemd Restart=always) made every restart
+    look like a brand-new sensor to the node, orphaning the old entry.
+    """
+    digest = hashlib.md5(socket.gethostname().encode("utf-8")).digest()
+    return ':'.join('%02x' % b for b in digest[:6])
+
+
+MAC_ADDRESS = _stable_mac_address()
 PORT = 8001
 DEFAULT_JSONFILE = "config_sensor.json"
 DEFAULT_ETHOSCOPE_CONF = "/etc/ethoscope/ethoscope.conf"
@@ -195,7 +207,7 @@ class WeatherDataFetcher:
             # Simple time-based adjustment (this is very approximate)
             import datetime
             current_hour = datetime.datetime.now().hour
-            if 6 <= current_hour <= 18:  # Rough daylight hours
+            if 7 <= current_hour <= 17:  # Rough daylight hours
                 time_factor = 1.0
             elif current_hour in [5, 6, 18, 19]:  # Dawn/dusk
                 time_factor = 0.3
@@ -239,6 +251,28 @@ class hwsensor():
         if weather_fetcher:
             return weather_fetcher.fetch_weather_data()['light']
         return random.randint(10000, 65000)
+
+    def read(self):
+        """Return a single consistent snapshot of all sensor values.
+
+        Reason: fetch weather once per reading so the four fields come from
+        the same observation and correctness doesn't hinge on the fetcher
+        cache (four separate property reads each re-enter fetch_weather_data).
+        """
+        if weather_fetcher:
+            data = weather_fetcher.fetch_weather_data()
+            return {
+                'temperature': data['temperature'],
+                'humidity': data['humidity'],
+                'pressure': data['pressure'],
+                'light': data['light'],
+            }
+        return {
+            'temperature': 20.0 + random.uniform(-5, 10),
+            'humidity': 50.0 + random.uniform(-20, 30),
+            'pressure': 1013.25 + random.uniform(-50, 50),
+            'light': random.randint(10000, 65000),
+        }
 
 
 class SensorListener():
@@ -299,7 +333,8 @@ class virtualSensor():
                                 'id_page': '/id',
                                 'settings' : '/set'
                             } )
-        except:
+        except TypeError:
+            # Older zeroconf takes a single `address=` instead of `addresses=`.
             serviceInfo = ServiceInfo("_sensor._tcp.%s." % self.__net_suffix,
                             self.uid + "._sensor._tcp.%s." % self.__net_suffix,
                             address = socket.inet_aton(self.address),
@@ -315,6 +350,8 @@ class virtualSensor():
         zeroconf = Zeroconf()
         zeroconf.register_service(serviceInfo)
 
+
+# Module-level sensor singleton, shared by the HTTP handler.
 hws = hwsensor()
 
 
@@ -354,15 +391,17 @@ class SensorHTTPHandler(BaseHTTPRequestHandler):
         """Send current sensor data"""
         host_header = self.headers.get('host', f"{socket.gethostname()}:{PORT}")
 
+        reading = hws.read()
         data = {
             "id": MAC_ADDRESS,
             "ip": host_header,
-            "name": config['sensor_name'],
-            "location": config['location'],
-            "temperature": hws.getTemperature,
-            "humidity": hws.getHumidity,
-            "pressure": hws.getPressure,
-            "light": hws.getLight,
+            # Reason: use .get() so a partial virtual_sensor config can't 500 the request.
+            "name": config.get('sensor_name', 'virtual-sensor'),
+            "location": config.get('location', ''),
+            "temperature": reading['temperature'],
+            "humidity": reading['humidity'],
+            "pressure": reading['pressure'],
+            "light": reading['light'],
             "alerts": False
         }
         self.send_json_response(data)

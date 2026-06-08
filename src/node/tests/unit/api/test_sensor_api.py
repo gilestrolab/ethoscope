@@ -48,12 +48,13 @@ class TestSensorAPI(unittest.TestCase):
         # Register routes
         self.api.register_routes()
 
-        # Verify all 4 routes were registered
-        self.assertEqual(len(route_calls), 4)
+        # Verify all 5 routes were registered
+        self.assertEqual(len(route_calls), 5)
 
         # Check specific routes
         paths = [call[0] for call in route_calls]
         self.assertIn("/sensors", paths)
+        self.assertIn("/sensors/merged", paths)
         self.assertIn("/sensor/set", paths)
         self.assertIn("/list_sensor_csv_files", paths)
         self.assertIn("/get_sensor_csv_data/<filename>", paths)
@@ -110,20 +111,34 @@ class TestSensorAPI(unittest.TestCase):
         )
 
     @patch("ethoscope_node.api.sensor_api.SensorAPI.get_request_data")
-    def test_edit_sensor_with_eval_fallback(self, mock_get_data):
-        """Test editing sensor falls back to eval for non-JSON."""
-        # Python dict string (not valid JSON)
+    def test_edit_sensor_rejects_non_json(self, mock_get_data):
+        """Non-JSON bodies must be rejected, not eval'd (RCE prevention)."""
+        # Python dict string (not valid JSON) - previously eval'd
         sensor_data = "{'id': 'sensor1', 'location': 'Lab B', 'name': 'Sensor'}"
         mock_get_data.return_value = sensor_data.encode("utf-8")
 
         mock_sensor = Mock()
-        mock_sensor.set.return_value = {"success": True}
         self.api.sensor_scanner.get_device.return_value = mock_sensor
 
         result = self.api._edit_sensor()
 
-        self.assertEqual(result, {"success": True})
-        mock_sensor.set.assert_called_once()
+        self.assertEqual(result, {"error": "Invalid data format"})
+        mock_sensor.set.assert_not_called()
+
+    @patch("ethoscope_node.api.sensor_api.SensorAPI.get_request_data")
+    def test_edit_sensor_does_not_execute_code(self, mock_get_data):
+        """A body crafted to execute code must not run it."""
+        import ethoscope_node.api.sensor_api as sensor_api_module
+
+        sensor_api_module._eval_canary = False
+        # Would set the canary True if eval() ran on the body.
+        payload = "__import__('ethoscope_node.api.sensor_api').sensor_api._eval_canary"
+        mock_get_data.return_value = payload.encode("utf-8")
+
+        result = self.api._edit_sensor()
+
+        self.assertEqual(result, {"error": "Invalid data format"})
+        self.assertFalse(sensor_api_module._eval_canary)
 
     @patch("ethoscope_node.api.sensor_api.SensorAPI.get_request_data")
     def test_edit_sensor_invalid_data_format(self, mock_get_data):
@@ -231,7 +246,10 @@ class TestSensorAPI(unittest.TestCase):
             "timestamp,temperature,humidity\n2024-01-01,22.5,45\n2024-01-02,23.0,46\n"
         )
 
-        with patch("builtins.open", mock_open(read_data=csv_content)):
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", mock_open(read_data=csv_content)),
+        ):
             result = self.api._get_csv_data("sensor1.csv")
 
         self.assertEqual(result["headers"], ["timestamp", "temperature", "humidity"])
@@ -243,7 +261,10 @@ class TestSensorAPI(unittest.TestCase):
         """Test reading empty CSV file."""
         csv_content = "timestamp,temperature,humidity\n"
 
-        with patch("builtins.open", mock_open(read_data=csv_content)):
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", mock_open(read_data=csv_content)),
+        ):
             result = self.api._get_csv_data("empty.csv")
 
         self.assertEqual(result["headers"], ["timestamp", "temperature", "humidity"])
@@ -271,7 +292,10 @@ class TestSensorAPI(unittest.TestCase):
             "timestamp,temperature\n2024-01-01,22.5\nmalformed line\n2024-01-02,23.0\n"
         )
 
-        with patch("builtins.open", mock_open(read_data=csv_content)):
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", mock_open(read_data=csv_content)),
+        ):
             result = self.api._get_csv_data("malformed.csv")
 
         # Should still parse, but malformed line is included
@@ -285,7 +309,10 @@ class TestSensorAPI(unittest.TestCase):
             "  timestamp  ,  temp  ,  humid  \n  2024-01-01  ,  22.5  ,  45  \n"
         )
 
-        with patch("builtins.open", mock_open(read_data=csv_content)):
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open", mock_open(read_data=csv_content)),
+        ):
             result = self.api._get_csv_data("whitespace.csv")
 
         # strip() removes leading/trailing whitespace from entire line
@@ -293,6 +320,25 @@ class TestSensorAPI(unittest.TestCase):
         # Middle elements keep internal spaces after commas
         self.assertEqual(result["headers"], ["timestamp  ", "  temp  ", "  humid"])
         self.assertEqual(result["data"][0], ["2024-01-01  ", "  22.5  ", "  45"])
+
+    def test_get_csv_data_rejects_path_traversal(self):
+        """Filenames escaping the sensors dir must be refused without opening."""
+        with patch("builtins.open") as mock_open_fn:
+            result = self.api._get_csv_data("../../../etc/passwd")
+
+        self.assertEqual(result, {"error": "File not found"})
+        mock_open_fn.assert_not_called()
+
+    def test_get_csv_data_rejects_non_csv(self):
+        """Non-.csv filenames must be refused."""
+        with (
+            patch("os.path.isfile", return_value=True),
+            patch("builtins.open") as mock_open_fn,
+        ):
+            result = self.api._get_csv_data("secrets.json")
+
+        self.assertEqual(result, {"error": "File not found"})
+        mock_open_fn.assert_not_called()
 
     @patch("ethoscope_node.api.sensor_api.SensorAPI.get_request_data")
     def test_edit_sensor_missing_fields(self, mock_get_data):

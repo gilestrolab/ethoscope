@@ -118,15 +118,12 @@ class SensorAPI(BaseAPI):
         """Edit sensor settings."""
         input_string = self.get_request_data().decode("utf-8")
 
-        # Use json.loads instead of eval for security
+        # Reason: parse strictly as JSON. A previous eval() fallback here was a
+        # remote-code-execution hole (arbitrary code ran as the node user).
         try:
             data = json.loads(input_string)
         except json.JSONDecodeError:
-            # Fallback for malformed JSON - but this is risky
-            try:
-                data = eval(input_string)  # This should eventually be removed
-            except Exception:
-                return {"error": "Invalid data format"}
+            return {"error": "Invalid data format"}
 
         if self.sensor_scanner:
             try:
@@ -156,7 +153,17 @@ class SensorAPI(BaseAPI):
     def _get_csv_data(self, filename):
         """Read CSV file and return data for plotting."""
         directory = self.sensors_dir
-        filepath = os.path.join(directory, filename)
+
+        # Reason: filename comes straight from the URL. Strip any path
+        # components and require a .csv suffix so reads stay confined to
+        # sensors_dir (prevents traversal like ../../etc/passwd).
+        safe_name = os.path.basename(filename)
+        if not safe_name.endswith(".csv") or not directory:
+            return {"error": "File not found"}
+
+        filepath = os.path.join(directory, safe_name)
+        if not os.path.isfile(filepath):
+            return {"error": "File not found"}
 
         data = []
         with open(filepath) as csvfile:
