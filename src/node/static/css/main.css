@@ -2200,6 +2200,18 @@ table thead th a:focus {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
+/* File manager (More > Browse / Download Files): keep every button uniform and
+   compact. The global .btn-success rule above forces width:100% and a larger
+   font, which made the Download button balloon next to the other actions.
+   Re-normalise all buttons in this section so they share one consistent size. */
+.file-browser .btn {
+    width: auto;
+    padding: 6px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 4px;
+}
+
 /* Alert info for additional interactors */
 .additional-interactor-item .alert-info {
     background-color: rgba(91, 70, 199, 0.1);
