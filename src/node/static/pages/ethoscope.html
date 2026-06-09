@@ -1235,7 +1235,7 @@
                                     {{opt.overview}}
                                 </div>
                                 <ul ng-if="selected_options.recording[name]['name']==opt.name">
-                                    <li ng-repeat="arg in opt.arguments">
+                                    <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.recording[name]['arguments'])">
                                         <label ng-if="arg.type != 'date_range'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
 
                                         <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
