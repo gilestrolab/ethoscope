@@ -1,7 +1,7 @@
 # Ethoscope Node Server Build System
 # Handles Python backend installation (frontend is now source-only)
 
-.PHONY: install-all install-dev install-production test test-unit test-integration test-functional test-coverage clean help
+.PHONY: all install-all install-dev install-production test test-unit test-integration test-functional test-coverage test-fast test-slow clean help
 
 # Default target - complete installation
 all: install-all
@@ -12,10 +12,10 @@ install-all:
 	pip install .
 	@echo "✓ Installation finished"
 
-# Development installation (editable Python package)
+# Development installation (editable Python package, with dev/test tooling)
 install-dev:
 	@echo "Installing Python backend package in development mode..."
-	pip install -e .
+	pip install -e .[dev]
 	@echo "✓ Development installation finished"
 
 # Production installation
