@@ -2,11 +2,10 @@ import datetime
 import json
 import logging
 import os
-import pickle
+import queue
 
 # streaming socket
 import socket
-import struct
 import tempfile
 import threading
 import time
@@ -22,6 +21,22 @@ from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.description import DescribedObject
 
 STREAMING_PORT = 8887
+
+# Boundary token used to delimit JPEG frames in the multipart/x-mixed-replace stream.
+# Consumers (browsers, OpenCV/Bonsai, the node proxy) split the byte stream on it.
+STREAM_BOUNDARY = b"frame"
+
+# HTTP/1.0 response sent once per client before the multipart body starts. Using a standard
+# MJPEG response means any HTTP client (browser <img>, OpenCV VideoCapture, the node proxy)
+# can consume the stream directly with no Python-specific decoding.
+STREAM_HTTP_HEADER = (
+    b"HTTP/1.0 200 OK\r\n"
+    b"Connection: close\r\n"
+    b"Cache-Control: no-cache, private\r\n"
+    b"Pragma: no-cache\r\n"
+    b"Content-Type: multipart/x-mixed-replace; boundary=" + STREAM_BOUNDARY + b"\r\n"
+    b"\r\n"
+)
 
 # Name of the marker file dropped into a video session folder when a recording terminates.
 # Its presence tells downstream tools (e.g. the node's h264_to_mp4 converter) that the .h264
@@ -81,6 +96,14 @@ class cameraCaptureThread(threading.Thread):
 
         self._img_path = img_path
         self._stream = stream
+
+        # Streaming server state (only used when self._stream is True).
+        # One shared TCP server fans the same encoded frame out to every connected client
+        # via a per-client bounded queue, so a slow client drops frames instead of stalling
+        # the camera loop, and the JPEG is only ever encoded once per frame.
+        self._stream_server_socket = None
+        self._stream_clients = []  # list of (client_socket, queue.Queue)
+        self._stream_lock = threading.Lock()
 
         self._resolution = (width, height)
         self._fps = fps
@@ -174,19 +197,9 @@ class cameraCaptureThread(threading.Thread):
         writer = None
 
         if self._stream:
-            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            server_socket.bind(("", STREAMING_PORT))
-            server_socket.listen(5)
-            logging.info("Socket stream initiliased.")
+            self._start_stream_server()
 
         while not self.stop_camera_activity:
-
-            # waiting for the streaming connection to be established
-            if self._stream:
-                logging.info("Waiting for a connection to start streaming")
-                client_socket, client_address = server_socket.accept()  # blocking call
-                logging.info("Connection established!")
 
             # processing images one by one
             for ix, (_, frame) in enumerate(self.camera):
@@ -231,14 +244,23 @@ class cameraCaptureThread(threading.Thread):
                         1,
                         (255, 255, 255),
                     )
-                    _, frame = cv2.imencode(
+                    ok, jpg = cv2.imencode(
                         ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 90]
                     )
 
-                    # send it to stream
-                    data = pickle.dumps(frame)
-                    message = struct.pack("Q", len(data)) + data
-                    client_socket.sendall(message)
+                    # Encode once, then fan the same MJPEG part out to every client.
+                    if ok:
+                        jpg_bytes = jpg.tobytes()
+                        chunk = (
+                            b"--" + STREAM_BOUNDARY + b"\r\n"
+                            b"Content-Type: image/jpeg\r\n"
+                            b"Content-Length: "
+                            + str(len(jpg_bytes)).encode()
+                            + b"\r\n\r\n"
+                            + jpg_bytes
+                            + b"\r\n"
+                        )
+                        self._broadcast_stream_frame(chunk)
 
                 # AFTER writing, annotates the frame for preview but only once every 5 seconds
                 if not self._stream and ((time.time() - self.preview_time) > 5):
@@ -251,11 +273,104 @@ class cameraCaptureThread(threading.Thread):
         self.camera._close()
 
         if self._stream:
-            client_socket.close()
-            server_socket.close()
+            self._stop_stream_server()
 
         if writer:
             writer.release()
+
+    def _start_stream_server(self):
+        """Open the MJPEG TCP server and start accepting clients in the background."""
+        self._stream_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._stream_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._stream_server_socket.bind(("", STREAMING_PORT))
+        self._stream_server_socket.listen(5)
+        threading.Thread(target=self._accept_stream_clients, daemon=True).start()
+        logging.info("MJPEG stream server initialised on port %d.", STREAMING_PORT)
+
+    def _accept_stream_clients(self):
+        """Accept incoming HTTP clients and hand each one its own writer thread."""
+        while not self.stop_camera_activity:
+            try:
+                client_socket, _ = self._stream_server_socket.accept()
+            except OSError:
+                break  # server socket has been closed during shutdown
+
+            try:
+                # Consume the HTTP request line/headers (best effort) so the client
+                # socket is drained, then send the multipart response header.
+                client_socket.settimeout(2)
+                try:
+                    client_socket.recv(4096)
+                except OSError:
+                    pass
+                client_socket.settimeout(None)
+                client_socket.sendall(STREAM_HTTP_HEADER)
+            except OSError:
+                try:
+                    client_socket.close()
+                except OSError:
+                    pass
+                continue
+
+            client_queue = queue.Queue(maxsize=10)
+            with self._stream_lock:
+                self._stream_clients.append((client_socket, client_queue))
+            threading.Thread(
+                target=self._serve_stream_client,
+                args=(client_socket, client_queue),
+                daemon=True,
+            ).start()
+            logging.info("Streaming client connected.")
+
+    def _serve_stream_client(self, client_socket, client_queue):
+        """Drain one client's queue to its socket; drop the client on any write error."""
+        try:
+            while not self.stop_camera_activity:
+                try:
+                    chunk = client_queue.get(timeout=5)
+                except queue.Empty:
+                    continue
+                if chunk is None:  # shutdown sentinel
+                    break
+                client_socket.sendall(chunk)
+        except OSError:
+            pass  # client went away
+        finally:
+            with self._stream_lock:
+                self._stream_clients = [
+                    (s, q) for (s, q) in self._stream_clients if s is not client_socket
+                ]
+            try:
+                client_socket.close()
+            except OSError:
+                pass
+            logging.info("Streaming client disconnected.")
+
+    def _broadcast_stream_frame(self, chunk):
+        """Queue one already-encoded MJPEG part for every connected client."""
+        with self._stream_lock:
+            clients = list(self._stream_clients)
+        for _, client_queue in clients:
+            try:
+                client_queue.put_nowait(chunk)
+            except queue.Full:
+                pass  # slow client: drop this frame rather than stall the camera loop
+
+    def _stop_stream_server(self):
+        """Signal all client writers to stop and close the server socket."""
+        with self._stream_lock:
+            clients = list(self._stream_clients)
+        for _, client_queue in clients:
+            try:
+                client_queue.put_nowait(None)
+            except queue.Full:
+                pass
+        if self._stream_server_socket is not None:
+            try:
+                self._stream_server_socket.close()
+            except OSError:
+                pass
+            self._stream_server_socket = None
 
 
 class GeneralVideoRecorder(DescribedObject):
