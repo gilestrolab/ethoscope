@@ -1248,9 +1248,10 @@ class TestSetupAPI(unittest.TestCase):
     # POST Endpoints - Virtual Sensor Tests
     # ============================================================================
 
+    @patch("ethoscope_node.api.setup_api.os.popen")
     @patch("bottle.request")
-    def test_setup_virtual_sensor_success(self, mock_request):
-        """Test virtual sensor setup successfully."""
+    def test_setup_virtual_sensor_success(self, mock_request, mock_popen):
+        """Enabling persists config (via save()) and restarts the service."""
         mock_request.json = {
             "enabled": True,
             "sensor_name": "weather-sensor",
@@ -1259,40 +1260,101 @@ class TestSetupAPI(unittest.TestCase):
             "api_key": "api_key_123",
         }
 
-        self.api.config.config = {}
-        self.api.config.save_config = Mock()
+        self.api.config.content = {}
+        self.mock_server.is_dockerized = False
+        mock_popen.return_value.__enter__ = Mock(
+            return_value=Mock(read=Mock(return_value=""))
+        )
+        mock_popen.return_value.__exit__ = Mock(return_value=False)
 
         result = self.api._setup_virtual_sensor()
 
         self.assertEqual(result["result"], "success")
-        self.api.config.save_config.assert_called_once()
-        vs_config = self.api.config.config["virtual_sensor"]
+        self.api.config.save.assert_called_once()
+        vs_config = self.api.config.content["virtual_sensor"]
         self.assertTrue(vs_config["enabled"])
         self.assertEqual(vs_config["sensor_name"], "weather-sensor")
+        self.assertEqual(vs_config["api_key"], "api_key_123")
+        # Enabling should enable + restart the systemd unit.
+        invoked = " ".join(c.args[0] for c in mock_popen.call_args_list)
+        self.assertIn("enable ethoscope_sensor_virtual.service", invoked)
+        self.assertIn("restart ethoscope_sensor_virtual.service", invoked)
 
     @patch("bottle.request")
     def test_setup_virtual_sensor_missing_fields(self, mock_request):
-        """Test virtual sensor setup with missing required fields."""
+        """Missing required fields when enabled returns an error and no save."""
         mock_request.json = {"enabled": True}
+        self.api.config.content = {}
 
         result = self.api._setup_virtual_sensor()
 
         self.assertEqual(result["result"], "error")
         self.assertIn("Missing required field", result["message"])
+        self.api.config.save.assert_not_called()
 
+    @patch("ethoscope_node.api.setup_api.os.popen")
     @patch("bottle.request")
-    def test_setup_virtual_sensor_disabled(self, mock_request):
-        """Test virtual sensor setup when disabled."""
+    def test_setup_virtual_sensor_disabled(self, mock_request, mock_popen):
+        """Disabling persists config and stops + disables the service."""
         mock_request.json = {"enabled": False}
 
-        self.api.config.config = {}
-        self.api.config.save_config = Mock()
+        self.api.config.content = {}
+        self.mock_server.is_dockerized = False
+        mock_popen.return_value.__enter__ = Mock(
+            return_value=Mock(read=Mock(return_value=""))
+        )
+        mock_popen.return_value.__exit__ = Mock(return_value=False)
 
         result = self.api._setup_virtual_sensor()
 
         self.assertEqual(result["result"], "success")
-        vs_config = self.api.config.config["virtual_sensor"]
+        self.api.config.save.assert_called_once()
+        vs_config = self.api.config.content["virtual_sensor"]
         self.assertFalse(vs_config["enabled"])
+        invoked = " ".join(c.args[0] for c in mock_popen.call_args_list)
+        self.assertIn("disable --now ethoscope_sensor_virtual.service", invoked)
+
+    @patch("ethoscope_node.api.setup_api.os.popen")
+    @patch("bottle.request")
+    def test_setup_virtual_sensor_dockerized_skips_systemctl(
+        self, mock_request, mock_popen
+    ):
+        """In docker deployments systemctl is not invoked."""
+        mock_request.json = {
+            "enabled": True,
+            "sensor_name": "weather-sensor",
+            "location": "Lab 1",
+        }
+        self.api.config.content = {}
+        self.mock_server.is_dockerized = True
+
+        result = self.api._setup_virtual_sensor()
+
+        self.assertEqual(result["result"], "success")
+        mock_popen.assert_not_called()
+
+    def test_get_virtual_sensor_returns_stored_config(self):
+        """GET /setup/virtual-sensor returns the persisted virtual_sensor section."""
+        stored = {
+            "enabled": True,
+            "sensor_name": "weather-sensor",
+            "location": "Lab 1",
+            "weather_location": "London,UK",
+            "api_key": "api_key_123",
+        }
+        self.api.config.content = {"virtual_sensor": stored}
+
+        result = self.api._get_virtual_sensor()
+
+        self.assertEqual(result, stored)
+
+    def test_get_virtual_sensor_empty_when_unset(self):
+        """GET returns an empty dict when no virtual sensor is configured."""
+        self.api.config.content = {}
+
+        result = self.api._get_virtual_sensor()
+
+        self.assertEqual(result, {})
 
     @patch("bottle.request")
     @patch("urllib.request.urlopen")

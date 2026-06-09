@@ -210,6 +210,113 @@
             </div>
             <div class="modal-body">
                 <form name="sensorForm" novalidate>
+                    <!-- Sensor type selector (only when adding a new sensor) -->
+                    <div class="row" ng-if="!selectedSensor._editing">
+                        <div class="col-12">
+                            <div class="form-group">
+                                <label class="form-label" style="font-weight: bold;">Sensor Type</label>
+                                <div>
+                                    <label class="radio-inline" style="margin-right: 20px;">
+                                        <input type="radio" ng-model="selectedSensor._virtual" ng-value="false"> Physical sensor
+                                    </label>
+                                    <label class="radio-inline">
+                                        <input type="radio" ng-model="selectedSensor._virtual" ng-value="true"> Virtual (weather) sensor
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted" ng-if="selectedSensor._virtual">
+                                    A virtual sensor reports real-world weather data (temperature, humidity, pressure, light) for a configured location via the OpenWeatherMap API. Only one virtual sensor can run per node.
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ============ VIRTUAL SENSOR FIELDS ============ -->
+                    <div ng-if="selectedSensor._virtual">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Name <span class="text-danger">*</span></label>
+                                    <input type="text"
+                                           class="form-control"
+                                           name="name"
+                                           ng-model="selectedSensor.name"
+                                           placeholder="virtual-sensor"
+                                           required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Location <span class="text-danger">*</span></label>
+                                    <input type="text"
+                                           class="form-control"
+                                           name="location"
+                                           ng-model="selectedSensor.location"
+                                           placeholder="Lab"
+                                           required>
+                                    <small class="form-text text-muted">Free-text physical location of the sensor.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">Weather Location</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           ng-model="selectedSensor.weather_location"
+                                           placeholder="London,GB or 51.5074,-0.1278 or 2643743">
+                                    <small class="form-text text-muted">City name, coordinates, or OpenWeatherMap city ID. Leave blank for simulated data.</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="form-label">OpenWeatherMap API Key</label>
+                                    <input type="text"
+                                           class="form-control"
+                                           ng-model="selectedSensor.api_key"
+                                           placeholder="Enter your API key">
+                                    <small class="form-text text-muted">Required for real weather data. Get a free key at openweathermap.org/api.</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="toggle-check">Virtual sensor enabled
+                                        <input type="checkbox"
+                                               class="toggle-check-input"
+                                               ng-model="selectedSensor.enabled">
+                                        <span class="toggle-check-text"></span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <button type="button"
+                                        class="btn btn-outline-primary"
+                                        ng-click="testWeatherApi()"
+                                        ng-disabled="!selectedSensor.weather_location || !selectedSensor.api_key">
+                                    <i class="fa fa-thermometer-half"></i> Test Weather API
+                                </button>
+                            </div>
+                            <div class="col-12" ng-if="weatherTestResult">
+                                <div class="alert" ng-class="weatherTestResult.success ? 'alert-success' : 'alert-danger'" style="margin-top: 10px; margin-bottom: 0;">
+                                    <span ng-if="weatherTestResult.success">
+                                        <i class="fa fa-check"></i>
+                                        {{weatherTestResult.location}} ({{weatherTestResult.country}}):
+                                        {{weatherTestResult.temperature}}&deg;C, {{weatherTestResult.humidity}}% humidity, {{weatherTestResult.pressure}} hPa
+                                    </span>
+                                    <span ng-if="!weatherTestResult.success">
+                                        <i class="fa fa-times"></i> {{weatherTestResult.message}}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ============ PHYSICAL SENSOR FIELDS ============ -->
+                    <div ng-if="!selectedSensor._virtual">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
@@ -342,6 +449,8 @@
                             </div>
                         </div>
                     </div>
+                    </div>
+                    <!-- ============ END PHYSICAL SENSOR FIELDS ============ -->
                 </form>
             </div>
             <div class="modal-footer">

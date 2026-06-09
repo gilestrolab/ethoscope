@@ -95,21 +95,80 @@
         $scope.clearSelectedSensor = function() {
             $scope.selectedSensor = {
                 active: true, name: '', URL: '', location: '', description: '',
-                alerts: { enabled: false, min_threshold: 18.0, max_threshold: 28.0 }
+                alerts: { enabled: false, min_threshold: 18.0, max_threshold: 28.0 },
+                _virtual: false,
+                weather_location: '', api_key: '', enabled: true
             };
+            $scope.weatherTestResult = null;
         };
 
         $scope.editSensor = function(sensor) {
             $scope.selectedSensor = angular.copy(sensor);
             $scope.selectedSensor._editing = true;
             $scope.selectedSensor._originalName = sensor.name;
+            $scope.weatherTestResult = null;
             if (!$scope.selectedSensor.alerts) {
                 $scope.selectedSensor.alerts = { enabled: false, min_threshold: 18.0, max_threshold: 28.0 };
             }
+            // A virtual (weather) sensor: load its stored config (weather location,
+            // api key) which is not part of the discovered sensor row data.
+            if ($scope.hasNoAlerts(sensor)) {
+                $scope.selectedSensor._virtual = true;
+                $http.get('/setup/virtual-sensor')
+                    .then(function(response) {
+                        var vs = response.data || {};
+                        $scope.selectedSensor.name = vs.sensor_name || sensor.name;
+                        $scope.selectedSensor.location = vs.location || sensor.location || '';
+                        $scope.selectedSensor.weather_location = vs.weather_location || '';
+                        $scope.selectedSensor.api_key = vs.api_key || '';
+                        $scope.selectedSensor.enabled = vs.enabled !== false;
+                    })
+                    .catch(function(error) {
+                        console.error('Error loading virtual sensor config:', error);
+                    });
+            }
+        };
+
+        $scope.testWeatherApi = function() {
+            $scope.weatherTestResult = null;
+            $http.post('/setup/test-weather-api', {
+                weather_location: $scope.selectedSensor.weather_location,
+                api_key: $scope.selectedSensor.api_key
+            }).then(function(response) {
+                $scope.weatherTestResult = response.data;
+            }).catch(function(error) {
+                console.error('Error testing weather API:', error);
+                $scope.weatherTestResult = { success: false, message: 'Request failed. Please try again.' };
+            });
         };
 
         $scope.saveSensor = function() {
             var data = $scope.selectedSensor;
+
+            // Virtual (weather) sensor: configure via the dedicated endpoint,
+            // which persists the config and applies the systemd service state.
+            if (data._virtual) {
+                $http.post('/setup/virtual-sensor', {
+                    enabled: data.enabled !== false,
+                    sensor_name: data.name,
+                    location: data.location || '',
+                    weather_location: data.weather_location || '',
+                    api_key: data.api_key || ''
+                }).then(function(response) {
+                    if (response.data.result === 'success') {
+                        $('#sensorModal').modal('hide');
+                        loadSensors();
+                        $scope.clearSelectedSensor();
+                    } else {
+                        alert('Error saving virtual sensor: ' + (response.data.message || 'Unknown error'));
+                    }
+                }).catch(function(error) {
+                    console.error('Error saving virtual sensor:', error);
+                    alert('Error saving virtual sensor. Please try again.');
+                });
+                return;
+            }
+
             var payload = {
                 name: data.name,
                 URL: data.URL || '',
@@ -175,19 +234,29 @@
 
         $scope.deleteSensor = function() {
             if (!$scope.sensorToDelete) return;
-            $http.post('/setup/delete-sensor', { name: $scope.sensorToDelete.name })
-                .then(function(response) {
-                    if (response.data.result === 'success') {
-                        $('#deleteSensorModal').modal('hide');
-                        loadSensors();
-                    } else {
-                        alert('Error deleting sensor: ' + (response.data.message || 'Unknown error'));
-                    }
-                })
-                .catch(function(error) {
-                    console.error('Error deleting sensor:', error);
-                    alert('Error deleting sensor. Please try again.');
-                });
+
+            var onSuccess = function(response) {
+                if (response.data.result === 'success') {
+                    $('#deleteSensorModal').modal('hide');
+                    loadSensors();
+                } else {
+                    alert('Error deleting sensor: ' + (response.data.message || 'Unknown error'));
+                }
+            };
+            var onError = function(error) {
+                console.error('Error deleting sensor:', error);
+                alert('Error deleting sensor. Please try again.');
+            };
+
+            // A virtual sensor has no configured-sensor entry to delete; instead
+            // disable it, which stops and disables the systemd service.
+            if ($scope.hasNoAlerts($scope.sensorToDelete)) {
+                $http.post('/setup/virtual-sensor', { enabled: false })
+                    .then(onSuccess).catch(onError);
+            } else {
+                $http.post('/setup/delete-sensor', { name: $scope.sensorToDelete.name })
+                    .then(onSuccess).catch(onError);
+            }
             $scope.sensorToDelete = null;
         };
 

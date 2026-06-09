@@ -55,6 +55,8 @@ class SetupAPI(BaseAPI):
             return self._get_current_config()
         elif action == "existing-users":
             return self._get_existing_users()
+        elif action == "virtual-sensor":
+            return self._get_virtual_sensor()
         else:
             bottle.abort(404, f"Setup action '{action}' not found")
 
@@ -1245,15 +1247,21 @@ Ethoscope Node Setup Wizard
         except Exception as e:
             return {"result": "error", "message": f"Slack test failed: {str(e)}"}
 
+    def _get_virtual_sensor(self):
+        """Return the stored virtual sensor configuration."""
+        return self.config.content.get("virtual_sensor", {})
+
     def _setup_virtual_sensor(self):
-        """Configure virtual sensor settings."""
+        """Configure virtual sensor settings and apply the service state."""
         try:
             data = bottle.request.json
             if not data:
                 return {"result": "error", "message": "No data provided"}
 
+            enabled = bool(data.get("enabled", False))
+
             # Validate required fields if enabled
-            if data.get("enabled", False):
+            if enabled:
                 required_fields = ["sensor_name", "location"]
                 for field in required_fields:
                     if not data.get(field):
@@ -1263,13 +1271,13 @@ Ethoscope Node Setup Wizard
                         }
 
             # Update virtual sensor configuration
-            config_data = self.config.config
+            config_data = self.config.content
             if "virtual_sensor" not in config_data:
                 config_data["virtual_sensor"] = {}
 
             config_data["virtual_sensor"].update(
                 {
-                    "enabled": data.get("enabled", False),
+                    "enabled": enabled,
                     "sensor_name": data.get("sensor_name", "virtual-sensor"),
                     "location": data.get("location", "Lab"),
                     "weather_location": data.get("weather_location", ""),
@@ -1278,18 +1286,66 @@ Ethoscope Node Setup Wizard
             )
 
             # Save configuration
-            self.config.save_config()
+            self.config.save()
 
-            return {
+            # Apply the service state so changes take effect immediately. A
+            # restart failure is non-fatal: the config is already persisted.
+            service_warning = self._apply_virtual_sensor_service(enabled)
+
+            result = {
                 "result": "success",
                 "message": "Virtual sensor configured successfully",
             }
+            if service_warning:
+                result["warning"] = service_warning
+            return result
 
         except Exception as e:
             return {
                 "result": "error",
                 "message": f"Failed to configure virtual sensor: {str(e)}",
             }
+
+    def _apply_virtual_sensor_service(self, enabled):
+        """Enable+restart or stop+disable the virtual sensor systemd service.
+
+        Args:
+            enabled (bool): Whether the virtual sensor should be running.
+
+        Returns:
+            str: A warning message if applying the state failed, else "".
+        """
+        service = "ethoscope_sensor_virtual.service"
+
+        # In docker deployments the service is managed by docker-compose, not
+        # systemd, so there is nothing to do here.
+        if getattr(self.server, "is_dockerized", False):
+            self.logger.info(
+                "Skipping systemctl for virtual sensor (dockerized deployment)"
+            )
+            return ""
+
+        if enabled:
+            cmds = [
+                f"/usr/bin/systemctl enable {service}",
+                f"/usr/bin/systemctl restart {service}",
+            ]
+            self.logger.info(f"Enabling and restarting {service}")
+        else:
+            cmds = [f"/usr/bin/systemctl disable --now {service}"]
+            self.logger.info(f"Stopping and disabling {service}")
+
+        try:
+            for cmd in cmds:
+                with os.popen(cmd) as po:
+                    output = po.read()
+                    if output.strip():
+                        self.logger.info(f"{cmd}: {output.strip()}")
+            return ""
+        except Exception as e:
+            warning = f"Configuration saved but could not apply service state: {e}"
+            self.logger.warning(warning)
+            return warning
 
     def _test_weather_api(self):
         """Test weather API connection."""
