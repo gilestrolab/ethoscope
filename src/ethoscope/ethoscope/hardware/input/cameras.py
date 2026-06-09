@@ -310,17 +310,13 @@ class V4L2Camera(BaseCamera):
             self.capture.set(CAP_PROP_FRAME_WIDTH, w)
             self.capture.set(CAP_PROP_FRAME_HEIGHT, h)
 
-        # Get target FPS from system setting if not specified
+        # The maxfps_setting is a *tracking* speed limit, used to cap CPU load
+        # during real-time analysis. It must NOT throttle video acquisition.
+        # Reason: tracking instantiates the camera without an explicit target_fps,
+        # so it falls back to (and is bounded by) maxfps_setting. The video
+        # recorder always passes an explicit fps, which we honour as-is.
         if target_fps is None:
             target_fps = pi.get_maxfps_setting()
-
-        # Apply max FPS constraint
-        max_fps = pi.get_maxfps_setting()
-        if target_fps > max_fps:
-            logging.warning(
-                f"Requested FPS {target_fps} exceeds maximum {max_fps}, using {max_fps}"
-            )
-            target_fps = max_fps
 
         if not isinstance(target_fps, int):
             raise EthoscopeException("FPS must be an integer number")
@@ -971,17 +967,13 @@ class OurPiCameraAsync(BaseCamera):
         if USE_PICAMERA2:
             self._perform_camera_cleanup(delay=1.0)
 
-        # Get target FPS from system setting if not specified
+        # The maxfps_setting is a *tracking* speed limit, used to cap CPU load
+        # during real-time analysis. It must NOT throttle video acquisition.
+        # Reason: tracking instantiates the camera without an explicit target_fps,
+        # so it falls back to (and is bounded by) maxfps_setting. The video
+        # recorder always passes an explicit fps, which we honour as-is.
         if target_fps is None:
             target_fps = pi.get_maxfps_setting()
-
-        # Apply max FPS constraint
-        max_fps = pi.get_maxfps_setting()
-        if target_fps > max_fps:
-            logging.warning(
-                f"Requested FPS {target_fps} exceeds maximum {max_fps}, using {max_fps}"
-            )
-            target_fps = max_fps
 
         w, h = target_resolution
         if not isinstance(target_fps, int):
