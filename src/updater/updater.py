@@ -174,8 +174,22 @@ class DeviceUpdater:
             raise DeviceUpdateError("Branch name must be a string.")
 
         try:
+            # Reason: the branch may have been created remotely after this device last
+            # fetched (e.g. a brand-new branch). Without fetching first, `git checkout`
+            # fails with "pathspec did not match any file(s) known to git". Fetching also
+            # lets us land on the remote tip rather than a stale local branch.
+            logging.info(f"Fetching latest refs before switching to branch '{branch}'.")
+            self._remote.fetch(prune=True)
+
             logging.info(f"Checking out branch '{branch}'.")
-            self._working_repo.git.checkout(branch)
+            remote_ref = f"{self._remote_name}/{branch}"
+            if any(ref.name == remote_ref for ref in self._remote.refs):
+                # `checkout -B` creates the local branch (or resets an existing/stale one)
+                # to the remote-tracking ref, so devices always land on the branch's tip.
+                self._working_repo.git.checkout("-B", branch, remote_ref)
+            else:
+                # Fall back to a plain checkout for purely local branches.
+                self._working_repo.git.checkout(branch)
             logging.info(f"Switched to branch '{branch}'.")
         except GitCommandError as e:
             logging.error(f"Failed to checkout branch '{branch}': {e}")
