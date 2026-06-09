@@ -107,7 +107,7 @@ class TestSensorAPI(unittest.TestCase):
         self.assertEqual(result, {"success": True})
         self.api.sensor_scanner.get_device.assert_called_once_with("sensor1")
         mock_sensor.set.assert_called_once_with(
-            {"location": "Lab A", "sensor_name": "Temp Sensor"}
+            {"name": "Temp Sensor", "location": "Lab A"}, use_json=True
         )
 
     @patch("ethoscope_node.api.sensor_api.SensorAPI.get_request_data")

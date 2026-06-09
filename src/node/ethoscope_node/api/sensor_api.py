@@ -129,8 +129,15 @@ class SensorAPI(BaseAPI):
             try:
                 sensor = self.sensor_scanner.get_device(data["id"])
                 if sensor:
+                    # Reason: the sensor firmware's /set handler parses the raw
+                    # request body as JSON (the `plain` arg) and reads the
+                    # `name`/`location` keys (accessories/hardware/etho_sensor/
+                    # network.cpp). Posting url-encoded form data with a
+                    # `sensor_name` key is unreliable across firmware/web-server
+                    # versions, so send JSON with the keys it expects.
                     return sensor.set(
-                        {"location": data["location"], "sensor_name": data["name"]}
+                        {"name": data["name"], "location": data["location"]},
+                        use_json=True,
                     )
             except Exception as e:
                 return {"error": f"Sensor operation failed: {str(e)}"}
