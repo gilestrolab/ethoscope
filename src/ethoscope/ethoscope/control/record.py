@@ -1,4 +1,5 @@
 import datetime
+import json
 import logging
 import os
 import pickle
@@ -21,6 +22,31 @@ from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.description import DescribedObject
 
 STREAMING_PORT = 8887
+
+# Name of the marker file dropped into a video session folder when a recording terminates.
+# Its presence tells downstream tools (e.g. the node's h264_to_mp4 converter) that the .h264
+# chunks in that folder are final and safe to merge into an mp4.
+RECORDING_MARKER_FILENAME = "recording.info"
+
+
+def write_recording_marker(session_dir, info_dict):
+    """
+    Atomically write the recording-complete marker file into a video session folder.
+
+    Args:
+        session_dir (str): Directory holding the .h264 chunks of one recording session.
+        info_dict (dict): JSON-serialisable metadata (status, timestamps, fps, resolution...).
+
+    Returns:
+        str: Full path of the marker file written.
+    """
+    marker_path = os.path.join(session_dir, RECORDING_MARKER_FILENAME)
+    tmp_path = marker_path + ".tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(info_dict, f, indent=2)
+    # Reason: os.replace is atomic on POSIX, so a reader (or rsync) never sees a half-written marker
+    os.replace(tmp_path, marker_path)
+    return marker_path
 
 
 class cameraCaptureThread(threading.Thread):
@@ -642,6 +668,22 @@ class ControlThreadVideoRecording(ControlThread):
             self._info["status"] = self._recorder.status  # "recording" or "streaming"
             logging.info(f"Started {self._recorder.status}")
 
+            # Stash metadata needed for the recording-complete marker written in stop().
+            # Presets (HD/Standard) pass empty recorder_kwargs, so read the resolved values
+            # from the underlying capture thread rather than from recorder_kwargs.
+            self._recording_start_time = self._info["time"]
+            self._recording_fps = recorder_kwargs.get("fps")
+            self._recording_resolution = None
+            try:
+                capture_thread = self._recorder._p
+                self._recording_fps = capture_thread._fps
+                width, height = capture_thread._resolution
+                self._recording_resolution = f"{width}x{height}"
+            except AttributeError:
+                # Streamer (and any non-recording recorder) has no capture thread; that's fine,
+                # stop() only writes a marker when an actual recording folder exists.
+                pass
+
             self._recorder.start_recording()
 
             # Setting up a timer to stop the recording
@@ -679,6 +721,31 @@ class ControlThreadVideoRecording(ControlThread):
         self._info["status"] = "stopped"
         self._info["time"] = time.time()
         self._info["error"] = error
+
+        # Drop a marker into the session folder so downstream conversion knows the .h264
+        # chunks are final. Written after the recorder has fully stopped (all chunks flushed).
+        # Guarded so it can never break shutdown; the isdir() check naturally skips streaming,
+        # which does not create a recording folder.
+        try:
+            session_dir = os.path.dirname(
+                getattr(self, "_output_video_full_prefix", "")
+            )
+            if session_dir and os.path.isdir(session_dir):
+                write_recording_marker(
+                    session_dir,
+                    {
+                        "status": "error" if error is not None else "completed",
+                        "start_time": getattr(self, "_recording_start_time", None),
+                        "stop_time": self._info["time"],
+                        "fps": getattr(self, "_recording_fps", None),
+                        "resolution": getattr(self, "_recording_resolution", None),
+                        "machine_id": self._machine_id,
+                        "device_name": self._device_name,
+                        "error": error,
+                    },
+                )
+        except Exception as e:
+            logging.warning(f"Could not write recording marker file: {e}")
 
         if error is not None:
             logging.error("Recorder closed with an error:")

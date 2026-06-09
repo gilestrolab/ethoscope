@@ -23,11 +23,66 @@
 #
 
 
+import json
 import os
 import re
 import subprocess
+import time
 from glob import glob
 from optparse import OptionParser
+
+# Marker file written by the ethoscope device when a recording terminates (see
+# src/ethoscope/ethoscope/control/record.py). Its presence means the .h264 chunks in the
+# folder are final and safe to merge.
+MARKER_FILENAME = "recording.info"
+
+
+def folder_is_ready(folder, extension="h264", max_age_hours=6):
+    """
+    Decide whether a folder's video chunks are safe to convert.
+
+    A folder is ready when the recording-complete marker is present, or - as a safety net for
+    legacy recordings and unclean stops where no marker was ever written - when no new chunk
+    has been written for at least ``max_age_hours``.
+
+    Args:
+        folder (str): Folder containing the .{extension} chunks.
+        extension (str): Chunk file extension (default "h264").
+        max_age_hours (float): Age threshold for the marker-less fallback.
+
+    Returns:
+        bool: True if the folder should be converted now.
+    """
+    if os.path.exists(os.path.join(folder, MARKER_FILENAME)):
+        return True
+
+    chunks = glob(os.path.join(folder, f"*.{extension}"))
+    if not chunks:
+        return False
+
+    newest_mtime = max(os.path.getmtime(f) for f in chunks)
+    age_hours = (time.time() - newest_mtime) / 3600.0
+    return age_hours >= max_age_hours
+
+
+def read_marker_fps(folder):
+    """
+    Return the recording FPS stored in the folder's marker file, or None if unavailable.
+
+    Args:
+        folder (str): Folder that may contain a ``recording.info`` marker.
+
+    Returns:
+        float | None: The recorded FPS, or None if no/invalid marker.
+    """
+    marker_path = os.path.join(folder, MARKER_FILENAME)
+    try:
+        with open(marker_path) as f:
+            fps = json.load(f).get("fps")
+        return float(fps) if fps is not None else None
+    except (OSError, ValueError, TypeError):
+        return None
+
 
 def get_video_fps(video_file, user_fps=None):
     """
@@ -84,7 +139,9 @@ def process_video(folder, extension="h264", user_fps=None):
     prefix = re.sub(r'_\d{5}$', '_merged', prefix)
     tmp_file = f"{prefix}.tmp"
     filename = f"{prefix}.mp4"
-    fps = get_video_fps(video_file, user_fps)
+    # Precedence: explicit --fps > recording marker fps > ffprobe auto-detection.
+    effective_fps = user_fps if user_fps is not None else read_marker_fps(folder)
+    fps = get_video_fps(video_file, effective_fps)
     if fps is None:
         print("Could not determine FPS.")
         return
@@ -153,15 +210,29 @@ def list_mp4s(root_path):
 
     return have_mp4s
 
-def crawl(root_path, extension="h264", force=False, user_fps=None):
+def crawl(root_path, extension="h264", force=False, user_fps=None,
+          ignore_marker=False, max_age_hours=6):
     """
-    Crawl all terminal folders in root_path.
+    Crawl all terminal folders in root_path and convert those whose recording has finished.
+
+    A folder is converted only when its recording is complete - signalled either by the
+    ``recording.info`` marker or, as a fallback, by chunks that have not changed for
+    ``max_age_hours``. ``force`` and ``ignore_marker`` bypass this gate.
     """
     all_folders = [x[0] for x in os.walk(root_path)]
     have_mp4s = [p for p in all_folders if glob(os.path.join(p, "*.mp4"))]
     terminal_folders = [p for p in all_folders if glob(os.path.join(p, f"*.{extension}"))]
 
     folders_to_process = terminal_folders if force else [folder for folder in terminal_folders if folder not in have_mp4s]
+
+    if not (force or ignore_marker):
+        ready = [f for f in folders_to_process if folder_is_ready(f, extension, max_age_hours)]
+        skipped = len(folders_to_process) - len(ready)
+        if skipped:
+            print(f"Skipping {skipped} folder(s) still recording or too recent (no marker, "
+                  f"chunks newer than {max_age_hours}h)")
+        folders_to_process = ready
+
     print(f"We have {len(folders_to_process)} new folders to process")
     for folder in folders_to_process:
         process_video(folder, extension, user_fps)
@@ -204,6 +275,8 @@ if __name__ == '__main__':
     parser.add_option("--force", dest="force", default=False, help="Force recreating videos even when MP4s are present", action="store_true")
     parser.add_option("--fps", dest="fps", type="float", help="Override the auto-detection of FPS with a user-defined value")
     parser.add_option("--purge", dest="purge", default=False, help="Purge .h264 files in folders where .mp4 exists", action="store_true")
+    parser.add_option("--ignore-marker", dest="ignore_marker", default=False, help="Convert regardless of the recording.info marker / chunk age (process unfinished recordings too)", action="store_true")
+    parser.add_option("--max-age-hours", dest="max_age_hours", type="float", default=6, help="For folders without a marker, only convert when the newest chunk is older than this many hours (default: 6)")
     (options, args) = parser.parse_args()
     option_dict = vars(options)
 
@@ -227,5 +300,7 @@ if __name__ == '__main__':
         option_dict['path'],
         extension=option_dict["extension"],
         force=option_dict["force"],
-        user_fps=option_dict.get("fps")
+        user_fps=option_dict.get("fps"),
+        ignore_marker=option_dict["ignore_marker"],
+        max_age_hours=option_dict["max_age_hours"],
     )
