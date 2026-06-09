@@ -844,12 +844,15 @@ class TestEthoscopeConfigurationSensorCRUD:
         assert "new_name" in config._settings["sensors"]
         assert "old_name" not in config._settings["sensors"]
 
-    def test_update_sensor_not_found(self):
-        """Test update_sensor raises error for missing sensor."""
+    def test_update_sensor_upserts_discovered_sensor(self):
+        """Editing a discovered-only sensor (not yet in config) persists it."""
         config = self._make_config()
-        with pytest.raises(ValueError) as exc_info:
-            config.update_sensor("nonexistent", {"name": "x"})
-        assert "not found" in str(exc_info.value)
+        with patch.object(config, "save"):
+            result = config.update_sensor(
+                "discovered", {"name": "discovered", "location": "lab"}
+            )
+        assert result["result"] == "success"
+        assert config._settings["sensors"]["discovered"]["location"] == "lab"
 
     def test_update_sensor_with_alerts(self):
         """Test sensor update preserves per-sensor alert config."""

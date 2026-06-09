@@ -675,7 +675,10 @@ class EthoscopeConfiguration:
         """
         Update an existing sensor in configuration.
 
-        Handles name changes by re-keying the entry.
+        Handles name changes by re-keying the entry. Behaves as an upsert: if
+        the sensor was only discovered on the network (transmitting data but not
+        yet saved to the config file), editing it persists it for the first time
+        instead of failing.
 
         Args:
             original_name: Current sensor name (used as key)
@@ -685,18 +688,17 @@ class EthoscopeConfiguration:
             Result dictionary with success/failure status
 
         Raises:
-            ValueError: If sensor not found or data is invalid
+            ValueError: If sensor data is invalid
         """
         sensors = self._settings.get("sensors", {})
-        if original_name not in sensors:
-            raise ValueError(f"Sensor '{original_name}' not found")
 
         new_name = sensordata.get("name", original_name)
 
         try:
-            # If name changed, remove old key
+            # If name changed, drop the old key (only present for configured
+            # sensors; discovered-only sensors won't have one yet).
             if new_name != original_name:
-                del sensors[original_name]
+                sensors.pop(original_name, None)
 
             sensors[new_name] = sensordata
             self._settings["sensors"] = sensors
