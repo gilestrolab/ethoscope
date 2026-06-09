@@ -7,10 +7,8 @@ for Ethoscope devices using a simple, HTTP-compatible approach.
 
 import errno
 import logging
-import pickle
 import queue
 import socket
-import struct
 import time
 from collections.abc import Iterator
 from threading import RLock, Thread
@@ -199,63 +197,49 @@ class EthoscopeStreamManager:
             self._streaming_clients.clear()
 
     def _streaming_broadcast_loop(self):
-        """Main loop for broadcasting frames to all clients."""
-        data = b""
-        payload_size = struct.calcsize("Q")
+        """Relay the device's MJPEG-over-HTTP stream verbatim to all clients.
 
-        while self._streaming_running and self._shared_socket:
-            try:
-                # Get message size
-                while len(data) < payload_size:
-                    packet = self._shared_socket.recv(4096)
-                    if not packet:
-                        break
-                    data += packet
+        The device now serves a standard ``multipart/x-mixed-replace`` MJPEG response on
+        STREAMING_PORT, so this is a pure byte passthrough: request the stream, drop the
+        device's HTTP response headers, and broadcast the multipart body unchanged. No
+        per-frame decoding (the boundary the device emits matches what we advertise to our
+        own clients).
+        """
+        if not self._streaming_running or self._shared_socket is None:
+            with self._streaming_lock:
+                self._streaming_running = False
+            return
 
-                if len(data) < payload_size:
+        try:
+            # Ask the device's MJPEG server for the stream.
+            self._shared_socket.sendall(b"GET / HTTP/1.0\r\n\r\n")
+
+            # Read past the device's HTTP response headers; anything after the blank line
+            # is already part of the multipart body and must be relayed.
+            header = b""
+            while b"\r\n\r\n" not in header:
+                packet = self._shared_socket.recv(4096)
+                if not packet:
                     break
+                header += packet
 
-                # Unpack message size
-                packed_msg_size = data[:payload_size]
-                data = data[payload_size:]
-                msg_size = struct.unpack("Q", packed_msg_size)[0]
+            if b"\r\n\r\n" in header:
+                leftover = header.split(b"\r\n\r\n", 1)[1]
+                if leftover:
+                    self._broadcast_frame(leftover)
 
-                # Get frame data
-                while len(data) < msg_size:
-                    packet = self._shared_socket.recv(4096)
-                    if not packet:
-                        break
-                    data += packet
-
-                if len(data) < msg_size:
+            # Stream the remaining body bytes straight through.
+            while self._streaming_running and self._shared_socket:
+                packet = self._shared_socket.recv(4096)
+                if not packet:
                     break
+                self._broadcast_frame(packet)
 
-                # Extract frame
-                frame_data = data[:msg_size]
-                data = data[msg_size:]
-
-                # Process and broadcast frame
-                try:
-                    frame = pickle.loads(frame_data)
-                    frame_bytes = (
-                        b"--frame\r\nContent-Type:image/jpeg\r\n\r\n"
-                        + frame.tobytes()
-                        + b"\r\n"
-                    )
-
-                    # Broadcast to all connected clients
-                    self._broadcast_frame(frame_bytes)
-
-                except Exception as e:
-                    self._logger.warning(f"Error processing frame: {e}")
-                    continue
-
-            except Exception as e:
-                if self._streaming_running:
-                    self._logger.error(f"Streaming broadcast error: {e}")
-                    # If this is a connection error, the health check will catch it
-                    # and restart the connection on the next streaming attempt
-                break
+        except Exception as e:
+            if self._streaming_running:
+                self._logger.error(f"Streaming broadcast error: {e}")
+                # A connection error here is caught by the health check, which restarts
+                # the connection on the next streaming attempt.
 
         self._logger.info("Streaming broadcast loop ended")
 

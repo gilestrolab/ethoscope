@@ -7,15 +7,12 @@ resource cleanup.
 """
 
 import errno
-import pickle
 import queue
 import socket
-import struct
 import time
 from threading import Thread
-from unittest.mock import MagicMock, Mock, call, patch
+from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pytest
 
 from ethoscope_node.scanner.ethoscope_streaming import (
@@ -478,105 +475,84 @@ class TestEthoscopeStreamManager:
         assert client_id2 not in manager._streaming_clients
         assert client_id1 in manager._streaming_clients
 
-    def test_streaming_broadcast_loop_processes_frame(self):
-        """Test streaming broadcast loop processes and distributes frames."""
+    # The device now serves a standard MJPEG-over-HTTP stream, so the broadcast loop is a
+    # pure passthrough: it requests the stream, drops the device's HTTP response headers,
+    # and relays the multipart body verbatim. These tests exercise that behaviour.
+
+    # Minimal, well-formed device response: HTTP headers + one MJPEG part.
+    _HTTP_HEADERS = (
+        b"HTTP/1.0 200 OK\r\n"
+        b"Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n"
+    )
+    _MJPEG_PART = (
+        b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: 4\r\n\r\n"
+        b"\xff\xd8\xff\xd9\r\n"
+    )
+
+    def test_streaming_broadcast_loop_requests_and_relays_body(self):
+        """Loop requests the stream, skips HTTP headers, relays the body verbatim."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-        # Create test frame
-        test_frame = np.zeros((480, 640), dtype=np.uint8)
-        frame_data = pickle.dumps(test_frame)
-        msg_size = len(frame_data)
-        packed_size = struct.pack("Q", msg_size)
-
-        # Prepare socket data
-        socket_data = packed_size + frame_data
-
-        # Mock socket
         mock_socket = MagicMock()
         mock_socket.recv.side_effect = [
-            socket_data,  # First recv gets all data
-            b"",  # Second recv signals end
+            self._HTTP_HEADERS,  # headers arrive first (no trailing body)
+            self._MJPEG_PART,  # one frame part
+            b"",  # connection closed
         ]
         manager._shared_socket = mock_socket
         manager._streaming_running = True
 
-        # Add client
         client_id, client_queue = manager._add_streaming_client()
 
-        # Run broadcast loop (will exit after processing one frame)
         manager._streaming_broadcast_loop()
 
-        # Verify client received formatted frame
-        frame_bytes = client_queue.get_nowait()
-        assert frame_bytes.startswith(b"--frame\r\nContent-Type:image/jpeg\r\n\r\n")
-        assert frame_bytes.endswith(b"\r\n")
+        # It must have issued an HTTP GET to the device's MJPEG server.
+        mock_socket.sendall.assert_called_once()
+        assert b"GET" in mock_socket.sendall.call_args[0][0]
+
+        # The body is relayed unchanged (no decoding/re-framing).
+        assert client_queue.get_nowait() == self._MJPEG_PART
         assert manager._streaming_running is False
 
-    def test_streaming_broadcast_loop_handles_partial_data(self):
-        """Test broadcast loop correctly handles partial data packets."""
+    def test_streaming_broadcast_loop_relays_body_attached_to_headers(self):
+        """Body bytes that arrive in the same packet as the headers are still relayed."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-        # Create test frame
-        test_frame = np.zeros((100, 100), dtype=np.uint8)
-        frame_data = pickle.dumps(test_frame)
-        msg_size = len(frame_data)
-        packed_size = struct.pack("Q", msg_size)
-
-        # Split data into multiple chunks
-        full_data = packed_size + frame_data
-        chunk1 = full_data[:50]
-        chunk2 = full_data[50:100]
-        chunk3 = full_data[100:]
-
-        # Mock socket that returns data in chunks
         mock_socket = MagicMock()
         mock_socket.recv.side_effect = [
-            chunk1,
-            chunk2,
-            chunk3,
-            b"",  # End signal
+            self._HTTP_HEADERS + self._MJPEG_PART,  # headers + body together
+            b"",  # connection closed
         ]
         manager._shared_socket = mock_socket
         manager._streaming_running = True
 
-        # Add client
         client_id, client_queue = manager._add_streaming_client()
 
-        # Run broadcast loop
         manager._streaming_broadcast_loop()
 
-        # Verify client received frame
-        assert not client_queue.empty()
+        assert client_queue.get_nowait() == self._MJPEG_PART
+        assert manager._streaming_running is False
 
-    def test_streaming_broadcast_loop_handles_corrupted_frame(self):
-        """Test broadcast loop handles corrupted frame data gracefully."""
+    def test_streaming_broadcast_loop_handles_partial_headers(self):
+        """Loop accumulates HTTP headers split across multiple recv() calls."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-        # Create corrupted data (valid size header, invalid pickle data)
-        msg_size = 100
-        packed_size = struct.pack("Q", msg_size)
-        corrupted_data = b"not_valid_pickle_data" * 10
-
-        # Prepare socket data
-        socket_data = packed_size + corrupted_data[:msg_size]
-
-        # Mock socket
         mock_socket = MagicMock()
         mock_socket.recv.side_effect = [
-            socket_data,
-            b"",  # End after one frame
+            b"HTTP/1.0 200 OK\r\n",  # header line 1
+            b"Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n",  # end
+            self._MJPEG_PART,  # body
+            b"",  # connection closed
         ]
         manager._shared_socket = mock_socket
         manager._streaming_running = True
 
-        # Add client
         client_id, client_queue = manager._add_streaming_client()
 
-        # Run broadcast loop (should handle error and continue)
         manager._streaming_broadcast_loop()
 
-        # Client queue should be empty (corrupted frame was skipped)
-        assert client_queue.empty()
+        assert client_queue.get_nowait() == self._MJPEG_PART
+        assert manager._streaming_running is False
 
     def test_streaming_broadcast_loop_socket_error(self):
         """Test broadcast loop handles socket errors."""
@@ -788,51 +764,20 @@ class TestEthoscopeStreamManager:
         # Should exit cleanly and mark as not running
         assert manager._streaming_running is False
 
-    def test_streaming_broadcast_loop_incomplete_message_size(self):
-        """Test broadcast loop handles incomplete message size."""
+    def test_streaming_broadcast_loop_incomplete_headers(self):
+        """Loop exits cleanly if the connection closes before HTTP headers complete."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-        # Send only partial size header (needs 8 bytes, send 4)
-        partial_header = struct.pack("I", 12345)  # Only 4 bytes
-
-        # Mock socket
         mock_socket = MagicMock()
         mock_socket.recv.side_effect = [
-            partial_header,
-            b"",  # Connection closed before complete header
+            b"HTTP/1.0 200 OK\r\n",  # partial headers, no blank line
+            b"",  # connection closed mid-header
         ]
         manager._shared_socket = mock_socket
         manager._streaming_running = True
 
-        # Run broadcast loop
         manager._streaming_broadcast_loop()
 
-        # Should exit cleanly
-        assert manager._streaming_running is False
-
-    def test_streaming_broadcast_loop_incomplete_frame_data(self):
-        """Test broadcast loop handles incomplete frame data."""
-        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
-
-        # Send complete size header but incomplete data
-        msg_size = 1000
-        packed_size = struct.pack("Q", msg_size)
-        partial_data = b"incomplete_data"
-
-        # Mock socket
-        mock_socket = MagicMock()
-        mock_socket.recv.side_effect = [
-            packed_size,
-            partial_data,
-            b"",  # Connection closed before all data received
-        ]
-        manager._shared_socket = mock_socket
-        manager._streaming_running = True
-
-        # Run broadcast loop
-        manager._streaming_broadcast_loop()
-
-        # Should exit cleanly
         assert manager._streaming_running is False
 
     def test_thread_safety_concurrent_client_operations(self):
