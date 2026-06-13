@@ -614,6 +614,38 @@ class TestIncubatorCRUD:
         inc = populated_db.getIncubatorByName("Incubator_01", asdict=True)
         assert inc["light_cycle_anchor"] is None
 
+    def test_incubator_has_hostname_column(self, test_db):
+        """Newly created incubators table includes the hostname binding column."""
+        import sqlite3
+
+        conn = sqlite3.connect(test_db._db_name)
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({test_db._incubators_table_name})")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "hostname" in cols
+
+    def test_add_incubator_with_hostname(self, test_db):
+        """Hostname round-trips through addIncubator and defaults to None."""
+        assert test_db.addIncubator(name="Bound_box", hostname="incubator-7") > 0
+        assert test_db.addIncubator(name="Unbound_box") > 0
+
+        bound = test_db.getIncubatorByName("Bound_box", asdict=True)
+        unbound = test_db.getIncubatorByName("Unbound_box", asdict=True)
+        assert bound["hostname"] == "incubator-7"
+        assert unbound["hostname"] is None
+
+    def test_update_incubator_bind_and_unbind_hostname(self, populated_db):
+        """updateIncubator can set and clear (None) the hostname."""
+        assert populated_db.updateIncubator(name="Incubator_01", hostname="incubator-3") >= 0
+        inc = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert inc["hostname"] == "incubator-3"
+
+        assert populated_db.updateIncubator(name="Incubator_01", hostname=None) >= 0
+        inc = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert inc["hostname"] is None
+
 
 class TestDeviceManagement:
     """Test ethoscope device management."""

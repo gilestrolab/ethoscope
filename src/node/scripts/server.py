@@ -16,6 +16,7 @@ from ethoscope_node.api import (
     DatabaseAPI,
     DeviceAPI,
     FileAPI,
+    IncubatorAPI,
     NodeAPI,
     ROITemplateAPI,
     SensorAPI,
@@ -24,6 +25,7 @@ from ethoscope_node.api import (
 )
 from ethoscope_node.auth import AuthMiddleware
 from ethoscope_node.scanner.ethoscope_scanner import EthoscopeScanner
+from ethoscope_node.scanner.incubator_scanner import IncubatorScanner
 from ethoscope_node.scanner.sensor_scanner import SensorScanner
 from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
 from ethoscope_node.utils.etho_db import ExperimentalDB
@@ -136,6 +138,7 @@ class EthoscopeNodeServer:
         self.config: EthoscopeConfiguration | None = None
         self.device_scanner: EthoscopeScanner | None = None
         self.sensor_scanner: SensorScanner | None = None
+        self.incubator_scanner: IncubatorScanner | None = None
         self.database: ExperimentalDB | None = None
         self.tunnel_utils: TunnelUtils | None = None
 
@@ -231,6 +234,7 @@ class EthoscopeNodeServer:
             DeviceAPI,
             BackupAPI,
             SensorAPI,
+            IncubatorAPI,
             ROITemplateAPI,
             NodeAPI,
             FileAPI,
@@ -370,6 +374,18 @@ class EthoscopeNodeServer:
                 self.logger.warning("Continuing without sensor scanner")
                 self.sensor_scanner = None
 
+            # Initialize incubator scanner (monitor-only: polls /telemetry of WiFi units)
+            try:
+                self.incubator_scanner = IncubatorScanner(
+                    results_dir=self.sensors_dir,
+                )
+                self.incubator_scanner.start()
+                self.logger.info("Incubator scanner started")
+            except Exception as e:
+                self.logger.warning(f"Failed to start incubator scanner: {e}")
+                self.logger.warning("Continuing without incubator scanner")
+                self.incubator_scanner = None
+
             self._setup_api_modules()
 
             # Ensure tunnel environment file is up to date (after API modules are setup)
@@ -406,6 +422,13 @@ class EthoscopeNodeServer:
                 self.logger.info("Sensor scanner stopped")
             except Exception as e:
                 self.logger.warning(f"Error stopping sensor scanner: {e}")
+
+        if self.incubator_scanner:
+            try:
+                self.incubator_scanner.stop()
+                self.logger.info("Incubator scanner stopped")
+            except Exception as e:
+                self.logger.warning(f"Error stopping incubator scanner: {e}")
 
         if self.tmp_imgs_dir and os.path.exists(self.tmp_imgs_dir):
             try:

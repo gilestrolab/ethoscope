@@ -21,6 +21,7 @@ from .base_scanner import (
 )
 from .ethoscope_scanner import Ethoscope, EthoscopeScanner
 from .ethoscope_streaming import EthoscopeStreamManager
+from .incubator_scanner import Incubator, IncubatorScanner
 from .sensor_scanner import Sensor, SensorScanner
 
 __all__ = [
@@ -31,6 +32,8 @@ __all__ = [
     "DeviceError",
     "Ethoscope",
     "EthoscopeScanner",
+    "Incubator",
+    "IncubatorScanner",
     "Sensor",
     "SensorScanner",
     "EthoscopeStreamManager",

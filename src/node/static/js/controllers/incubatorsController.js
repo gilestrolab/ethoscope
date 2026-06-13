@@ -7,6 +7,7 @@
 
         // Initialize scope variables
         $scope.incubators = {};
+        $scope.liveIncubators = {};   // live telemetry of discovered WiFi units, keyed by hostname
         $scope.sensors = {};
         $scope.devices = {};       // keyed by device id; carries status + experimental_info
         $scope.activeUsers = [];
@@ -122,6 +123,81 @@
             if (!$scope.selectedIncubator || !$scope.selectedIncubator._editing) return false;
             var name = $scope.selectedIncubator._originalName || $scope.selectedIncubator.name;
             return $scope.runningDevicesInIncubator(name).length > 0;
+        };
+
+        // Load live telemetry of discovered WiFi incubators, re-keyed by hostname.
+        var loadLive = function() {
+            $http.get('/incubators/live')
+                .then(function(response) {
+                    var live = response.data || {};
+                    var byHost = {};
+                    for (var id in live) {
+                        var info = live[id];
+                        var host = info.hostname || id;
+                        byHost[host] = info;
+                    }
+                    $scope.liveIncubators = byHost;
+                })
+                .catch(function(error) {
+                    console.error('Error loading live incubators:', error);
+                });
+        };
+
+        // Live telemetry for a DB incubator record (bound by hostname), or null.
+        $scope.liveForIncubator = function(incubator) {
+            if (!incubator || !incubator.hostname) return null;
+            return $scope.liveIncubators[incubator.hostname] || null;
+        };
+
+        // True if the live unit was successfully polled (status not offline).
+        $scope.isLiveOnline = function(live) {
+            return !!live && (live.status && live.status !== 'offline');
+        };
+
+        // Discovered WiFi units not yet bound to any incubator record.
+        $scope.discoveredUnbound = function() {
+            var bound = {};
+            for (var key in $scope.incubators) {
+                var h = $scope.incubators[key].hostname;
+                if (h) bound[h] = true;
+            }
+            var out = [];
+            for (var host in $scope.liveIncubators) {
+                if (!bound[host]) out.push($scope.liveIncubators[host]);
+            }
+            return out;
+        };
+
+        // All discovered hostnames (for the bind dropdown in the modal).
+        $scope.availableHostnames = function() {
+            return Object.keys($scope.liveIncubators);
+        };
+
+        // Comma-joined hostnames of discovered-but-unbound units (for the banner).
+        $scope.discoveredUnboundNames = function() {
+            return $scope.discoveredUnbound().map(function(u) { return u.hostname; }).join(', ');
+        };
+
+        // Bind (or, with hostname null/empty, unbind) a DB record to a physical unit.
+        // Pushes the incubator name into the unit's sensor location server-side.
+        $scope.bindIncubator = function(name, hostname) {
+            if (!name) return;
+            $http.post('/incubator/bind', { name: name, hostname: hostname || null })
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        if ($scope.selectedIncubator) {
+                            $scope.selectedIncubator.hostname = hostname || null;
+                        }
+                        loadIncubators();
+                        loadLive();
+                    } else {
+                        alert('Error binding incubator: ' + (response.data.message || 'Unknown error'));
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error binding incubator:', error);
+                    alert('Error binding incubator. Please try again.');
+                });
         };
 
         // Get sensor associated with an incubator (matched by location field)
@@ -370,11 +446,23 @@
             return dateToTimeString(val);
         };
 
+        // Live telemetry polling (every 15 s). Rescheduled recursively and
+        // cancelled on view destroy.
+        var livePoll = null;
+        var startLivePolling = function() {
+            loadLive();
+            livePoll = $timeout(startLivePolling, 15000);
+        };
+        $scope.$on('$destroy', function() {
+            if (livePoll) $timeout.cancel(livePoll);
+        });
+
         // Initial load
         loadIncubators();
         loadUsers();
         loadSensors();
         loadDevices();
+        startLivePolling();
     };
 
     angular.module('flyApp').controller('incubatorsController', incubatorsController);

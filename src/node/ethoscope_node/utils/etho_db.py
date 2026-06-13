@@ -204,7 +204,8 @@ class ExperimentalDB(multiprocessing.Process):
                                 lights_on TEXT DEFAULT '',
                                 lights_off TEXT DEFAULT '',
                                 light_period_minutes INTEGER DEFAULT 1440,
-                                light_cycle_anchor REAL
+                                light_cycle_anchor REAL,
+                                hostname TEXT
                             );"""
 
         # device_interventions: append-only log of user-originated mutating actions
@@ -258,6 +259,9 @@ class ExperimentalDB(multiprocessing.Process):
             self._migrate_incubators_add_period_and_anchor()
             # Migration 9: Add termination_reason column to runs table
             self._migrate_runs_add_termination_reason()
+            # Migration 10: Add hostname column to incubators (binds a record to a
+            # physical WiFi incubator unit, e.g. "incubator-1")
+            self._migrate_incubators_add_hostname()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
 
@@ -702,6 +706,31 @@ class ExperimentalDB(multiprocessing.Process):
 
         except Exception as e:
             logging.error(f"Error migrating incubators table (period/anchor): {e}")
+
+    def _migrate_incubators_add_hostname(self):
+        """
+        Add a ``hostname`` column to the incubators table if absent. It binds a
+        DB incubator record to a physical WiFi incubator unit by its mDNS
+        hostname (``incubator-<id>``); NULL means the record is not yet bound to
+        any hardware.
+        """
+        try:
+            check_columns = f"PRAGMA table_info({self._incubators_table_name})"
+            table_info = self.executeSQL(check_columns)
+
+            if not isinstance(table_info, list):
+                return
+
+            has_hostname = any(col[1] == "hostname" for col in table_info)
+            if not has_hostname:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN hostname TEXT"
+                )
+                logging.info("Added hostname to incubators table")
+
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (hostname): {e}")
 
     def getRun(self, run_id, asdict=False):
         """
@@ -1399,6 +1428,7 @@ class ExperimentalDB(multiprocessing.Process):
         lights_off: str = "",
         light_period_minutes: int = 1440,
         light_cycle_anchor: float = None,
+        hostname: str = None,
     ):
         """
         Add a new incubator to the database.
@@ -1414,6 +1444,8 @@ class ExperimentalDB(multiprocessing.Process):
             lights_off: Lights-off time HH:MM
             light_period_minutes: Cycle length in minutes (default 1440 = 24h)
             light_cycle_anchor: Unix timestamp marking ZT0; None = wall-clock midnight
+            hostname: mDNS hostname of the bound physical unit (e.g. "incubator-1");
+                None = not bound to any hardware
 
         Returns:
             ID of the inserted incubator or -1 if error
@@ -1443,15 +1475,18 @@ class ExperimentalDB(multiprocessing.Process):
             anchor_sql = (
                 "NULL" if light_cycle_anchor is None else f"{float(light_cycle_anchor)}"
             )
+            hostname_sql = (
+                "NULL" if hostname is None else f"'{hostname.replace(chr(39), chr(39) * 2)}'"
+            )
 
             sql_add_incubator = f"""
             INSERT INTO {self._incubators_table_name}
             (name, location, owner, description, created, active,
-             lights_on, lights_off, light_period_minutes, light_cycle_anchor)
+             lights_on, lights_off, light_period_minutes, light_cycle_anchor, hostname)
             VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}',
                     '{escaped_description}', '{created}', {active},
                     '{escaped_lights_on}', '{escaped_lights_off}',
-                    {period_sql}, {anchor_sql})
+                    {period_sql}, {anchor_sql}, {hostname_sql})
             """
 
             result = self.executeSQL(sql_add_incubator)
@@ -1518,6 +1553,13 @@ class ExperimentalDB(multiprocessing.Process):
                         set_clauses.append(f"{field} = NULL")
                     else:
                         set_clauses.append(f"{field} = {float(value)}")
+                elif field == "hostname":
+                    # Explicit None unbinds the record from any physical unit.
+                    if value is None:
+                        set_clauses.append(f"{field} = NULL")
+                    else:
+                        escaped_value = str(value).replace("'", "''")
+                        set_clauses.append(f"{field} = '{escaped_value}'")
                 elif field == "created":
                     set_clauses.append(f"{field} = '{value}'")
                 else:

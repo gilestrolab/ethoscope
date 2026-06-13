@@ -25,6 +25,7 @@ from .bugreport_api import BugReportAPI
 from .database_api import DatabaseAPI
 from .device_api import DeviceAPI
 from .file_api import FileAPI
+from .incubator_api import IncubatorAPI
 from .node_api import NodeAPI
 from .roi_template_api import ROITemplateAPI
 from .sensor_api import SensorAPI
@@ -36,6 +37,7 @@ __all__ = [
     "DeviceAPI",
     "BackupAPI",
     "SensorAPI",
+    "IncubatorAPI",
     "ROITemplateAPI",
     "NodeAPI",
     "FileAPI",

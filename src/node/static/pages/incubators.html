@@ -26,6 +26,14 @@
     </label>
 </div>
 
+<!-- Discovered-but-unlinked WiFi units -->
+<div class="alert alert-info" ng-if="discoveredUnbound().length > 0" ng-cloak style="margin-top: 10px;">
+    <i class="fa fa-wifi"></i>
+    {{discoveredUnbound().length}} smart incubator(s) discovered on the network are not yet
+    linked to a record: <strong>{{discoveredUnboundNames()}}</strong>.
+    Open an incubator's <i class="fa fa-edit"></i> edit dialog to link one.
+</div>
+
 <!-- INCUBATORS TABLE -->
 <table class="table table-striped" ng-cloak>
     <thead>
@@ -58,6 +66,7 @@
             </a>
         </th>
         <th>Sensor</th>
+        <th>Live</th>
         <th>
             <a href="#" ng-click="sortType = 'active'; sortReverse = !sortReverse">
                 Status
@@ -106,6 +115,28 @@
                     {{getSensorForIncubator(incubator.name).name || getSensorForIncubator(incubator.name).ip}}
                 </span>
                 <span ng-if="!getSensorForIncubator(incubator.name)" style="color: grey;">
+                    —
+                </span>
+            </td>
+            <td>
+                <!-- Live readings from the bound WiFi unit (monitor-only) -->
+                <span ng-if="isLiveOnline(liveForIncubator(incubator))" title="Live readings from the linked unit">
+                    <i class="fa fa-circle" style="color:#5cb85c; font-size:0.6em; vertical-align:middle;"></i>
+                    {{liveForIncubator(incubator).temperature | number:1}}&deg;C
+                    <span ng-if="liveForIncubator(incubator).peltier_dir && liveForIncubator(incubator).peltier_dir !== 'off'"
+                          style="font-size:0.85em; color:#888;">
+                        · {{liveForIncubator(incubator).peltier_dir}}
+                    </span>
+                    <span ng-if="liveForIncubator(incubator).light_level !== undefined && liveForIncubator(incubator).light_level !== null"
+                          style="font-size:0.85em; color:#888;" title="Light level">
+                        · <i class="fa fa-lightbulb"></i> {{liveForIncubator(incubator).light_level}}%
+                    </span>
+                </span>
+                <span ng-if="incubator.hostname && !isLiveOnline(liveForIncubator(incubator))"
+                      style="color:#d9534f;" title="Linked unit not responding">
+                    <i class="fa fa-circle" style="font-size:0.6em; vertical-align:middle;"></i> offline
+                </span>
+                <span ng-if="!incubator.hostname" style="color: grey;" title="Not linked to a physical unit">
                     —
                 </span>
             </td>
@@ -294,6 +325,46 @@
                             <small class="form-text text-muted">
                                 All devices started in this incubator will be phase-locked to this anchor.
                                 Editing it (or the period) requires that no device is currently running here.
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Physical unit (WiFi) — link a discovered smart incubator -->
+                    <div class="row" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
+                        <div class="col-12">
+                            <label class="form-label" style="font-weight: bold;">
+                                <i class="fa fa-wifi"></i> Physical unit (WiFi)
+                            </label>
+                            <small class="form-text text-muted" style="margin-top: -5px; margin-bottom: 10px;">
+                                Link this record to a discovered smart incubator so the node monitors its
+                                live temperature/light and files its sensor readings under this incubator.
+                                Monitoring only — setpoints are not pushed yet.
+                            </small>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-group" style="display: flex; gap: 8px; align-items: center;">
+                                <select class="form-control" ng-model="selectedIncubator.hostname">
+                                    <option value="">— Not linked —</option>
+                                    <option ng-repeat="host in availableHostnames()" value="{{host}}">{{host}}</option>
+                                    <!-- keep the current binding visible even if the unit is offline now -->
+                                    <option ng-if="selectedIncubator.hostname && availableHostnames().indexOf(selectedIncubator.hostname) === -1"
+                                            value="{{selectedIncubator.hostname}}">{{selectedIncubator.hostname}} (offline)</option>
+                                </select>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-primary"
+                                        ng-click="bindIncubator(selectedIncubator._originalName || selectedIncubator.name, selectedIncubator.hostname)"
+                                        ng-disabled="!selectedIncubator._editing"
+                                        title="Save the link and push this incubator's name to the unit">
+                                    <i class="fa fa-link"></i> Link
+                                </button>
+                            </div>
+                            <small ng-if="!selectedIncubator._editing" class="form-text text-muted">
+                                Save the incubator first, then re-open it to link a unit.
+                            </small>
+                            <small ng-if="liveForIncubator(selectedIncubator)" class="form-text text-muted">
+                                Live: {{liveForIncubator(selectedIncubator).temperature | number:1}}&deg;C,
+                                light {{liveForIncubator(selectedIncubator).light_level}}%,
+                                fw {{liveForIncubator(selectedIncubator).fw}}
                             </small>
                         </div>
                     </div>

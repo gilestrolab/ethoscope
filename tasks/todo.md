@@ -91,3 +91,31 @@ in all three modes (default / data-dir override / explicit); package independenc
   write perms; on a fresh node the service has them. Log clearly on failure.
 - A running server cannot relocate already-loaded config → restart required after a change.
 - `migrate_config_dir` must be idempotent and never overwrite newer files at the destination.
+
+---
+
+# Smart incubators — node integration (Phase 1: monitor-only)
+
+Date: 2026-06-12
+Plan: `~/.claude/plans/noble-drifting-brook.md`
+
+- [x] Firmware: incubator also serves the etho_sensor API (`GET /` JSON, `/id`, `POST /set`),
+      advertises `_incubator._tcp` + `_sensor._tcp`, status page moved to `/status`. Compiles
+      clean (d1_mini, RAM 42%/flash 39%). FW bumped to 3.1.0-wifi.
+- [x] `IncubatorScanner`/`Incubator` (`_incubator._tcp`, polls `/telemetry`) + server.py wiring.
+- [x] DB `hostname` binding column on incubators (migration 10) threaded through add/update.
+- [x] `incubator_api`: GET `/incubators/live`, GET `/incubators/merged`, POST `/incubator/bind`
+      (binds record ↔ unit and pushes incubator name into the unit's sensor `location`).
+- [x] Incubators page: live status column, discovered-unbound banner, link-unit control (15s poll).
+- [x] Tests: scanner / etho_db hostname / incubator_api — 33 new, all green; 528 node-unit regression green.
+
+## Review
+- The unit is discovered on two channels: `SensorScanner` (unchanged) handles CSV + temp alerts;
+  the new `IncubatorScanner` handles incubator telemetry. No node sensor-code changes.
+- Phase 2 (not done): push `set_temp`/light schedule DB→firmware (node already authoritative for
+  the per-ethoscope daylight LEDs). Open: firmware is fixed 24h (no T-cycle); panel-vs-LED policy.
+
+## Discovered during work
+- arduino-cli needs the sketch folder name to match the `.ino`; `firmware/` ≠
+  `client_firmware_esp8266.ino`, so `build.sh`'s `arduino-cli compile .` fails in place — build
+  by copying into a correctly-named temp sketch dir (or rename). Worth fixing in build.sh later.
