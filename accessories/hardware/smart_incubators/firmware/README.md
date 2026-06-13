@@ -5,7 +5,9 @@ design. Each incubator is now a self-contained WiFi device that:
 
 - regulates **temperature** with a Peltier (TEC) element driven through a **Cytron
   SHIELD-MD10 R2** H-bridge,
-- runs a programmable **light/dark schedule** (five modes: DD/LD/LL/DL/MM),
+- runs a **node-driven light/dark schedule** with configurable cycle length (24 h
+  wall-clock or T-cycle anchored to a node-supplied ZT0 timestamp) and
+  per-direction **fade in / fade out** PWM ramps on the panel LED,
 - senses **temperature + humidity** (SHT31) and **light** (BH1750, calibrated lux),
 - keeps time from **NTP** with a **DS3231** RTC as battery-backed backup,
 - persists its configuration to flash (LittleFS) and survives reboots,
@@ -181,9 +183,14 @@ runs each task on its own `millis()` timer.
   PWM duty. A **deadband** (`±0.3 °C`) stops hunting, a **direction-dwell** prevents rapid
   current reversal, a **slew limit** caps duty change per cycle, and a **failsafe** forces
   the Peltier OFF on sensor fault or out-of-range temperature.
-- **Light modes:** `DD` dark · `LD` light in `[lights_on, lights_off)` · `LL` light ·
-  `DL` inverted · `MM` manual (set the level via REST). Levels fade smoothly and
-  non-blocking.
+- **Light schedule:** always light-during-window. With `light_period_minutes==1440` and
+  `light_cycle_anchor==0` the window is wall-clock `[lights_on, lights_off)`; otherwise
+  it's `[lights_on, lights_off)` *within* a cycle of `light_period_minutes` whose phase is
+  `(now − light_cycle_anchor) mod period`. Per-direction fade (`fade_in_ms` / `fade_out_ms`)
+  ramps the panel PWM between `0%` and `max_light` non-blockingly; a bench override is
+  available via `POST /command {"set_light":<pct>}` (transient — the next schedule tick
+  resumes control). The four legacy mode shortcuts (`DD/LL/DL/MM`) were removed in 3.2 —
+  the node is the single source of truth.
 - **Humidity** is **sensed only** — the current hardware has no humidity actuator
   (`set_hum` is kept for logging/future use).
 - **Time:** NTP is primary; the server is the `ntp` config field (default `pool.ntp.org`).
@@ -291,10 +298,10 @@ API to `accessories/hardware/etho_sensor`, mDNS service `_sensor._tcp`), so the 
 | `POST /set` | update sensor `name`/`location` (the node pushes the bound incubator's name into `location`) |
 
 > The sensor `location` defaults to `incubator-<id>` and is overwritten by the node with the
-> bound incubator's name, so readings always group under their incubator. `set_temp`/light
-> schedule are **not** yet pushed from the node (that is a later phase); for now the node
-> only monitors. Note `GET /` is the sensor data endpoint — the status page moved to
-> `/status`.
+> bound incubator's name, so readings always group under their incubator. From firmware 3.2.0
+> the node also pushes the **light schedule** (lights_on/off + period + anchor + fade) to
+> `/config` on every relevant edit, with a 60 s reconciler re-pushing on drift (e.g. after a
+> firmware reboot). Note `GET /` is the sensor data endpoint — the status page is at `/status`.
 
 Examples:
 
@@ -302,14 +309,20 @@ Examples:
 # Read live state
 curl http://incubator-1.local/telemetry
 
-# Change the temperature setpoint and switch to LD with a 9–21h photoperiod
+# Push a 9-21h wall-clock photoperiod with a 30s fade in/out and 80% peak brightness
 curl -X POST http://incubator-1.local/config \
      -H 'Content-Type: application/json' \
-     -d '{"set_temp":24.0,"mode":"LD","lights_on":"09:00","lights_off":"21:00"}'
+     -d '{"set_temp":24.0,"lights_on":"09:00","lights_off":"21:00",
+          "light_period_minutes":1440,"light_cycle_anchor":0,
+          "fade_in_ms":30000,"fade_out_ms":30000,"max_light":80}'
 
-# Manually set the light to 50% (mode MM) and re-sync the RTC from NTP
-curl -X POST http://incubator-1.local/command \
-     -d '{"set_light":50,"sync_time":true}'
+# Push a T=21h cycle: light during the first 9h after ZT0 (anchor = now)
+curl -X POST http://incubator-1.local/config \
+     -d "{\"lights_on\":\"00:00\",\"lights_off\":\"09:00\",
+          \"light_period_minutes\":1260,\"light_cycle_anchor\":$(date -u +%s)}"
+
+# Transient bench override (next schedule tick takes back control)
+curl -X POST http://incubator-1.local/command -d '{"set_light":50,"sync_time":true}'
 
 # Offline lab: point the node at a local NTP server (e.g. the controller running ntpd)
 curl -X POST http://incubator-1.local/config -d '{"ntp":"192.168.1.10"}'
@@ -318,15 +331,15 @@ curl -X POST http://incubator-1.local/config -d '{"ntp":"192.168.1.10"}'
 curl -X POST http://incubator-1.local/command -d "{\"set_time\":$(date -u +%s)}"
 ```
 
-`POST /config` accepts any subset of: `node_id, tz, ntp, set_temp, set_hum, max_light, mode
-(DD/LD/LL/DL/MM or 0–4), lights_on ("HH:MM" or minutes), lights_off, report_interval,
-kp, ki, kd, deadband, max_duty, dir_dwell_ms, slew_per_cycle, temp_min, temp_max,
-peltier_enabled`.
+`POST /config` accepts any subset of: `node_id, tz, ntp, set_temp, set_hum, max_light,
+lights_on ("HH:MM" or minutes), lights_off, light_period_minutes, light_cycle_anchor
+(unix ts; 0 = wall-clock mode), fade_in_ms, fade_out_ms, report_interval, kp, ki, kd,
+deadband, max_duty, dir_dwell_ms, slew_per_cycle, temp_min, temp_max, peltier_enabled`.
 
-`/telemetry` fields include: `node_id, fw, build, built, time, time_valid, uptime_s, temperature,
-humidity, lux, sensor_fault, set_temp, set_hum, mode, light_level, light_target,
-max_light, lights_on, lights_off, peltier_duty (signed: + heat / − cool), peltier_dir,
-fan_on, rssi, wifi`.
+`/telemetry` fields include: `node_id, fw, build, built, time, time_valid, uptime_s,
+temperature, humidity, lux, sensor_fault, set_temp, set_hum, light_level, max_light,
+lights_on, lights_off, light_period_minutes, light_cycle_anchor, fade_in_ms, fade_out_ms,
+peltier_duty (signed: + heat / − cool), peltier_dir, fan_on, rssi, wifi`.
 
 ---
 

@@ -139,6 +139,7 @@ class EthoscopeNodeServer:
         self.device_scanner: EthoscopeScanner | None = None
         self.sensor_scanner: SensorScanner | None = None
         self.incubator_scanner: IncubatorScanner | None = None
+        self.incubator_reconciler = None  # ethoscope_node.incubators.Reconciler
         self.database: ExperimentalDB | None = None
         self.tunnel_utils: TunnelUtils | None = None
 
@@ -374,7 +375,7 @@ class EthoscopeNodeServer:
                 self.logger.warning("Continuing without sensor scanner")
                 self.sensor_scanner = None
 
-            # Initialize incubator scanner (monitor-only: polls /telemetry of WiFi units)
+            # Initialize incubator scanner (polls /telemetry of WiFi units)
             try:
                 self.incubator_scanner = IncubatorScanner(
                     results_dir=self.sensors_dir,
@@ -385,6 +386,30 @@ class EthoscopeNodeServer:
                 self.logger.warning(f"Failed to start incubator scanner: {e}")
                 self.logger.warning("Continuing without incubator scanner")
                 self.incubator_scanner = None
+
+            # Reconciler: re-push DB schedules to drifted firmware on a slow tick.
+            # Best-effort; failures are warn-only. Only enable when both scanner
+            # and database are available.
+            if self.incubator_scanner is not None and self.database is not None:
+                try:
+                    from ethoscope_node.api.incubator_storage_adapter import (
+                        ExperimentalDBIncubatorStorage,
+                    )
+                    from ethoscope_node.incubators import (
+                        IncubatorFirmwareClient,
+                        Reconciler,
+                    )
+
+                    self.incubator_reconciler = Reconciler(
+                        ExperimentalDBIncubatorStorage(self.database),
+                        self.incubator_scanner,
+                        IncubatorFirmwareClient(),
+                    )
+                    self.incubator_reconciler.start()
+                    self.logger.info("Incubator reconciler started")
+                except Exception as e:
+                    self.logger.warning(f"Failed to start incubator reconciler: {e}")
+                    self.incubator_reconciler = None
 
             self._setup_api_modules()
 
@@ -422,6 +447,13 @@ class EthoscopeNodeServer:
                 self.logger.info("Sensor scanner stopped")
             except Exception as e:
                 self.logger.warning(f"Error stopping sensor scanner: {e}")
+
+        if self.incubator_reconciler:
+            try:
+                self.incubator_reconciler.stop()
+                self.logger.info("Incubator reconciler stopped")
+            except Exception as e:
+                self.logger.warning(f"Error stopping incubator reconciler: {e}")
 
         if self.incubator_scanner:
             try:

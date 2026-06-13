@@ -327,6 +327,56 @@
                                 Editing it (or the period) requires that no device is currently running here.
                             </small>
                         </div>
+
+                        <!-- Smart-incubator panel LED: fade timing + peak brightness -->
+                        <div class="col-md-4" style="margin-top: 10px;">
+                            <div class="form-group">
+                                <label class="form-label" for="fadeInSeconds">Fade-in (s)</label>
+                                <input type="number"
+                                       class="form-control"
+                                       id="fadeInSeconds"
+                                       name="fade_in_seconds"
+                                       ng-model="selectedIncubator.fade_in_seconds"
+                                       min="0"
+                                       max="3600"
+                                       ng-disabled="isIncubatorLocked()">
+                                <small class="form-text text-muted">
+                                    Time to ramp the panel LED from 0% to max at sunrise.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-4" style="margin-top: 10px;">
+                            <div class="form-group">
+                                <label class="form-label" for="fadeOutSeconds">Fade-out (s)</label>
+                                <input type="number"
+                                       class="form-control"
+                                       id="fadeOutSeconds"
+                                       name="fade_out_seconds"
+                                       ng-model="selectedIncubator.fade_out_seconds"
+                                       min="0"
+                                       max="3600"
+                                       ng-disabled="isIncubatorLocked()">
+                                <small class="form-text text-muted">
+                                    Time to ramp the panel LED back to 0% at sunset.
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-4" style="margin-top: 10px;">
+                            <div class="form-group">
+                                <label class="form-label" for="maxLight">Max brightness (%)</label>
+                                <input type="number"
+                                       class="form-control"
+                                       id="maxLight"
+                                       name="max_light"
+                                       ng-model="selectedIncubator.max_light"
+                                       min="0"
+                                       max="100"
+                                       ng-disabled="isIncubatorLocked()">
+                                <small class="form-text text-muted">
+                                    Peak panel-LED level (0&ndash;100%).
+                                </small>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Physical unit (WiFi) — link a discovered smart incubator -->
@@ -336,9 +386,9 @@
                                 <i class="fa fa-wifi"></i> Physical unit (WiFi)
                             </label>
                             <small class="form-text text-muted" style="margin-top: -5px; margin-bottom: 10px;">
-                                Link this record to a discovered smart incubator so the node monitors its
-                                live temperature/light and files its sensor readings under this incubator.
-                                Monitoring only — setpoints are not pushed yet.
+                                Link this record to a discovered smart incubator. The node owns the light
+                                schedule and pushes it (lights, period, anchor, fade, max brightness) to
+                                the firmware on every save; a 60 s reconciler re-pushes on drift.
                             </small>
                         </div>
                         <div class="col-md-8">
@@ -356,6 +406,13 @@
                                         ng-disabled="!selectedIncubator._editing"
                                         title="Save the link and push this incubator's name to the unit">
                                     <i class="fa fa-link"></i> Link
+                                </button>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-secondary"
+                                        ng-click="pushIncubatorSchedule(selectedIncubator._originalName || selectedIncubator.name)"
+                                        ng-disabled="!selectedIncubator._editing || !selectedIncubator.hostname || !isLiveOnline(liveForIncubator(selectedIncubator))"
+                                        title="Re-push the saved schedule to the firmware right now">
+                                    <i class="fa fa-arrow-up"></i> Push now
                                 </button>
                             </div>
                             <small ng-if="!selectedIncubator._editing" class="form-text text-muted">

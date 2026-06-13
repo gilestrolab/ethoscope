@@ -16,18 +16,21 @@ template <typename T> static T clampv(T v, T lo, T hi) {
 }
 
 void toJson(JsonObject o) {
-  o["node_id"]         = cfg.node_id;
-  o["name"]            = cfg.name;
-  o["location"]        = cfg.location;
-  o["tz"]              = cfg.tz;
-  o["ntp"]             = cfg.ntp;
-  o["set_temp"]        = cfg.set_temp;
-  o["set_hum"]         = cfg.set_hum;
-  o["max_light"]       = cfg.max_light;
-  o["mode"]            = cfg.mode;
-  o["lights_on"]       = cfg.lights_on;
-  o["lights_off"]      = cfg.lights_off;
-  o["report_interval"] = cfg.report_interval;
+  o["node_id"]              = cfg.node_id;
+  o["name"]                 = cfg.name;
+  o["location"]             = cfg.location;
+  o["tz"]                   = cfg.tz;
+  o["ntp"]                  = cfg.ntp;
+  o["set_temp"]             = cfg.set_temp;
+  o["set_hum"]              = cfg.set_hum;
+  o["max_light"]            = cfg.max_light;
+  o["lights_on"]            = cfg.lights_on;
+  o["lights_off"]           = cfg.lights_off;
+  o["light_period_minutes"] = cfg.light_period_minutes;
+  o["light_cycle_anchor"]   = cfg.light_cycle_anchor;
+  o["fade_in_ms"]           = cfg.fade_in_ms;
+  o["fade_out_ms"]          = cfg.fade_out_ms;
+  o["report_interval"]      = cfg.report_interval;
   o["kp"]              = cfg.kp;
   o["ki"]              = cfg.ki;
   o["kd"]              = cfg.kd;
@@ -40,18 +43,20 @@ void toJson(JsonObject o) {
   o["peltier_enabled"] = cfg.peltier_enabled;
 }
 
-// Accept "09:00" or a raw minute-of-day integer.
+// Accept "09:00" or a raw minute-into-cycle integer. Upper bound is the cycle
+// length (max 48h), not 24h, so T-cycle schedules can use offsets > 1440.
 static bool parseMinuteOfDay(JsonVariantConst v, uint16_t &out) {
+  const int max_minute = 48 * 60 - 1;
   if (v.is<const char *>()) {
     const char *s = v.as<const char *>();
     int hh = 0, mm = 0;
     if (sscanf(s, "%d:%d", &hh, &mm) == 2) {
-      out = clampv(hh * 60 + mm, 0, 24 * 60 - 1);
+      out = clampv(hh * 60 + mm, 0, max_minute);
       return true;
     }
     return false;
   }
-  if (v.is<int>()) { out = clampv(v.as<int>(), 0, 24 * 60 - 1); return true; }
+  if (v.is<int>()) { out = clampv(v.as<int>(), 0, max_minute); return true; }
   return false;
 }
 
@@ -73,20 +78,19 @@ int applyJson(JsonObjectConst in) {
   if (in["set_temp"].is<float>())  { cfg.set_temp = clampv((float)in["set_temp"], 0.0f, 50.0f); n++; }
   if (in["set_hum"].is<float>())   { cfg.set_hum  = clampv((float)in["set_hum"], 0.0f, 100.0f); n++; }
   if (in["max_light"].is<int>())   { cfg.max_light = clampv((int)in["max_light"], 0, 100); n++; }
-  if (in["mode"].is<int>())        { cfg.mode = clampv((int)in["mode"], 0, 4); n++; }
-  // mode may also arrive as a string ("LD", "DD", ...)
-  if (in["mode"].is<const char *>()) {
-    const char *m = in["mode"];
-    if      (!strcmp(m, "DD")) cfg.mode = MODE_DD;
-    else if (!strcmp(m, "LD")) cfg.mode = MODE_LD;
-    else if (!strcmp(m, "LL")) cfg.mode = MODE_LL;
-    else if (!strcmp(m, "DL")) cfg.mode = MODE_DL;
-    else if (!strcmp(m, "MM")) cfg.mode = MODE_MM;
-    n++;
-  }
   uint16_t mod;
   if (in["lights_on"]  && parseMinuteOfDay(in["lights_on"],  mod)) { cfg.lights_on  = mod; n++; }
   if (in["lights_off"] && parseMinuteOfDay(in["lights_off"], mod)) { cfg.lights_off = mod; n++; }
+  if (in["light_period_minutes"].is<int>()) {
+    cfg.light_period_minutes = clampv((int)in["light_period_minutes"], 1, 48 * 60); n++;
+  }
+  if (in["light_cycle_anchor"].is<unsigned int>() || in["light_cycle_anchor"].is<int>()) {
+    // Anchor is a unix timestamp; 0 = wall-clock-mode sentinel. Use a 32-bit
+    // unsigned int — good through year 2106, which we'll consider "future work".
+    cfg.light_cycle_anchor = (uint32_t)in["light_cycle_anchor"]; n++;
+  }
+  if (in["fade_in_ms"].is<int>())  { cfg.fade_in_ms  = clampv((int)in["fade_in_ms"],  0, 60000); n++; }
+  if (in["fade_out_ms"].is<int>()) { cfg.fade_out_ms = clampv((int)in["fade_out_ms"], 0, 60000); n++; }
   if (in["report_interval"].is<int>()) { cfg.report_interval = clampv((int)in["report_interval"], 1, 3600); n++; }
   if (in["kp"].is<float>())            { cfg.kp = in["kp"]; n++; }
   if (in["ki"].is<float>())            { cfg.ki = in["ki"]; n++; }

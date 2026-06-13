@@ -3,38 +3,52 @@
 #include "incubator.h"
 #include "pins.h"
 #include "TimeKeeper.h"
+#include <time.h>
 
-// Fade pacing: ms per 1% step (10 ms ≈ 1 s for a full 0→100 sweep, like the legacy FW).
-static const unsigned long FADE_STEP_MS = 10;
+// Per-direction fade pacing: ms per 1% step, computed from cfg.fade_in_ms /
+// fade_out_ms at the top of update(). A floor of 1 ms avoids div-by-zero and
+// caps the on-CPU rate.
 static unsigned long last_step = 0;
 
-// Is the local time inside the [lights_on, lights_off) window? Handles an overnight
-// window (lights_on > lights_off) too.
-static bool inDayWindow(int minuteOfDay) {
-  if (cfg.lights_on == cfg.lights_off) return false;       // zero-length window
+// True iff the cycle-relative time falls inside the [lights_on, lights_off)
+// window. Handles wrap-around (lights_on > lights_off) for both wall-clock
+// (24h) and T-cycle modes.
+static bool inWindow(int minuteInCycle) {
+  if (cfg.lights_on == cfg.lights_off) return true;   // always-on convention
   if (cfg.lights_on < cfg.lights_off) {
-    return minuteOfDay >= cfg.lights_on && minuteOfDay < cfg.lights_off;
+    return minuteInCycle >= cfg.lights_on && minuteInCycle < cfg.lights_off;
   }
-  // overnight window, e.g. on=21:00 off=06:00
-  return minuteOfDay >= cfg.lights_on || minuteOfDay < cfg.lights_off;
+  return minuteInCycle >= cfg.lights_on || minuteInCycle < cfg.lights_off;
 }
 
-// Decide the target light level from mode + time.
-static void evaluateSchedule() {
-  if (cfg.mode == MODE_MM) return;        // manual: leave target untouched
+// Compute "should the light be on right now?" using the same algorithm as the
+// node-side ``ethoscope_node.incubators.schedule.is_light_on`` and the
+// ethoscope-side ``LightController.should_light_be_on`` — keep all three in
+// step or the merged drift detector will think the firmware is wrong forever.
+static bool isLightOn() {
+  // T-cycle if period != 24h OR an explicit anchor is set; otherwise wall-clock.
+  bool anchored = cfg.light_cycle_anchor != 0 || cfg.light_period_minutes != 1440;
 
-  switch (cfg.mode) {
-    case MODE_DD: state.light_target = 0; return;
-    case MODE_LL: state.light_target = cfg.max_light; return;
-    default: break;                        // LD / DL need the clock
+  if (anchored) {
+    if (cfg.light_cycle_anchor == 0) return false; // non-24h with no anchor → refuse
+    time_t now_ts = time(nullptr);
+    if (now_ts <= 0) return false;                 // no valid time yet
+    long period_s = (long)cfg.light_period_minutes * 60L;
+    if (period_s <= 0) return false;
+    long phase_s = ((long)now_ts - (long)cfg.light_cycle_anchor) % period_s;
+    if (phase_s < 0) phase_s += period_s;
+    int phase_min = (int)(phase_s / 60);
+    return inWindow(phase_min);
   }
 
+  // Wall-clock mode — same path as the legacy firmware.
   int t = TimeKeeper::localMinuteOfDay();
-  if (t < 0) return;                        // no valid time yet → hold current target
+  if (t < 0) return false;                          // hold off until time is valid
+  return inWindow(t);
+}
 
-  bool day = inDayWindow(t);
-  if (cfg.mode == MODE_LD) state.light_target = day ? cfg.max_light : 0;
-  else /* MODE_DL */       state.light_target = day ? 0 : cfg.max_light;
+static void evaluateSchedule() {
+  state.light_target = isLightOn() ? cfg.max_light : 0;
 }
 
 static void writeLevel(int pct) {
@@ -60,9 +74,16 @@ void setManualLevel(int pct) {
 void update() {
   evaluateSchedule();
 
-  // Non-blocking fade toward the target, one percent per FADE_STEP_MS.
+  // Direction-aware fade step: separate ramp-up and ramp-down durations.
+  // Both stored in ms; one 1% step every (ms / 100) ms with a 1ms floor.
+  unsigned long fade_ms = (state.light_level < state.light_target)
+                          ? cfg.fade_in_ms
+                          : cfg.fade_out_ms;
+  unsigned long step_ms = fade_ms / 100;
+  if (step_ms == 0) step_ms = 1;
+
   unsigned long now = millis();
-  if (now - last_step < FADE_STEP_MS) return;
+  if (now - last_step < step_ms) return;
   last_step = now;
 
   if (state.light_level < state.light_target)      writeLevel(state.light_level + 1);

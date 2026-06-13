@@ -119,3 +119,112 @@ Plan: `~/.claude/plans/noble-drifting-brook.md`
 - arduino-cli needs the sketch folder name to match the `.ino`; `firmware/` ≠
   `client_firmware_esp8266.ino`, so `build.sh`'s `arduino-cli compile .` fails in place — build
   by copying into a correctly-named temp sketch dir (or rename). Worth fixing in build.sh later.
+
+---
+
+# Smart incubators — node integration (Phase 2: schedule push + fade + decoupled subpackage)
+
+Date: 2026-06-13
+Plan: `~/.claude/plans/i-think-we-should-nested-puppy.md`
+
+## Goals
+
+1. Push the node's variable-T light schedule (`lights_on/off/period/anchor`) to incubator firmware as source of truth.
+2. Add fade-in/out (incubator-only — ethoscope GPIO17 is not HW-PWM capable).
+3. Decouple incubator control: self-contained subpackage under `ethoscope_node.incubators`, `[full]` extras gates the heavy node stack.
+
+## Tasks
+
+### Stage 1 — subpackage scaffold (pure-Python, no network)
+- [ ] `ethoscope_node/incubators/__init__.py` + `schedule.py` (port `should_light_be_on`, payload builder) + tests
+- [ ] `ethoscope_node/incubators/firmware_client.py` (requests-based) + tests
+- [ ] `ethoscope_node/incubators/storage.py` (ABC + `SQLiteIncubatorStorage`) + tests
+
+### Stage 2 — discovery + reconciliation
+- [ ] `ethoscope_node/incubators/scanner.py` (with duplicated BaseDevice/DeviceScanner) + tests
+- [ ] `ethoscope_node/incubators/reconciler.py` (Timer-based drift re-push) + tests
+
+### Stage 3 — routes + standalone server + SPA
+- [ ] `ethoscope_node/incubators/routes.py` (framework-agnostic handlers) + tests
+- [ ] `ethoscope_node/incubators/bottle_app.py`
+- [ ] `ethoscope_node/incubators/standalone.py` (CLI entry)
+- [ ] `ethoscope_node/incubators/web/{index.html,app.js,style.css}` minimal SPA
+
+### Stage 4 — packaging
+- [x] `src/node/pyproject.toml`: keep default install = full node (incubator-only is fringe), add console-script `ethoscope-incubator-server`, document manual minimal-install recipe in pyproject header
+- [x] Makefile / systemd units / Docker / migrate_to_unified_structure.sh: unchanged from Phase 1 (default install pulls everything)
+
+### Stage 5 — node integration
+- [ ] `ExperimentalDBIncubatorStorage` adapter; refactor `api/incubator_api.py` to thin bridge
+- [ ] `scanner/incubator_scanner.py` becomes re-export shim
+- [ ] Wire `Reconciler` lifecycle into `scripts/server.py`
+
+### Stage 6 — DB migration + auto-push
+- [ ] `etho_db.py` migration 11 adds `fade_in_seconds` + `fade_out_seconds`; addIncubator/updateIncubator accept them
+- [ ] `setup_api.py`: extend `_LOCKED_INCUBATOR_FIELDS`; auto-push after add/update/reset-anchor
+- [ ] Tests
+
+### Stage 7 — firmware
+- [ ] `incubator.h` Config: drop `mode`; add `light_period_minutes`, `light_cycle_anchor`, `fade_in_ms`, `fade_out_ms`
+- [ ] `Config.cpp/h`: parsers + bump persisted-config schema version (reset old configs to defaults)
+- [ ] `LightControl.cpp/h`: drop modes; new `isLightOn` (wall-clock + T-cycle); per-direction fade step
+- [ ] `Api.cpp/h`: `/config` accepts new fields; `/telemetry` reports them; drop mode/light_target hints
+- [ ] `version.h`: bump to 3.2.0-wifi
+- [ ] `README.md`: update API table + curl examples + note mode removal
+- [ ] Compile-check
+
+### Stage 8 — node frontend
+- [ ] `incubators.html` + `incubatorsController.js`: fade inputs, push-now button, drift badge
+
+### Verification
+- [x] Default install `pip install -e src/node/` pulls the full node stack (cherrypy 18.10.0, etc.); IncubatorAPI bridge imports cleanly
+- [x] Manual minimal recipe (fresh venv, `pip install --no-deps -e src/node` + `pip install bottle zeroconf requests`) → subpackage imports; CherryPy import fails; standalone `ethoscope-incubator-server` starts, SPA loads, REST round-trips fade fields
+- [x] `pytest src/node/ethoscope_node/incubators/tests` → 127 green (schedule, firmware_client, storage, scanner, reconciler, routes, bottle_app)
+- [x] Full node `pytest src/node/tests/` → 1734 green (the 60 in test_target_detection_analysis.py blocked by an unrelated numpy/MKL system-level link error, not by Phase 2 code)
+- [x] Firmware compile via `build.sh`: clean, RAM 42% / flash 39% (d1_mini, esp8266 3.1.2), FW 3.2.0-wifi build #5
+- [x] Smoke: standalone server adds an incubator with fade=30/45/80, GET /api/incubators returns the round-tripped record
+
+## Review (2026-06-13)
+
+Phase 2 implemented across nine stages.
+
+**Net code shape:**
+- New self-contained subpackage `ethoscope_node/incubators/` (1.6 kLOC + 600 LOC of tests):
+  schedule.py (T-cycle algorithm + firmware payload builder), firmware_client.py,
+  storage.py (ABC + SQLite impl), scanner.py (duplicated minimal Base{Device,Scanner}),
+  reconciler.py (Timer-based drift re-push), routes.py (framework-agnostic handlers),
+  bottle_app.py, standalone.py (CLI entry), web/ (vanilla-JS SPA). **Zero
+  `ethoscope_node.*` imports** outside this package.
+- `pyproject.toml`: default install unchanged (full node stack); added
+  console-script `ethoscope-incubator-server` for the rare incubator-only
+  deployment + documented the manual `--no-deps + bottle/zeroconf/requests`
+  recipe in the pyproject header.
+- Node-side bridge: `api/incubator_storage_adapter.py` wraps ExperimentalDB into the
+  ABC; `api/incubator_api.py` is now a thin handler-registration shim; old
+  `scanner/incubator_scanner.py` is a re-export shim.
+- Reconciler lifecycle wired into `scripts/server.py`.
+- DB migration 11 adds `fade_in_seconds`, `fade_out_seconds`, `max_light` to incubators.
+- `setup_api.py` `_LOCKED_INCUBATOR_FIELDS` extended; add/update/reset-anchor each
+  trigger best-effort auto-push via `IncubatorAPI.push_schedule_to_unit`.
+- Firmware FW 3.1.0 → 3.2.0-wifi: dropped DD/LL/DL/MM modes; added
+  `light_period_minutes`, `light_cycle_anchor`, `fade_in_ms`, `fade_out_ms` to Config;
+  new `isLightOn()` port of `should_light_be_on` (wall-clock + T-cycle); per-direction
+  fade step. `POST /command set_light` kept as transient debug override.
+- Node UI: edit modal gains Fade-in/Fade-out/Max-brightness inputs and a "Push now"
+  button next to "Link"; controller hydrates+saves the new fields and posts to
+  `/incubator/push-schedule`.
+
+**Decoupling proven (manual recipe):** stripped-down venv with
+`pip install --no-deps ethoscope_node && pip install bottle zeroconf requests`
+runs `ethoscope-incubator-server` end-to-end — no CherryPy, no MySQL connector,
+no numpy, no GitPython. The default install stays full for the common case.
+
+**Drift handling:** auto-push on every relevant write + 60 s background reconciliation
+that re-pushes when telemetry-reported schedule diverges from storage. Failures are
+warn-only.
+
+## Out of scope (deferred)
+- Ethoscope-side fade (GPIO17 is not a HW-PWM pin; pairs with WS2812 hardware-rev plan).
+- Packaging the standalone as a Debian/Docker artefact (Phase 3).
+- Migrating already-deployed firmware configs — bump persisted-config schema, accept
+  reset-to-defaults on first boot of new FW.

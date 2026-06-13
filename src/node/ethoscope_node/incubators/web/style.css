@@ -1,0 +1,124 @@
+:root {
+  --bg: #fafafa;
+  --fg: #222;
+  --muted: #777;
+  --line: #ddd;
+  --accent: #2a6df4;
+  --ok: #2c8a2e;
+  --warn: #c47000;
+  --err: #c0392b;
+}
+
+* { box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  margin: 0;
+  padding: 0;
+}
+header {
+  background: white;
+  border-bottom: 1px solid var(--line);
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+header h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+
+.muted { color: var(--muted); font-size: 0.9em; }
+.hidden { display: none; }
+
+.banner {
+  background: #fff8e6;
+  border: 1px solid #f0d780;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+.banner code {
+  background: #fff;
+  padding: 0.05em 0.4em;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.toolbar .muted { margin-left: auto; }
+
+button {
+  font: inherit;
+  padding: 0.4rem 0.85rem;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+button.primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+button:hover { filter: brightness(0.97); }
+button.icon { padding: 0.2rem 0.5rem; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+th, td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+th { background: #f3f3f3; font-weight: 600; font-size: 0.9rem; }
+tr:last-child td { border-bottom: none; }
+.row-actions { display: flex; gap: 0.25rem; justify-content: flex-end; }
+
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 0.4em; }
+.dot.online { background: var(--ok); }
+.dot.offline { background: var(--err); }
+.dot.unbound { background: var(--muted); }
+.dot.drift { background: var(--warn); }
+
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1.25rem 1.5rem;
+  min-width: 30rem;
+  max-width: 90vw;
+}
+dialog h2 { margin-top: 0; font-size: 1.1rem; }
+dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+dialog input, dialog select {
+  font: inherit;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+dialog fieldset {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.6rem 0.9rem;
+  margin: 0.75rem 0;
+}
+dialog fieldset legend { padding: 0 0.4rem; font-weight: 600; font-size: 0.9rem; }
+.form-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }

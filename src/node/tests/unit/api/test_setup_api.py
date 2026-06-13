@@ -914,6 +914,105 @@ class TestSetupAPI(unittest.TestCase):
         self.assertEqual(result["code"], "incubator_busy")
         mock_db.updateIncubator.assert_not_called()
 
+    # ---- Phase 2 fade fields + auto-push ----
+
+    def _install_fake_incubator_api(self):
+        """Attach a fake IncubatorAPI to the server registry so auto-push can find it."""
+        fake = Mock()
+        fake.__class__.__name__ = "IncubatorAPI"
+        fake.push_schedule_to_unit = Mock(return_value=True)
+        self.mock_server.api_modules = [fake]
+        return fake
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_incubator_accepts_fade_fields(self, mock_db_class, mock_request):
+        """Fade timing and max_light forward to addIncubator."""
+        mock_request.json = {
+            "name": "Fady",
+            "fade_in_seconds": 30,
+            "fade_out_seconds": 45,
+            "max_light": 80,
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 7
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "success")
+        kwargs = mock_db.addIncubator.call_args[1]
+        self.assertEqual(kwargs["fade_in_seconds"], 30)
+        self.assertEqual(kwargs["fade_out_seconds"], 45)
+        self.assertEqual(kwargs["max_light"], 80)
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_incubator_triggers_auto_push(self, mock_db_class, mock_request):
+        """Successful add fires the auto-push for new units."""
+        fake_api = self._install_fake_incubator_api()
+        mock_request.json = {"name": "AutoPush", "hostname": "incubator-9"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 1
+
+        self.api._setup_add_incubator()
+        fake_api.push_schedule_to_unit.assert_called_once_with("AutoPush")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_update_incubator_accepts_fade_fields_and_pushes(
+        self, mock_db_class, mock_request
+    ):
+        """Updating fade timing triggers an auto-push."""
+        fake_api = self._install_fake_incubator_api()
+        mock_request.json = {
+            "original_name": "Box1",
+            "fade_in_seconds": 5,
+            "fade_out_seconds": 10,
+            "max_light": 60,
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.updateIncubator.return_value = 1
+        # No running devices so the locked-field guard doesn't trip.
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {}
+
+        result = self.api._setup_update_incubator()
+        self.assertEqual(result["result"], "success")
+        kwargs = mock_db.updateIncubator.call_args[1]
+        self.assertEqual(kwargs["fade_in_seconds"], 5)
+        self.assertEqual(kwargs["max_light"], 60)
+        fake_api.push_schedule_to_unit.assert_called_once_with("Box1")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_reset_anchor_triggers_auto_push(self, mock_db_class, mock_request):
+        """Resetting anchor also re-pushes the schedule to the firmware."""
+        fake_api = self._install_fake_incubator_api()
+        mock_request.json = {"name": "Box1"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.updateIncubator.return_value = 1
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {}
+
+        self.api._setup_reset_incubator_anchor()
+        fake_api.push_schedule_to_unit.assert_called_once_with("Box1")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_incubator_swallows_push_errors(self, mock_db_class, mock_request):
+        """Auto-push errors must not break the response — best-effort policy."""
+        fake_api = self._install_fake_incubator_api()
+        fake_api.push_schedule_to_unit.side_effect = RuntimeError("boom")
+        mock_request.json = {"name": "AutoPush"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 1
+
+        result = self.api._setup_add_incubator()
+        self.assertEqual(result["result"], "success")  # response still succeeds
+
     # ============================================================================
     # POST Endpoints - Notification Tests
     # ============================================================================

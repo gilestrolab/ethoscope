@@ -46,39 +46,31 @@ static String fmtLux(float v) {
   return String((int)lroundf(v));
 }
 
-static const char *modeName(uint8_t m) {
-  switch (m) {
-    case MODE_DD: return "DD";
-    case MODE_LD: return "LD";
-    case MODE_LL: return "LL";
-    case MODE_DL: return "DL";
-    default:      return "MM";
-  }
-}
-
 // Build the telemetry object (also used by the root status page).
 static void fillTelemetry(JsonObject o) {
-  o["node_id"]      = cfg.node_id;
-  o["fw"]           = FW_VERSION;
-  o["build"]        = FW_BUILD;
-  o["built"]        = FW_BUILD_DATE;
-  o["time"]         = (uint32_t)time(nullptr);
-  o["time_valid"]   = state.time_valid;
-  o["uptime_s"]     = (millis() - state.boot_millis) / 1000;
+  o["node_id"]              = cfg.node_id;
+  o["fw"]                   = FW_VERSION;
+  o["build"]                = FW_BUILD;
+  o["built"]                = FW_BUILD_DATE;
+  o["time"]                 = (uint32_t)time(nullptr);
+  o["time_valid"]           = state.time_valid;
+  o["uptime_s"]             = (millis() - state.boot_millis) / 1000;
 
-  o["temperature"]  = state.temperature;
-  o["humidity"]     = state.humidity;
-  o["lux"]          = state.lux;
-  o["sensor_fault"] = state.sensor_fault;
+  o["temperature"]          = state.temperature;
+  o["humidity"]             = state.humidity;
+  o["lux"]                  = state.lux;
+  o["sensor_fault"]         = state.sensor_fault;
 
-  o["set_temp"]     = cfg.set_temp;
-  o["set_hum"]      = cfg.set_hum;
-  o["mode"]         = modeName(cfg.mode);
-  o["light_level"]  = state.light_level;
-  o["light_target"] = state.light_target;
-  o["max_light"]    = cfg.max_light;
-  o["lights_on"]    = cfg.lights_on;
-  o["lights_off"]   = cfg.lights_off;
+  o["set_temp"]             = cfg.set_temp;
+  o["set_hum"]              = cfg.set_hum;
+  o["light_level"]          = state.light_level;
+  o["max_light"]            = cfg.max_light;
+  o["lights_on"]            = cfg.lights_on;
+  o["lights_off"]           = cfg.lights_off;
+  o["light_period_minutes"] = cfg.light_period_minutes;
+  o["light_cycle_anchor"]   = cfg.light_cycle_anchor;
+  o["fade_in_ms"]           = cfg.fade_in_ms;
+  o["fade_out_ms"]          = cfg.fade_out_ms;
 
   o["peltier_duty"] = state.peltier_duty;            // signed: + heat / - cool
   o["peltier_dir"]  = state.peltier_duty > 0 ? "heat"

@@ -9,14 +9,9 @@
 #include <Arduino.h>
 #include "version.h"     // FW_VERSION / FW_BUILD / FW_BUILD_DATE
 
-// Light schedule modes (same five behaviours as the legacy radio firmware).
-enum LightMode {
-  MODE_DD = 0,  // constant dark
-  MODE_LD = 1,  // light during the day window [lights_on, lights_off)
-  MODE_LL = 2,  // constant light
-  MODE_DL = 3,  // inverted: dark during the day window, light otherwise
-  MODE_MM = 4   // manual: firmware does not touch the light; set via REST
-};
+// Light scheduling is always LD (light-during-window) — the four legacy modes
+// (DD/LL/DL/MM) were removed in firmware 3.2.0 in favour of node-driven
+// schedules. For bench overrides use ``POST /command set_light`` (transient).
 
 // Persisted configuration. Defaults below are written on first boot.
 struct Config {
@@ -29,13 +24,21 @@ struct Config {
                                                             // IP/hostname for offline labs
                                                             // (e.g. the controller running ntpd)
 
-  // Setpoints & light schedule
+  // Setpoints & light schedule (LD mode; T-cycle supported via period+anchor).
   float    set_temp       = 22.0;   // °C  — Peltier target
   float    set_hum        = 65.0;   // %RH — SENSED ONLY (no humidity actuator in HW)
   uint8_t  max_light      = 100;    // %   — light level used when "on"
-  uint8_t  mode           = MODE_LD;
-  uint16_t lights_on      = 9 * 60;  // minute-of-day, local time (09:00)
-  uint16_t lights_off     = 21 * 60; // (21:00)
+  uint16_t lights_on      = 9 * 60;  // minute-of-day (wall-clock) OR minute-into-cycle
+                                     // (T-cycle), depending on light_cycle_anchor.
+  uint16_t lights_off     = 21 * 60;
+  // Cycle length in minutes. 1440 + anchor==0 → wall-clock mode (local midnight).
+  // Any other combination → T-cycle (phase = (now_ts - anchor) % period).
+  uint16_t light_period_minutes = 1440;
+  uint32_t light_cycle_anchor   = 0; // unix ts marking ZT0; 0 = wall-clock mode
+  // Fade timing for the panel LED at each light transition. Stored in ms so the
+  // ramp walker can use them directly.
+  uint16_t fade_in_ms     = 1000;   // 0 → instant
+  uint16_t fade_out_ms    = 1000;
   uint16_t report_interval = 60;     // s — sensor refresh / telemetry freshness target
 
   // Temperature control (hand-rolled PID) + safety

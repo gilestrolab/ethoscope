@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smart Incubators</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Smart Incubators</h1>
+  <div id="status-line"></div>
+</header>
+
+<main>
+  <section id="discovered-banner" class="banner hidden"></section>
+
+  <section>
+    <div class="toolbar">
+      <button id="add-btn" class="primary">+ Add incubator</button>
+      <button id="refresh-btn">Refresh</button>
+      <span id="last-refresh" class="muted"></span>
+    </div>
+
+    <table id="incubators">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Hostname</th>
+          <th>Lights on / off</th>
+          <th>T (h)</th>
+          <th>Fade in/out (s)</th>
+          <th>Max %</th>
+          <th>Live</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+</main>
+
+<dialog id="edit-dialog">
+  <form method="dialog" id="edit-form">
+    <h2 id="dialog-title">Edit incubator</h2>
+
+    <label>Name <input name="name" required></label>
+    <label>Location <input name="location"></label>
+    <label>Owner <input name="owner"></label>
+    <label>Description <input name="description"></label>
+
+    <fieldset>
+      <legend>Light schedule</legend>
+      <label>Lights on <input name="lights_on" placeholder="09:00"></label>
+      <label>Lights off <input name="lights_off" placeholder="21:00"></label>
+      <label>Period (hours) <input name="period_hours" type="number" min="1" max="48" value="24"></label>
+      <label>Anchor (unix ts, blank = wall-clock) <input name="light_cycle_anchor" type="number" step="any"></label>
+      <label>Fade-in (s) <input name="fade_in_seconds" type="number" min="0" value="1"></label>
+      <label>Fade-out (s) <input name="fade_out_seconds" type="number" min="0" value="1"></label>
+      <label>Max brightness (%) <input name="max_light" type="number" min="0" max="100" value="100"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Physical unit (WiFi)</legend>
+      <label>Hostname
+        <select name="hostname" id="hostname-select">
+          <option value="">— Not linked —</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <div class="form-actions">
+      <button type="button" id="save-btn" class="primary">Save</button>
+      <button type="button" id="cancel-btn">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>

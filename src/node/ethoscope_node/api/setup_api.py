@@ -30,6 +30,9 @@ _LOCKED_INCUBATOR_FIELDS = frozenset(
         "lights_off",
         "light_period_minutes",
         "light_cycle_anchor",
+        "fade_in_seconds",
+        "fade_out_seconds",
+        "max_light",
     }
 )
 
@@ -608,6 +611,14 @@ class SetupAPI(BaseAPI):
                 "light_period_minutes": period,
                 "light_cycle_anchor": anchor,
             }
+            # Phase-2 fade fields — optional. Defaults match the firmware.
+            for fade_key in ("fade_in_seconds", "fade_out_seconds", "max_light"):
+                if fade_key in data:
+                    incubator_data[fade_key] = int(data[fade_key])
+            if data.get("hostname") is not None:
+                hostname = str(data.get("hostname")).strip()
+                if hostname:
+                    incubator_data["hostname"] = hostname
 
             if not incubator_data["name"]:
                 return {"result": "error", "message": "Incubator name is required"}
@@ -615,6 +626,7 @@ class SetupAPI(BaseAPI):
             result = db.addIncubator(**incubator_data)
 
             if result > 0:
+                self._auto_push_schedule(incubator_data["name"])
                 return {
                     "result": "success",
                     "message": f'Incubator {incubator_data["name"]} created successfully',
@@ -661,6 +673,10 @@ class SetupAPI(BaseAPI):
                 update_data["lights_off"] = data["lights_off"].strip()
             if "active" in data:
                 update_data["active"] = int(data["active"])
+            # Phase-2 fade timing / max brightness — pushed to firmware on save.
+            for fade_key in ("fade_in_seconds", "fade_out_seconds", "max_light"):
+                if fade_key in data:
+                    update_data[fade_key] = int(data[fade_key])
 
             # Period / anchor: merge with current row, then normalise so the
             # period↔anchor invariant holds regardless of which field the user
@@ -697,6 +713,7 @@ class SetupAPI(BaseAPI):
             result = db.updateIncubator(name=original_name, **update_data)
 
             if result >= 0:
+                self._auto_push_schedule(new_name or original_name)
                 return {
                     "result": "success",
                     "message": "Incubator updated successfully",
@@ -756,6 +773,7 @@ class SetupAPI(BaseAPI):
             now_ts = time.time()
             result = db.updateIncubator(name=name, light_cycle_anchor=now_ts)
             if result >= 0:
+                self._auto_push_schedule(name)
                 return {
                     "result": "success",
                     "message": f"Cycle anchor reset for {name}",
@@ -766,6 +784,24 @@ class SetupAPI(BaseAPI):
         except Exception as e:
             self.logger.error(f"Error resetting cycle anchor: {e}")
             return {"result": "error", "message": str(e)}
+
+    def _auto_push_schedule(self, name: str) -> bool:
+        """Best-effort schedule push after a DB write.
+
+        Looks up the ``IncubatorAPI`` instance via the server's API registry;
+        if the bridge isn't initialised yet (very early in startup) or the
+        unit is offline, returns ``False`` silently and the reconciler will
+        catch up on its next tick. Never raises.
+        """
+        try:
+            for api in getattr(self.server, "api_modules", []):
+                if api.__class__.__name__ == "IncubatorAPI" and hasattr(
+                    api, "push_schedule_to_unit"
+                ):
+                    return bool(api.push_schedule_to_unit(name))
+        except Exception as e:
+            self.logger.warning("Auto-push for incubator '%s' raised: %s", name, e)
+        return False
 
     def _setup_add_sensor(self):
         """Add a new sensor to configuration."""

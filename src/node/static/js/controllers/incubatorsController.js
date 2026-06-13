@@ -200,6 +200,25 @@
                 });
         };
 
+        // Manual schedule re-push to the bound firmware. Auto-push fires on save,
+        // and the reconciler covers reboots — this is a power-user button.
+        $scope.pushIncubatorSchedule = function(name) {
+            if (!name) return;
+            $http.post('/incubator/push-schedule', { name: name })
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        loadLive();
+                    } else {
+                        alert('Could not push schedule: ' +
+                              (response.data.message || 'unit offline or unbound'));
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error pushing schedule:', error);
+                    alert('Network error while pushing schedule.');
+                });
+        };
+
         // Get sensor associated with an incubator (matched by location field)
         $scope.getSensorForIncubator = function(incubatorName) {
             if (!incubatorName || !$scope.sensors) return null;
@@ -246,6 +265,9 @@
                 lights_off: null,
                 light_period_hours: 24,
                 light_cycle_anchor: null,
+                fade_in_seconds: 1,
+                fade_out_seconds: 1,
+                max_light: 100,
                 owner: ''
             };
         };
@@ -273,6 +295,17 @@
                 (incubator.light_cycle_anchor !== undefined && incubator.light_cycle_anchor !== null)
                     ? Number(incubator.light_cycle_anchor)
                     : null;
+
+            // Phase-2 fade timing + peak brightness. Defaults match the firmware.
+            $scope.selectedIncubator.fade_in_seconds =
+                Number.isFinite(parseInt(incubator.fade_in_seconds, 10))
+                    ? parseInt(incubator.fade_in_seconds, 10) : 1;
+            $scope.selectedIncubator.fade_out_seconds =
+                Number.isFinite(parseInt(incubator.fade_out_seconds, 10))
+                    ? parseInt(incubator.fade_out_seconds, 10) : 1;
+            $scope.selectedIncubator.max_light =
+                Number.isFinite(parseInt(incubator.max_light, 10))
+                    ? parseInt(incubator.max_light, 10) : 100;
         };
 
         // Format a unix timestamp for display in the modal. Returns '—' if absent.
@@ -341,7 +374,10 @@
                     lights_on: lightsOn,
                     lights_off: lightsOff,
                     light_period_minutes: periodMinutes,
-                    active: data.active ? 1 : 0
+                    active: data.active ? 1 : 0,
+                    fade_in_seconds: parseInt(data.fade_in_seconds, 10) || 0,
+                    fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
+                    max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100))
                 };
                 // Anchor is server-managed when period changes; only emit it
                 // explicitly if the user has one (so we don't accidentally
@@ -372,7 +408,10 @@
                     description: data.description || '',
                     lights_on: lightsOn,
                     lights_off: lightsOff,
-                    light_period_minutes: periodMinutes
+                    light_period_minutes: periodMinutes,
+                    fade_in_seconds: parseInt(data.fade_in_seconds, 10) || 0,
+                    fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
+                    max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100))
                 };
 
                 $http.post('/setup/add-incubator', addPayload)
