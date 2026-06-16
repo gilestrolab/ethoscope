@@ -155,11 +155,25 @@ class EthoscopeNodeServer:
         # downstream code can rely on self.config_dir always being a real path.
         from ethoscope_node.utils.configuration import set_default_config_file
         from ethoscope_node.utils.etho_db import set_default_config_dir
-        from ethoscope_node.utils.paths import resolve_config_dir
+        from ethoscope_node.utils.paths import (
+            migrate_legacy_config_dir,
+            resolve_config_dir,
+        )
 
         self.config_dir: str = resolve_config_dir(
             explicit=config_dir, data_dir=ethoscope_data_dir
         )
+
+        # One-time upgrade migration: pull config from the historical
+        # /etc/ethoscope default into the resolved dir before anything reads it,
+        # so an already-configured node doesn't re-run the setup wizard. Must
+        # happen before EthoscopeConfiguration / ExperimentalDB are instantiated.
+        migrated = migrate_legacy_config_dir(self.config_dir)
+        if migrated:
+            self.logger.info(
+                f"Migrated legacy config into {self.config_dir}: {migrated}"
+            )
+
         set_default_config_dir(self.config_dir)
         set_default_config_file(os.path.join(self.config_dir, "ethoscope.conf"))
         self.logger.info(f"Using config directory: {self.config_dir}")

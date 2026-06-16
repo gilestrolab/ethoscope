@@ -112,5 +112,66 @@ class TestMigrateConfigDir(unittest.TestCase):
         )
 
 
+class TestMigrateLegacyConfigDir(unittest.TestCase):
+    def _make(self, tmp, name, content="x"):
+        path = os.path.join(tmp, name)
+        with open(path, "w") as f:
+            f.write(content)
+        return path
+
+    def test_migrates_existing_legacy_config(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as legacy, tempfile.TemporaryDirectory() as new:
+            self._make(legacy, "ethoscope.conf")
+            self._make(legacy, "ethoscope-node.db")  # users gate the wizard
+            self._make(legacy, "environment")  # bootstrap anchor, must stay
+
+            moved = paths.migrate_legacy_config_dir(new, legacy_dir=legacy)
+
+            self.assertIn("ethoscope.conf", moved)
+            self.assertIn("ethoscope-node.db", moved)
+            self.assertNotIn("environment", moved)
+            self.assertTrue(os.path.exists(os.path.join(new, "ethoscope.conf")))
+            self.assertTrue(os.path.exists(os.path.join(new, "ethoscope-node.db")))
+            self.assertTrue(os.path.exists(os.path.join(legacy, "environment")))
+
+    def test_noop_when_legacy_has_no_config(self):
+        import tempfile
+
+        # Legacy dir exists (e.g. only the bootstrap env file) but was never a
+        # config dir: nothing to migrate.
+        with tempfile.TemporaryDirectory() as legacy, tempfile.TemporaryDirectory() as new:
+            self._make(legacy, "environment")
+            self.assertEqual(paths.migrate_legacy_config_dir(new, legacy_dir=legacy), [])
+
+    def test_noop_when_new_dir_already_configured(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as legacy, tempfile.TemporaryDirectory() as new:
+            self._make(legacy, "ethoscope.conf", "LEGACY")
+            self._make(new, "ethoscope.conf", "CURRENT")
+
+            self.assertEqual(paths.migrate_legacy_config_dir(new, legacy_dir=legacy), [])
+            with open(os.path.join(new, "ethoscope.conf")) as f:
+                self.assertEqual(f.read(), "CURRENT")  # untouched
+
+    def test_noop_when_new_dir_equals_legacy(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._make(tmp, "ethoscope.conf")
+            self.assertEqual(paths.migrate_legacy_config_dir(tmp, legacy_dir=tmp), [])
+
+    def test_noop_when_legacy_missing(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as new:
+            self.assertEqual(
+                paths.migrate_legacy_config_dir(new, legacy_dir="/nonexistent/etc"),
+                [],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

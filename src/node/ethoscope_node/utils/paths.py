@@ -30,6 +30,12 @@ DEFAULT_DATA_DIR = "/ethoscope_data"
 # configurable config dir, otherwise resolving the config dir would be circular.
 BOOTSTRAP_ENV_FILE = "/etc/ethoscope/environment"
 
+# Where the config dir used to be hardcoded, before it became configurable and
+# defaulted to {ETHOSCOPE_DATA_DIR}/config. Used only for the one-time upgrade
+# migration so existing nodes don't re-run the setup wizard (see
+# :func:`migrate_legacy_config_dir`).
+LEGACY_CONFIG_DIR = "/etc/ethoscope"
+
 
 def resolve_data_dir(explicit: str | None = None) -> str:
     """Resolve the root data directory.
@@ -129,3 +135,45 @@ def migrate_config_dir(
         shutil.move(src, dst)
         moved.append(name)
     return moved
+
+
+def migrate_legacy_config_dir(
+    new_dir: str, legacy_dir: str = LEGACY_CONFIG_DIR
+) -> list[str]:
+    """One-time migration from the historical hardcoded config dir on upgrade.
+
+    Before the config dir became configurable it was hardcoded to
+    ``/etc/ethoscope``. After upgrading, the resolved config dir defaults to
+    ``{ETHOSCOPE_DATA_DIR}/config``, which is empty for an existing node. Left
+    alone, the node would create a fresh config with ``setup.completed = False``
+    and an empty user database, re-triggering the setup wizard for what is
+    already a configured, running instance.
+
+    This moves the legacy config content (including ``ethoscope-node.db``, which
+    holds the users that gate the wizard) into ``new_dir`` so the existing setup
+    is preserved. It runs at startup, *before* the wizard ever needs to decide
+    whether setup is required — unlike the wizard's own migration, which can only
+    fire once you are already in the wizard.
+
+    No-op (returns ``[]``) when ``new_dir`` equals ``legacy_dir``, when the legacy
+    dir has no ``ethoscope.conf`` to migrate, or when ``new_dir`` already holds an
+    ``ethoscope.conf`` (an already-configured new location is never overwritten).
+
+    Args:
+        new_dir: The resolved config directory to migrate into.
+        legacy_dir: The historical config directory (defaults to ``/etc/ethoscope``).
+
+    Returns:
+        The list of entry names actually moved (empty if nothing to do).
+    """
+    if os.path.abspath(new_dir) == os.path.abspath(legacy_dir):
+        return []
+    # Only treat the legacy dir as a real config dir if it actually holds a
+    # config file. /etc/ethoscope also hosts the bootstrap env file, so its mere
+    # existence is not enough to mean "this node was configured here".
+    if not os.path.isfile(os.path.join(legacy_dir, "ethoscope.conf")):
+        return []
+    # The new location is already set up — don't disturb it.
+    if os.path.isfile(os.path.join(new_dir, "ethoscope.conf")):
+        return []
+    return migrate_config_dir(legacy_dir, new_dir)
