@@ -63,10 +63,10 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="form-group">
-                                    <label for="adminPin">PIN Code</label>
+                                    <label for="adminPin">PIN Code <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" id="adminPin"
-                                           ng-model="adminUser.pin" placeholder="1234" maxlength="4">
-                                    <small class="form-text text-muted">4-digit PIN for device access</small>
+                                           ng-model="adminUser.pin" placeholder="1234" minlength="4" maxlength="8" required>
+                                    <small class="form-text text-muted">Required — at least 4 characters. This is what you'll use to log in.</small>
                                 </div>
                             </div>
                             <div class="col-md-6">

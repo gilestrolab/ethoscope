@@ -360,7 +360,10 @@
                 case 2:
                     return $scope.basicInfo.dataDir && $scope.basicInfo.configDir;
                 case 3:
-                    return $scope.adminUser.username && $scope.adminUser.email && $scope.adminUser.fullname;
+                    // PIN is required: without it the admin cannot log in once auth
+                    // is enabled at the end of the wizard (issue #221).
+                    return $scope.adminUser.username && $scope.adminUser.email && $scope.adminUser.fullname
+                        && $scope.adminUser.pin && $scope.adminUser.pin.length >= 4;
                 case 4:
                     return true; // Additional users are optional
                 case 5:

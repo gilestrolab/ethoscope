@@ -361,6 +361,16 @@ class SetupAPI(BaseAPI):
                 return {"result": "error", "message": "Username is required"}
             if not user_data["email"]:
                 return {"result": "error", "message": "Email is required"}
+            # PIN is the only credential the login screen accepts — refusing it
+            # here is what stops the wizard from leaving the node in a locked-out
+            # state with auth enabled and no usable admin (issue #221).
+            if not user_data["pin"]:
+                return {"result": "error", "message": "PIN is required"}
+            if len(user_data["pin"]) < 4:
+                return {
+                    "result": "error",
+                    "message": "PIN must be at least 4 characters",
+                }
 
             # Check if user already exists
             existing_user = db.getUserByName(user_data["username"])
@@ -1434,6 +1444,37 @@ Ethoscope Node Setup Wizard
     def _complete_setup(self):
         """Complete the setup process."""
         try:
+            # If the wizard turned auth on but no admin with a PIN exists, finishing
+            # would lock the operator out of their own node (issue #221 — Analía
+            # skipped the admin step, the wizard happily flipped setup.completed
+            # and authentication.enabled, and the login screen then had nothing
+            # to accept). Refuse and point them back to the admin step.
+            auth_enabled = bool(
+                self.config._settings.get("authentication", {}).get("enabled", False)
+            )
+            if auth_enabled:
+                try:
+                    db = ExperimentalDB()
+                    admins = db.getAllUsers(
+                        active_only=True, admin_only=True, asdict=True
+                    )
+                    has_usable_admin = any(
+                        (u.get("PIN") or u.get("pin") or "").strip()
+                        for u in admins.values()
+                    )
+                except Exception:
+                    # Couldn't reach the DB — safer to block than to lock out.
+                    has_usable_admin = False
+                if not has_usable_admin:
+                    return {
+                        "result": "error",
+                        "message": (
+                            "Authentication is enabled but no admin user has a PIN "
+                            "set. Go back to the Admin User step and finish setting "
+                            "one up — otherwise no-one will be able to log in."
+                        ),
+                    }
+
             # Mark setup as completed
             self.config.complete_setup()
 

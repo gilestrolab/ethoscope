@@ -20,8 +20,10 @@ imported from anywhere (including very early during startup) without import
 cycles.
 """
 
+import json
 import os
 import shutil
+import sqlite3
 
 DEFAULT_DATA_DIR = "/ethoscope_data"
 
@@ -137,6 +139,39 @@ def migrate_config_dir(
     return moved
 
 
+def _config_is_completed(conf_path: str) -> bool:
+    """True only if ``conf_path`` is a real, completed-wizard config.
+
+    Used to tell a finished setup apart from the auto-stub that
+    ``EthoscopeConfiguration`` writes the first time it starts in an empty dir.
+    Unreadable / unparseable files are treated as not-completed, so the legacy
+    migration can still rescue the user.
+    """
+    try:
+        with open(conf_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return False
+    return bool(data.get("setup", {}).get("completed", False))
+
+
+def _db_has_users(db_path: str) -> bool:
+    """True if the user DB at ``db_path`` holds at least one row.
+
+    Used to distinguish a real user DB carried over from a configured node from
+    the empty stub that ``ExperimentalDB`` creates on first boot.
+    """
+    try:
+        conn = sqlite3.connect(db_path)
+        try:
+            cur = conn.execute("SELECT 1 FROM users LIMIT 1")
+            return cur.fetchone() is not None
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return False
+
+
 def migrate_legacy_config_dir(
     new_dir: str, legacy_dir: str = LEGACY_CONFIG_DIR
 ) -> list[str]:
@@ -155,9 +190,18 @@ def migrate_legacy_config_dir(
     whether setup is required — unlike the wizard's own migration, which can only
     fire once you are already in the wizard.
 
+    Crucially, ``EthoscopeConfiguration`` and ``ExperimentalDB`` auto-create
+    stub files (an unconfigured ``ethoscope.conf`` and an empty
+    ``ethoscope-node.db``) just by being instantiated. Earlier versions of this
+    function treated the mere presence of those stubs as proof that the new dir
+    was already set up, so the very first launch after the bad upgrade closed
+    the migration window forever (issue #221). We now check the *content* of
+    each candidate file and remove it if it is still an empty stub before
+    delegating to :func:`migrate_config_dir`.
+
     No-op (returns ``[]``) when ``new_dir`` equals ``legacy_dir``, when the legacy
-    dir has no ``ethoscope.conf`` to migrate, or when ``new_dir`` already holds an
-    ``ethoscope.conf`` (an already-configured new location is never overwritten).
+    dir has no ``ethoscope.conf`` to migrate, or when ``new_dir`` already holds a
+    real (completed) config — those are never overwritten.
 
     Args:
         new_dir: The resolved config directory to migrate into.
@@ -173,7 +217,27 @@ def migrate_legacy_config_dir(
     # existence is not enough to mean "this node was configured here".
     if not os.path.isfile(os.path.join(legacy_dir, "ethoscope.conf")):
         return []
-    # The new location is already set up — don't disturb it.
-    if os.path.isfile(os.path.join(new_dir, "ethoscope.conf")):
+    # The new location already holds a finished setup — leave it alone.
+    new_conf = os.path.join(new_dir, "ethoscope.conf")
+    if os.path.isfile(new_conf) and _config_is_completed(new_conf):
         return []
+
+    # Otherwise the new dir is either empty or holds only auto-init stubs.
+    # Sweep the stubs aside so the legacy files can actually land here —
+    # migrate_config_dir refuses to overwrite anything already at the
+    # destination.
+    if os.path.isfile(new_conf):  # stub config from EthoscopeConfiguration
+        try:
+            os.unlink(new_conf)
+        except OSError:
+            return []
+    new_db = os.path.join(new_dir, "ethoscope-node.db")
+    if os.path.isfile(new_db) and not _db_has_users(new_db):
+        try:
+            os.unlink(new_db)
+        except OSError:
+            # Couldn't clear the empty stub — migrating the config alone would
+            # leave the user without their accounts. Better to bail.
+            return []
+
     return migrate_config_dir(legacy_dir, new_dir)

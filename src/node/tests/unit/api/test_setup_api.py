@@ -489,6 +489,7 @@ class TestSetupAPI(unittest.TestCase):
         mock_request.json = {
             "username": "admin",
             "email": "admin@test.com",
+            "pin": "1234",
         }
 
         mock_db_class.side_effect = Exception("Database error")
@@ -497,6 +498,40 @@ class TestSetupAPI(unittest.TestCase):
 
         self.assertEqual(result["result"], "error")
         self.assertIn("Database error", result["message"])
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_admin_user_missing_pin(self, mock_db_class, mock_request):
+        """Without a PIN the operator would be locked out after wizard finish — refuse here."""
+        mock_request.json = {
+            "username": "admin",
+            "fullname": "Admin User",
+            "email": "admin@test.com",
+        }
+
+        result = self.api._setup_admin_user()
+
+        self.assertEqual(result["result"], "error")
+        self.assertIn("PIN", result["message"])
+        # No user row should have been created or updated.
+        mock_db_class.return_value.addUser.assert_not_called()
+        mock_db_class.return_value.updateUser.assert_not_called()
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_admin_user_short_pin(self, mock_db_class, mock_request):
+        """A 1-2 character PIN is almost certainly a typo — reject early."""
+        mock_request.json = {
+            "username": "admin",
+            "fullname": "Admin User",
+            "email": "admin@test.com",
+            "pin": "12",
+        }
+
+        result = self.api._setup_admin_user()
+
+        self.assertEqual(result["result"], "error")
+        self.assertIn("at least 4", result["message"])
 
     # ============================================================================
     # POST Endpoints - Additional User Tests
@@ -1500,6 +1535,54 @@ class TestSetupAPI(unittest.TestCase):
 
         self.assertEqual(result["result"], "error")
         self.assertIn("Setup error", result["message"])
+
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_complete_setup_blocked_when_auth_on_but_no_admin_pin(self, mock_db_class):
+        """Auth on + no admin with a PIN would lock the operator out — refuse.
+
+        Mirrors issue #221: Analía's wizard left the node in this state and she
+        could not log back in.
+        """
+        self.api.config._settings["authentication"] = {"enabled": True}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        # An admin row exists but has no PIN — exactly the broken state.
+        mock_db.getAllUsers.return_value = {
+            "admin": {"name": "admin", "isAdmin": True, "PIN": ""}
+        }
+
+        result = self.api._complete_setup()
+
+        self.assertEqual(result["result"], "error")
+        self.assertIn("PIN", result["message"])
+        self.api.config.complete_setup.assert_not_called()
+
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_complete_setup_allowed_when_auth_off(self, mock_db_class):
+        """If the operator deliberately disabled auth, no PIN check applies."""
+        self.api.config._settings["authentication"] = {"enabled": False}
+
+        result = self.api._complete_setup()
+
+        self.assertEqual(result["result"], "success")
+        self.api.config.complete_setup.assert_called_once()
+        # DB shouldn't even be opened when auth is off.
+        mock_db_class.assert_not_called()
+
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_complete_setup_allowed_with_valid_admin(self, mock_db_class):
+        """Happy path: auth on, admin with PIN — proceed."""
+        self.api.config._settings["authentication"] = {"enabled": True}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getAllUsers.return_value = {
+            "admin": {"name": "admin", "isAdmin": True, "PIN": "1234"}
+        }
+
+        result = self.api._complete_setup()
+
+        self.assertEqual(result["result"], "success")
+        self.api.config.complete_setup.assert_called_once()
 
     def test_reset_setup_success(self):
         """Test resetting setup successfully."""
