@@ -268,6 +268,7 @@
                 fade_in_seconds: 1,
                 fade_out_seconds: 1,
                 max_light: 100,
+                crepuscular: false,
                 owner: ''
             };
         };
@@ -306,6 +307,8 @@
             $scope.selectedIncubator.max_light =
                 Number.isFinite(parseInt(incubator.max_light, 10))
                     ? parseInt(incubator.max_light, 10) : 100;
+            // Crepuscular toggle — bool in the UI, int 0/1 on the wire.
+            $scope.selectedIncubator.crepuscular = !!incubator.crepuscular;
         };
 
         // Format a unix timestamp for display in the modal. Returns '—' if absent.
@@ -377,7 +380,8 @@
                     active: data.active ? 1 : 0,
                     fade_in_seconds: parseInt(data.fade_in_seconds, 10) || 0,
                     fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
-                    max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100))
+                    max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100)),
+                    crepuscular: data.crepuscular ? 1 : 0
                 };
                 // Anchor is server-managed when period changes; only emit it
                 // explicitly if the user has one (so we don't accidentally
@@ -411,7 +415,8 @@
                     light_period_minutes: periodMinutes,
                     fade_in_seconds: parseInt(data.fade_in_seconds, 10) || 0,
                     fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
-                    max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100))
+                    max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100)),
+                    crepuscular: data.crepuscular ? 1 : 0
                 };
 
                 $http.post('/setup/add-incubator', addPayload)

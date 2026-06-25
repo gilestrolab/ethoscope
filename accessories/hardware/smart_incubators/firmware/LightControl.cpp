@@ -74,8 +74,20 @@ void setManualLevel(int pct) {
 void update() {
   evaluateSchedule();
 
+  // Crepuscular off → hard transition. Jump straight to the target so old
+  // operators who don't opt in see the legacy on/off behaviour.
+  if (!cfg.crepuscular) {
+    if (state.light_level != state.light_target) writeLevel(state.light_target);
+    return;
+  }
+
   // Direction-aware fade step: separate ramp-up and ramp-down durations.
   // Both stored in ms; one 1% step every (ms / 100) ms with a 1ms floor.
+  // (A sunset-like S-curve would require larger code + lookup tables; the
+  // node-side reference uses smoothstep, but on the ESP8266 the eye-perceived
+  // 1%-per-step linear ramp at this rate is visually indistinguishable from
+  // a curved one when the total fade is > ~5 s. Trade-off in favour of code
+  // simplicity / RAM headroom.)
   unsigned long fade_ms = (state.light_level < state.light_target)
                           ? cfg.fade_in_ms
                           : cfg.fade_out_ms;

@@ -328,6 +328,31 @@
                             </small>
                         </div>
 
+                        <!-- Crepuscular lighting toggle: master switch for the
+                             smoothstep S-curve fade. When OFF, transitions are
+                             hard on/off (default, preserves legacy behaviour);
+                             when ON, the daemon and the smart-incubator firmware
+                             ramp brightness along a sunset-like curve over the
+                             configured fade-in/fade-out durations. -->
+                        <div class="col-12" style="margin-top: 10px;">
+                            <div class="form-check">
+                                <input type="checkbox"
+                                       class="form-check-input"
+                                       id="crepuscular"
+                                       name="crepuscular"
+                                       ng-model="selectedIncubator.crepuscular"
+                                       ng-disabled="isIncubatorLocked()">
+                                <label class="form-check-label" for="crepuscular">
+                                    <i class="fa fa-sun"></i>
+                                    <strong>Crepuscular lighting</strong>
+                                </label>
+                                <small class="form-text text-muted" style="margin-left: 1.5em;">
+                                    Smooth sunset-/sunrise-like ramps along an S-curve. When off,
+                                    transitions are instant on/off and the fade timings below are ignored.
+                                </small>
+                            </div>
+                        </div>
+
                         <!-- Smart-incubator panel LED: fade timing + peak brightness -->
                         <div class="col-md-4" style="margin-top: 10px;">
                             <div class="form-group">
@@ -339,7 +364,7 @@
                                        ng-model="selectedIncubator.fade_in_seconds"
                                        min="0"
                                        max="3600"
-                                       ng-disabled="isIncubatorLocked()">
+                                       ng-disabled="isIncubatorLocked() || !selectedIncubator.crepuscular">
                                 <small class="form-text text-muted">
                                     Time to ramp the panel LED from 0% to max at sunrise.
                                 </small>
@@ -355,7 +380,7 @@
                                        ng-model="selectedIncubator.fade_out_seconds"
                                        min="0"
                                        max="3600"
-                                       ng-disabled="isIncubatorLocked()">
+                                       ng-disabled="isIncubatorLocked() || !selectedIncubator.crepuscular">
                                 <small class="form-text text-muted">
                                     Time to ramp the panel LED back to 0% at sunset.
                                 </small>

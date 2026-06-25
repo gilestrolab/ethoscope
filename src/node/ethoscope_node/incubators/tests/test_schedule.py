@@ -183,6 +183,7 @@ class TestBuildFirmwarePayload:
             "fade_in_ms": 5000,
             "fade_out_ms": 10000,
             "max_light": 80,
+            "crepuscular": 0,
         }
 
     def test_anchor_float_is_truncated_to_int_seconds(self):
@@ -207,6 +208,16 @@ class TestBuildFirmwarePayload:
     def test_negative_fade_falls_to_zero(self):
         payload = schedule.build_firmware_payload({"fade_in_seconds": -5})
         assert payload["fade_in_ms"] == 0
+
+    def test_crepuscular_truthy_becomes_one(self):
+        for truthy in (True, 1, "1"):
+            payload = schedule.build_firmware_payload({"crepuscular": truthy})
+            assert payload["crepuscular"] == 1, f"failed for {truthy!r}"
+
+    def test_crepuscular_falsy_becomes_zero(self):
+        for falsy in (False, 0, "", None):
+            payload = schedule.build_firmware_payload({"crepuscular": falsy})
+            assert payload["crepuscular"] == 0, f"failed for {falsy!r}"
 
 
 class TestScheduleDrifted:

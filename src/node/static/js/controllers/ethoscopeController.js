@@ -953,6 +953,17 @@
                             (incubator.light_cycle_anchor !== null && incubator.light_cycle_anchor !== undefined)
                                 ? String(incubator.light_cycle_anchor)
                                 : '';
+                        // Phase-3 fade timing + crepuscular toggle. Off by default
+                        // → ethoscope daylight LED keeps its hard on/off behaviour.
+                        option.experimental_info.arguments.fade_in_seconds =
+                            parseInt(incubator.fade_in_seconds, 10) || 1;
+                        option.experimental_info.arguments.fade_out_seconds =
+                            parseInt(incubator.fade_out_seconds, 10) || 1;
+                        option.experimental_info.arguments.max_light =
+                            (incubator.max_light !== null && incubator.max_light !== undefined)
+                                ? parseInt(incubator.max_light, 10) : 100;
+                        option.experimental_info.arguments.crepuscular =
+                            incubator.crepuscular ? 1 : 0;
                     }
                 }
             }

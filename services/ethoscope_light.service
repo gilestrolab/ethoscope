@@ -1,12 +1,16 @@
 [Unit]
 Description=Ethoscope LED daylight controller
-After=network.target
+After=network.target pigpiod.service
+Wants=pigpiod.service
 
 [Service]
 Type=simple
 RuntimeDirectory=ethoscope
 WorkingDirectory=/opt/ethoscope/src/ethoscope/ethoscope/hardware/interfaces/
 ExecStart=/usr/bin/python3 /opt/ethoscope/src/ethoscope/ethoscope/hardware/interfaces/light_daemon.py
+# Belt-and-braces: always drive GPIO17 low on stop. The daemon already does
+# this internally via its backend close(), but pinctrl is a no-op safety net
+# in case the daemon crashed before it could shut down its backend.
 ExecStopPost=/usr/bin/pinctrl set 17 op dl
 RestartSec=5
 Restart=always

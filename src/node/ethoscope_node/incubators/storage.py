@@ -40,6 +40,7 @@ INCUBATOR_FIELDS = (
     "fade_in_seconds",
     "fade_out_seconds",
     "max_light",
+    "crepuscular",
 )
 
 IncubatorRecord = dict[str, Any]
@@ -54,6 +55,7 @@ _UPDATABLE_INT_FIELDS = frozenset(
         "fade_in_seconds",
         "fade_out_seconds",
         "max_light",
+        "crepuscular",
     }
 )
 _UPDATABLE_NULLABLE_FLOAT_FIELDS = frozenset({"light_cycle_anchor"})
@@ -151,7 +153,8 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                     hostname TEXT,
                     fade_in_seconds INTEGER DEFAULT 1,
                     fade_out_seconds INTEGER DEFAULT 1,
-                    max_light INTEGER DEFAULT 100
+                    max_light INTEGER DEFAULT 100,
+                    crepuscular INTEGER DEFAULT 0
                 )
                 """
             )
@@ -235,8 +238,8 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                         name, location, owner, description, created, active,
                         lights_on, lights_off, light_period_minutes,
                         light_cycle_anchor, hostname,
-                        fade_in_seconds, fade_out_seconds, max_light
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        fade_in_seconds, fade_out_seconds, max_light, crepuscular
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         name,
@@ -253,6 +256,7 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                         int(record.get("fade_in_seconds") or 1),
                         int(record.get("fade_out_seconds") or 1),
                         int(record.get("max_light") or 100),
+                        1 if int(record.get("crepuscular") or 0) else 0,
                     ),
                 )
                 return int(cur.lastrowid or -1)

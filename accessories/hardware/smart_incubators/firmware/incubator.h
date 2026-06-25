@@ -36,9 +36,12 @@ struct Config {
   uint16_t light_period_minutes = 1440;
   uint32_t light_cycle_anchor   = 0; // unix ts marking ZT0; 0 = wall-clock mode
   // Fade timing for the panel LED at each light transition. Stored in ms so the
-  // ramp walker can use them directly.
+  // ramp walker can use them directly. Ignored when crepuscular = false (hard on/off).
   uint16_t fade_in_ms     = 1000;   // 0 → instant
   uint16_t fade_out_ms    = 1000;
+  // Crepuscular toggle. False (default) = hard on/off transitions; True =
+  // smoothstep S-curve ramp using fade_in_ms / fade_out_ms (sunset-like).
+  bool     crepuscular    = false;
   uint16_t report_interval = 60;     // s — sensor refresh / telemetry freshness target
 
   // Temperature control (hand-rolled PID) + safety

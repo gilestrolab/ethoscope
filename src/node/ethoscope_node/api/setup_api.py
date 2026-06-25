@@ -33,6 +33,7 @@ _LOCKED_INCUBATOR_FIELDS = frozenset(
         "fade_in_seconds",
         "fade_out_seconds",
         "max_light",
+        "crepuscular",
     }
 )
 
@@ -611,10 +612,19 @@ class SetupAPI(BaseAPI):
                 "light_period_minutes": period,
                 "light_cycle_anchor": anchor,
             }
-            # Phase-2 fade fields — optional. Defaults match the firmware.
-            for fade_key in ("fade_in_seconds", "fade_out_seconds", "max_light"):
+            # Phase-2/3 fade fields — optional. Defaults match the firmware.
+            for fade_key in (
+                "fade_in_seconds",
+                "fade_out_seconds",
+                "max_light",
+                "crepuscular",
+            ):
                 if fade_key in data:
-                    incubator_data[fade_key] = int(data[fade_key])
+                    incubator_data[fade_key] = (
+                        int(bool(data[fade_key]))
+                        if fade_key == "crepuscular"
+                        else int(data[fade_key])
+                    )
             if data.get("hostname") is not None:
                 hostname = str(data.get("hostname")).strip()
                 if hostname:
@@ -673,10 +683,20 @@ class SetupAPI(BaseAPI):
                 update_data["lights_off"] = data["lights_off"].strip()
             if "active" in data:
                 update_data["active"] = int(data["active"])
-            # Phase-2 fade timing / max brightness — pushed to firmware on save.
-            for fade_key in ("fade_in_seconds", "fade_out_seconds", "max_light"):
+            # Phase-2/3 fade timing / max brightness / crepuscular toggle —
+            # pushed to firmware on save.
+            for fade_key in (
+                "fade_in_seconds",
+                "fade_out_seconds",
+                "max_light",
+                "crepuscular",
+            ):
                 if fade_key in data:
-                    update_data[fade_key] = int(data[fade_key])
+                    update_data[fade_key] = (
+                        int(bool(data[fade_key]))
+                        if fade_key == "crepuscular"
+                        else int(data[fade_key])
+                    )
 
             # Period / anchor: merge with current row, then normalise so the
             # period↔anchor invariant holds regardless of which field the user

@@ -71,6 +71,7 @@ static void fillTelemetry(JsonObject o) {
   o["light_cycle_anchor"]   = cfg.light_cycle_anchor;
   o["fade_in_ms"]           = cfg.fade_in_ms;
   o["fade_out_ms"]          = cfg.fade_out_ms;
+  o["crepuscular"]          = cfg.crepuscular ? 1 : 0;
 
   o["peltier_duty"] = state.peltier_duty;            // signed: + heat / - cool
   o["peltier_dir"]  = state.peltier_duty > 0 ? "heat"

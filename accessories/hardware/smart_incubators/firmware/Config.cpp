@@ -30,6 +30,7 @@ void toJson(JsonObject o) {
   o["light_cycle_anchor"]   = cfg.light_cycle_anchor;
   o["fade_in_ms"]           = cfg.fade_in_ms;
   o["fade_out_ms"]          = cfg.fade_out_ms;
+  o["crepuscular"]          = cfg.crepuscular ? 1 : 0;
   o["report_interval"]      = cfg.report_interval;
   o["kp"]              = cfg.kp;
   o["ki"]              = cfg.ki;
@@ -91,6 +92,8 @@ int applyJson(JsonObjectConst in) {
   }
   if (in["fade_in_ms"].is<int>())  { cfg.fade_in_ms  = clampv((int)in["fade_in_ms"],  0, 60000); n++; }
   if (in["fade_out_ms"].is<int>()) { cfg.fade_out_ms = clampv((int)in["fade_out_ms"], 0, 60000); n++; }
+  if (in["crepuscular"].is<bool>()) { cfg.crepuscular = in["crepuscular"]; n++; }
+  else if (in["crepuscular"].is<int>()) { cfg.crepuscular = ((int)in["crepuscular"]) != 0; n++; }
   if (in["report_interval"].is<int>()) { cfg.report_interval = clampv((int)in["report_interval"], 1, 3600); n++; }
   if (in["kp"].is<float>())            { cfg.kp = in["kp"]; n++; }
   if (in["ki"].is<float>())            { cfg.ki = in["ki"]; n++; }

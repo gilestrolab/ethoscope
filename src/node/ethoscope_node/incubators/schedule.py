@@ -33,6 +33,7 @@ SCHEDULE_FIELDS = (
     "fade_in_seconds",
     "fade_out_seconds",
     "max_light",
+    "crepuscular",
 )
 
 
@@ -159,6 +160,9 @@ def build_firmware_payload(record: dict[str, Any]) -> dict[str, Any]:
         "fade_out_ms": _coerce_uint(record.get("fade_out_seconds"), default=1, lo=0)
         * 1000,
         "max_light": _coerce_uint(record.get("max_light"), default=100, lo=0, hi=100),
+        # 1 = sunset-like smoothstep fade; 0 = legacy hard on/off (firmware
+        # ignores fade_in_ms / fade_out_ms when off).
+        "crepuscular": 1 if record.get("crepuscular") else 0,
     }
     return payload
 
@@ -178,6 +182,7 @@ def schedule_drifted(record: dict[str, Any], telemetry: dict[str, Any]) -> bool:
         "fade_in_ms",
         "fade_out_ms",
         "max_light",
+        "crepuscular",
     ):
         if field not in telemetry:
             return True

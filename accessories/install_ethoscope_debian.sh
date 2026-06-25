@@ -253,6 +253,8 @@ step_install_apt_packages() {
         python3-dev \
         libcap-dev \
         pkg-config \
+        pigpio \
+        python3-pigpio \
         git wget curl
 
     # NTP: ntp was removed in Trixie, replaced by ntpsec
@@ -440,6 +442,16 @@ step_enable_system_services() {
     systemctl enable ethoscope_device.service ethoscope_listener.service \
         ethoscope_update.service ethoscope_GPIO_listener.service \
         ethoscope_light.service
+
+    # pigpiod drives the PWM-capable light backend. The light daemon falls back
+    # to pinctrl (binary on/off) if pigpiod isn't running, so this is best-effort:
+    # missing on a stripped-down install simply means no smooth fades.
+    if systemctl list-unit-files 2>/dev/null | grep -q "^pigpiod\.service"; then
+        systemctl enable pigpiod.service 2>/dev/null && \
+            print_success "Enabled pigpiod.service (PWM backend for fades)"
+    else
+        print_warning "pigpiod.service not found — light daemon will use pinctrl (binary on/off)"
+    fi
 
     # NTP service
     print_info "Enabling NTP service..."

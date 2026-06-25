@@ -208,7 +208,8 @@ class ExperimentalDB(multiprocessing.Process):
                                 hostname TEXT,
                                 fade_in_seconds INTEGER DEFAULT 1,
                                 fade_out_seconds INTEGER DEFAULT 1,
-                                max_light INTEGER DEFAULT 100
+                                max_light INTEGER DEFAULT 100,
+                                crepuscular INTEGER DEFAULT 0
                             );"""
 
         # device_interventions: append-only log of user-originated mutating actions
@@ -268,6 +269,10 @@ class ExperimentalDB(multiprocessing.Process):
             # Migration 11: Add per-incubator fade-in/out timing and peak
             # brightness — pushed to the firmware along with the schedule.
             self._migrate_incubators_add_fade()
+            # Migration 12: Add 'crepuscular' toggle that selects between
+            # hard on/off transitions (default 0) and a smoothstep-curve
+            # fade using the fade_in/out timings.
+            self._migrate_incubators_add_crepuscular()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
 
@@ -768,6 +773,31 @@ class ExperimentalDB(multiprocessing.Process):
 
         except Exception as e:
             logging.error(f"Error migrating incubators table (fade): {e}")
+
+    def _migrate_incubators_add_crepuscular(self):
+        """
+        Add a ``crepuscular`` integer column (0/1) to the incubators table if
+        absent. When 0 (default), light transitions are hard on/off. When 1,
+        the daemon (and the smart-incubator firmware) ramp along a smoothstep
+        S-curve over the configured fade_in_seconds / fade_out_seconds, for a
+        sunset-like dusk and dawn.
+        """
+        try:
+            table_info = self.executeSQL(
+                f"PRAGMA table_info({self._incubators_table_name})"
+            )
+            if not isinstance(table_info, list):
+                return
+
+            existing = {col[1] for col in table_info}
+            if "crepuscular" not in existing:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN crepuscular INTEGER DEFAULT 0"
+                )
+                logging.info("Added crepuscular to incubators table")
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (crepuscular): {e}")
 
     def getRun(self, run_id, asdict=False):
         """
@@ -1469,6 +1499,7 @@ class ExperimentalDB(multiprocessing.Process):
         fade_in_seconds: int = 1,
         fade_out_seconds: int = 1,
         max_light: int = 100,
+        crepuscular: int = 0,
     ):
         """
         Add a new incubator to the database.
@@ -1489,6 +1520,9 @@ class ExperimentalDB(multiprocessing.Process):
             fade_in_seconds: Panel-LED ramp-up duration in seconds (firmware default 1)
             fade_out_seconds: Panel-LED ramp-down duration in seconds (firmware default 1)
             max_light: Peak brightness for the panel LED (0–100, default 100)
+            crepuscular: 1 to enable a sunset-like smoothstep fade between
+                0 % and max_light at each transition; 0 (default) keeps the
+                legacy hard on/off behaviour and ignores the fade timings
 
         Returns:
             ID of the inserted incubator or -1 if error
@@ -1526,17 +1560,18 @@ class ExperimentalDB(multiprocessing.Process):
             fade_in_sql = int(fade_in_seconds) if fade_in_seconds is not None else 1
             fade_out_sql = int(fade_out_seconds) if fade_out_seconds is not None else 1
             max_light_sql = int(max_light) if max_light is not None else 100
+            crepuscular_sql = 1 if int(crepuscular or 0) else 0
 
             sql_add_incubator = f"""
             INSERT INTO {self._incubators_table_name}
             (name, location, owner, description, created, active,
              lights_on, lights_off, light_period_minutes, light_cycle_anchor, hostname,
-             fade_in_seconds, fade_out_seconds, max_light)
+             fade_in_seconds, fade_out_seconds, max_light, crepuscular)
             VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}',
                     '{escaped_description}', '{created}', {active},
                     '{escaped_lights_on}', '{escaped_lights_off}',
                     {period_sql}, {anchor_sql}, {hostname_sql},
-                    {fade_in_sql}, {fade_out_sql}, {max_light_sql})
+                    {fade_in_sql}, {fade_out_sql}, {max_light_sql}, {crepuscular_sql})
             """
 
             result = self.executeSQL(sql_add_incubator)
@@ -1600,6 +1635,7 @@ class ExperimentalDB(multiprocessing.Process):
                     "fade_in_seconds",
                     "fade_out_seconds",
                     "max_light",
+                    "crepuscular",
                 ):
                     set_clauses.append(f"{field} = {int(value)}")
                 elif field == "light_cycle_anchor":
