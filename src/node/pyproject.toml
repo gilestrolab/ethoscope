@@ -98,6 +98,9 @@ Documentation = "http://lab.gilest.ro/ethoscope"
 # Standalone smart-incubator-only server. Works on a stripped-down venv too
 # (see the install header for the manual minimal-install recipe).
 ethoscope-incubator-server = "ethoscope_node.incubators.standalone:main"
+# Companion CLI to talk to a remote smart-incubator firmware over HTTP.
+# Same minimal-install footprint as the server (requests is enough).
+ethoscope-incubator = "ethoscope_node.incubators.cli:main"
 backup_tool = "scripts.backup_tool:main"
 make_index = "scripts.make_index:main"
 server = "scripts.server:main"

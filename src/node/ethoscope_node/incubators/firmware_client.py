@@ -105,3 +105,33 @@ class IncubatorFirmwareClient:
         standalone UI's preview button.
         """
         return self._post_json(ip, "/command", {"set_light": int(pct)}, port)
+
+    def get_health(self, ip: str, *, port: int = DEFAULT_PORT) -> dict[str, Any]:
+        """Fetch ``/health`` — a small subset of telemetry for liveness probes."""
+        return self._get(ip, "/health", port)
+
+    def get_i2c_scan(self, ip: str, *, port: int = DEFAULT_PORT) -> dict[str, Any]:
+        """Fetch ``/i2c_scan`` — list of devices responding on the I2C bus.
+
+        Returns ``{"count": int, "devices": [{"addr": "0xNN", "name": str?}, ...]}``.
+        Useful for diagnosing ``sensor_fault`` / ``rtc:false`` states without
+        opening the enclosure.
+        """
+        return self._get(ip, "/i2c_scan", port)
+
+    def reboot(self, ip: str, *, port: int = DEFAULT_PORT) -> dict[str, Any]:
+        """Reboot the device via ``POST /command {"reboot": true}``."""
+        return self._post_json(ip, "/command", {"reboot": True}, port)
+
+    def sync_time(self, ip: str, *, port: int = DEFAULT_PORT) -> dict[str, Any]:
+        """Force an NTP→RTC sync via ``POST /command {"sync_time": true}``.
+
+        No-op when the RTC is absent; harmless to call.
+        """
+        return self._post_json(ip, "/command", {"sync_time": True}, port)
+
+    def set_time(
+        self, ip: str, epoch: int, *, port: int = DEFAULT_PORT
+    ) -> dict[str, Any]:
+        """Manually set the clock to ``epoch`` (UTC seconds) and persist to RTC."""
+        return self._post_json(ip, "/command", {"set_time": int(epoch)}, port)

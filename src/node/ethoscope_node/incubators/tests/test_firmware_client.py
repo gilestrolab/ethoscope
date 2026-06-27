@@ -102,3 +102,40 @@ def test_get_with_invalid_json_raises(client):
     with patch("requests.get", return_value=_ok_response(None)):
         with pytest.raises(IncubatorHTTPError, match="non-JSON"):
             client.get_telemetry("10.0.0.5")
+
+
+def test_get_health_hits_health_endpoint(client):
+    with patch("requests.get", return_value=_ok_response({"wifi": True})) as m:
+        assert client.get_health("10.0.0.5") == {"wifi": True}
+    m.assert_called_once_with("http://10.0.0.5:80/health", timeout=1.0)
+
+
+def test_get_i2c_scan_hits_scan_endpoint(client):
+    payload = {"count": 1, "devices": [{"addr": "0x44", "name": "SHT31"}]}
+    with patch("requests.get", return_value=_ok_response(payload)) as m:
+        assert client.get_i2c_scan("10.0.0.5") == payload
+    m.assert_called_once_with("http://10.0.0.5:80/i2c_scan", timeout=1.0)
+
+
+def test_reboot_posts_reboot_command(client):
+    with patch("requests.post", return_value=_ok_response({"reboot": True})) as m:
+        assert client.reboot("10.0.0.5") == {"reboot": True}
+    m.assert_called_once_with(
+        "http://10.0.0.5:80/command", json={"reboot": True}, timeout=1.0
+    )
+
+
+def test_sync_time_posts_sync_time_command(client):
+    with patch("requests.post", return_value=_ok_response({"sync_time": True})) as m:
+        client.sync_time("10.0.0.5")
+    m.assert_called_once_with(
+        "http://10.0.0.5:80/command", json={"sync_time": True}, timeout=1.0
+    )
+
+
+def test_set_time_posts_set_time_command_as_int(client):
+    with patch("requests.post", return_value=_ok_response({"set_time": 100})) as m:
+        client.set_time("10.0.0.5", 100)
+    m.assert_called_once_with(
+        "http://10.0.0.5:80/command", json={"set_time": 100}, timeout=1.0
+    )
