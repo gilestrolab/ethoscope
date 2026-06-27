@@ -1,8 +1,12 @@
 // pins.h
 // Pin map for the WeMos D1 R2 (ESP8266). See README.md "Hardware" for the full wiring
-// rationale. Assignments are constrained by the Cytron SHIELD-MD10 R2 jumper selectors:
-//   PWM (JP5) ∈ {D3,D5,D6,D9,D10,D11}   DIR (JP8) ∈ {D2,D4,D7,D8,D12,D13}
-// The D1 R2 only exposes D0..D8, so the only safe, free intersection is PWM=D6, DIR=D7.
+// rationale. Assignments are constrained by the Cytron SHIELD-MD10 R2 jumper selectors,
+// which use Arduino-format labels. On this board revision the Arduino<->Wemos silkscreen
+// maps as follows for the available jumper positions:
+//   PWM (JP5)  Arduino->Wemos:  D3->D1, D5->D3, D6->D4, D9->D7, D10->D8, D11->D7(MOSI)
+//   DIR (JP8)  Arduino->Wemos:  D2->D0, D4->D2(SDA), D7->D5, D8->D6, D12->D6(MISO), D13->D5(SCK)
+// Active picks below: PWM jumper = Arduino-D6 (Wemos D4? — verify on shield),
+// DIR jumper = Arduino-D2 (Wemos D0).
 #pragma once
 #include <Arduino.h>
 
@@ -11,14 +15,16 @@
 #define PIN_I2C_SCL      D1   // GPIO5  (board-designated SCL)
 
 // --- Peltier via Cytron SHIELD-MD10 R2 (shield stacked; set its jumpers to match) ---
-#define PIN_PELTIER_PWM  D6   // GPIO12 -> MD10 PWM, jumper JP5 = D6
-#define PIN_PELTIER_DIR  D7   // GPIO13 -> MD10 DIR, jumper JP8 = D7
+#define PIN_PELTIER_PWM  D6   // GPIO12 -> MD10 PWM, jumper JP5 (verify Arduino label on shield)
+#define PIN_PELTIER_DIR  D0   // GPIO16 -> MD10 DIR, jumper JP8 = Arduino-D2 (Wemos D0)
 
-// --- Light panel (logic-level N-MOSFET gate) ---
-#define PIN_LED_PWM      D5   // GPIO14 -> MOSFET gate (onboard LED mirrors this — cosmetic)
+// --- Light panel (logic-level N-MOSFET gate, e.g. 30N06L low-side switch) ---
+// GPIO15 must be LOW at boot; the 10k gate pull-down on the MOSFET enforces this.
+// Do NOT add an external pull-up on this line.
+#define PIN_LED_PWM      D8   // GPIO15 -> MOSFET gate
 
 // --- Hot-side fan (direct MOSFET, NOT through the MD10) ---
-#define PIN_FAN          D0   // GPIO16 -> fan MOSFET (digital on/off; optional)
+#define PIN_FAN          D7   // GPIO13 -> fan MOSFET (digital on/off; optional)
 
 // Peltier current-direction polarity.
 // IMPORTANT: verify on the bench which DIR level heats vs cools for YOUR TEC wiring
