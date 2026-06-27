@@ -15,5 +15,6 @@ namespace TimeKeeper {
   void setTime(uint32_t epoch); // manually set the clock (UTC epoch) + DS3231 — no NTP needed
 
   bool valid();              // true once the system clock holds a real (post-2021) time
+  bool present();            // true iff the DS1307/DS3231 was detected on I2C at begin()
   int  localMinuteOfDay();   // 0..1439 in local time, or -1 if time is not yet valid
 }

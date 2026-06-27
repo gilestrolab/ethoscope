@@ -8,6 +8,7 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
 #include <time.h>
 #include <math.h>
 
@@ -54,6 +55,7 @@ static void fillTelemetry(JsonObject o) {
   o["built"]                = FW_BUILD_DATE;
   o["time"]                 = (uint32_t)time(nullptr);
   o["time_valid"]           = state.time_valid;
+  o["rtc"]                  = TimeKeeper::present();
   o["uptime_s"]             = (millis() - state.boot_millis) / 1000;
 
   o["temperature"]          = state.temperature;
@@ -142,11 +144,45 @@ static void handleHealth() {
   doc["rssi"]         = state.rssi;
   doc["heap"]         = ESP.getFreeHeap();
   doc["time_valid"]   = state.time_valid;
+  doc["rtc"]          = TimeKeeper::present();
   doc["sensor_fault"] = state.sensor_fault;
   doc["uptime_s"]     = (millis() - state.boot_millis) / 1000;
   doc["host"]         = Network::hostname();
   doc["fw"]           = FW_VERSION;
   doc["build"]        = FW_BUILD;
+  sendJson(doc);
+}
+
+// GET /i2c_scan → walk the bus and report which addresses ACK. Useful for diagnosing
+// a "sensor_fault:true, rtc:false" state: if the array is empty the whole bus is dead
+// (power / pull-ups / SDA-SCL swap); if some devices respond the missing ones are bad
+// or wired differently. Known devices on this system: 0x23/0x5C BH1750, 0x44/0x45 SHT31,
+// 0x68 DS3231 or DS1307. Wire is begun in Sensors::begin(), so this just reuses the bus.
+static const char* knownI2c(uint8_t a) {
+  switch (a) {
+    case 0x23: case 0x5C: return "BH1750";
+    case 0x44: case 0x45: return "SHT31";
+    case 0x68:            return "DS3231/DS1307";
+    default:              return nullptr;
+  }
+}
+static void handleI2cScan() {
+  JsonDocument doc;
+  JsonArray devs = doc["devices"].to<JsonArray>();
+  int n = 0;
+  for (uint8_t addr = 0x03; addr <= 0x77; addr++) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() == 0) {
+      JsonObject d = devs.add<JsonObject>();
+      char hex[5];
+      snprintf(hex, sizeof(hex), "0x%02X", addr);
+      d["addr"] = hex;
+      const char* name = knownI2c(addr);
+      if (name) d["name"] = name;
+      n++;
+    }
+  }
+  doc["count"] = n;
   sendJson(doc);
 }
 
@@ -222,6 +258,7 @@ void begin() {
   server.on("/config",    HTTP_POST, handlePostConfig);
   server.on("/command",   HTTP_POST, handleCommand);
   server.on("/health",    HTTP_GET,  handleHealth);
+  server.on("/i2c_scan",  HTTP_GET,  handleI2cScan);
   // Sensor-compatible API (discovered by the node SensorScanner as an ethoscope sensor).
   server.on("/",          HTTP_GET,  handleSensorData);
   server.on("/id",        HTTP_GET,  handleId);

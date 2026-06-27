@@ -46,7 +46,8 @@ void begin() {
   applyTimeConfig();           // start SNTP (configTime also applies the POSIX TZ string)
 }
 
-bool valid() { return time(nullptr) > MIN_VALID_EPOCH; }
+bool valid()   { return time(nullptr) > MIN_VALID_EPOCH; }
+bool present() { return rtc_present; }
 
 void setTime(uint32_t epoch) {
   if (epoch < (uint32_t)MIN_VALID_EPOCH) return;   // reject implausible times
