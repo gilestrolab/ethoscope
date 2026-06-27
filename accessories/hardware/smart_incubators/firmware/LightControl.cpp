@@ -3,6 +3,7 @@
 #include "incubator.h"
 #include "pins.h"
 #include "TimeKeeper.h"
+#include <math.h>
 #include <time.h>
 
 // Per-direction fade pacing: ms per 1% step, computed from cfg.fade_in_ms /
@@ -53,7 +54,11 @@ static void evaluateSchedule() {
 
 static void writeLevel(int pct) {
   state.light_level = pct;
-  analogWrite(PIN_LED_PWM, (int)((long)pct * PWM_RANGE / 100));
+  // Gamma-correct the linear 0..100 percent to a perceptually even PWM duty.
+  // Endpoints stay exact (pow(0,g)=0, pow(1,g)=1) so 0 is fully off and 100 is full duty.
+  float norm = (float)pct / 100.0f;
+  int duty = (int)(powf(norm, LIGHT_GAMMA) * PWM_RANGE + 0.5f);
+  analogWrite(PIN_LED_PWM, duty);
 }
 
 namespace LightControl {

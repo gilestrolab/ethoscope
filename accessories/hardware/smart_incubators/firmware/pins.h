@@ -29,3 +29,8 @@
 // PWM configuration. MD10 accepts up to 10 kHz; we use 5 kHz.
 #define PWM_FREQ_HZ  5000
 #define PWM_RANGE    1023    // analogWrite resolution (0..PWM_RANGE)
+
+// Gamma correction for the LED panel PWM. Human brightness perception is roughly
+// logarithmic, so a linear duty cycle looks crammed at the bottom and plateaued
+// at the top. ~2.2 matches the sRGB convention and gives a visually even ramp.
+#define LIGHT_GAMMA  2.2f
