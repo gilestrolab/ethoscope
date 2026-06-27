@@ -48,6 +48,13 @@ DEFAULT_FADE_IN_SECONDS = 1
 DEFAULT_FADE_OUT_SECONDS = 1
 DEFAULT_PWM_FREQUENCY_HZ = 5000
 
+# Gamma correction for the LED PWM duty cycle. Human brightness perception is
+# roughly logarithmic, so a linear duty looks crammed at the bottom and plateaus
+# at the top. ~2.2 matches the sRGB convention and gives a visually even ramp.
+# Endpoints (0 and 100) are preserved exactly. Applied only by the PigpioBackend
+# (PWM); the PinctrlBackend is binary and is unaffected.
+LIGHT_GAMMA = 2.2
+
 # Pi hardware-PWM-capable GPIOs (BCM): PWM0 ∈ {12, 18}, PWM1 ∈ {13, 19}.
 _HW_PWM_GPIOS = frozenset({12, 13, 18, 19})
 
@@ -183,13 +190,17 @@ class PigpioBackend(_LedBackend):
         pct = max(0, min(100, int(pct)))
         if pct == self._current_pct:
             return
+        # Gamma-correct the linear 0..100 percent to a perceptually even duty.
+        # pow(0, g) == 0 and pow(1, g) == 1, so the endpoints stay exact.
+        norm = pct / 100.0
+        corrected = norm**LIGHT_GAMMA
         if self._hardware:
             # hardware_PWM duty cycle is 0..1_000_000 (1 = 0.0001%)
-            duty = int(round(pct * 10000))
+            duty = int(round(corrected * 1_000_000))
             self._pi.hardware_PWM(self._gpio_pin, self._frequency_hz, duty)
         else:
             # set_PWM_dutycycle uses the configured range (1000 → 0..100.0%)
-            duty = int(round(pct * 10))
+            duty = int(round(corrected * 1000))
             self._pi.set_PWM_dutycycle(self._gpio_pin, duty)
         self._current_pct = pct
 

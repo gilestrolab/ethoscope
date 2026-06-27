@@ -20,12 +20,23 @@ from ethoscope.hardware.interfaces.light_daemon import (
     DEFAULT_FADE_IN_SECONDS,
     DEFAULT_FADE_OUT_SECONDS,
     DEFAULT_MAX_LIGHT,
+    LIGHT_GAMMA,
     LightController,
     LightDaemonClient,
     LightDaemonUnavailable,
     PigpioBackend,
     PinctrlBackend,
 )
+
+
+def _expected_hw_duty(pct: int) -> int:
+    """Mirror PigpioBackend's gamma curve for hardware_PWM (range 1_000_000)."""
+    return int(round((pct / 100.0) ** LIGHT_GAMMA * 1_000_000))
+
+
+def _expected_sw_duty(pct: int) -> int:
+    """Mirror PigpioBackend's gamma curve for set_PWM_dutycycle (range 1000)."""
+    return int(round((pct / 100.0) ** LIGHT_GAMMA * 1000))
 
 
 def _pinctrl_controller(**kwargs):
@@ -404,8 +415,8 @@ class TestPigpioBackendDispatch:
         assert pi.hardware_PWM.called
         last_call_args = pi.hardware_PWM.call_args
         assert last_call_args[0][0] == 12  # GPIO12
-        # duty cycle is pct * 10_000
-        assert last_call_args[0][2] == 500_000
+        # Duty is gamma-corrected to keep perceived brightness linear.
+        assert last_call_args[0][2] == _expected_hw_duty(50)
 
     def test_hardware_pwm_dispatch_on_gpio18(self):
         backend = PigpioBackend(18)
@@ -414,7 +425,7 @@ class TestPigpioBackendDispatch:
         pi.hardware_PWM.assert_called()
         last = pi.hardware_PWM.call_args
         assert last[0][0] == 18
-        assert last[0][2] == 250_000
+        assert last[0][2] == _expected_hw_duty(25)
 
     def test_software_pwm_dispatch_on_gpio17(self):
         """GPIO17 is the legacy LED pin — falls into DMA-software PWM."""
@@ -422,18 +433,18 @@ class TestPigpioBackendDispatch:
         backend.set_pct(50)
         pi = self._fake._instance
         pi.hardware_PWM.assert_not_called()
-        # init sets frequency, range, then writes 0, then 500 (50%).
+        # init sets frequency, range, then writes 0, then the gamma-corrected duty for 50%.
         pi.set_PWM_frequency.assert_called_with(17, 5000)
         pi.set_PWM_range.assert_called_with(17, 1000)
         last = pi.set_PWM_dutycycle.call_args
-        assert last[0] == (17, 500)
+        assert last[0] == (17, _expected_sw_duty(50))
 
     def test_pct_clamped_to_0_100(self):
         backend = PigpioBackend(17)
         backend.set_pct(-50)
         backend.set_pct(150)
         pi = self._fake._instance
-        # Last two duty values should be 0 (from -50 → 0) and 1000 (from 150 → 100).
+        # Gamma preserves endpoints exactly: -50 → 0 duty, 150 → 1000 duty.
         assert pi.set_PWM_dutycycle.call_args_list[-2][0] == (17, 0)
         assert pi.set_PWM_dutycycle.call_args_list[-1][0] == (17, 1000)
 
