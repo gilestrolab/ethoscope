@@ -5,8 +5,9 @@
 // maps as follows for the available jumper positions:
 //   PWM (JP5)  Arduino->Wemos:  D3->D1, D5->D3, D6->D4, D9->D7, D10->D8, D11->D7(MOSI)
 //   DIR (JP8)  Arduino->Wemos:  D2->D0, D4->D2(SDA), D7->D5, D8->D6, D12->D6(MISO), D13->D5(SCK)
-// Active picks below: PWM jumper = Arduino-D6 (Wemos D4? — verify on shield),
-// DIR jumper = Arduino-D2 (Wemos D0).
+// Active picks below: PWM jumper = Arduino-D6 (Wemos D4 = GPIO2),
+// DIR jumper = Arduino-D2 (Wemos D0 = GPIO16).
+// Note the -2 shift on this board revision: Arduino-DN sits at Wemos-D(N-2).
 #pragma once
 #include <Arduino.h>
 
@@ -15,7 +16,11 @@
 #define PIN_I2C_SCL      D1   // GPIO5  (board-designated SCL)
 
 // --- Peltier via Cytron SHIELD-MD10 R2 (shield stacked; set its jumpers to match) ---
-#define PIN_PELTIER_PWM  D6   // GPIO12 -> MD10 PWM, jumper JP5 (verify Arduino label on shield)
+// PWM lands on GPIO2 (the built-in LED pin). The LED will mirror PWM duty — cosmetic.
+// GPIO2 must be HIGH at boot, which the internal pull-up handles; consequence is a brief
+// (~100 ms) blip of full-duty TEC current at the boot-default DIR before begin() runs,
+// which is harmless because DIR defaults to DIR_COOL (the safe direction).
+#define PIN_PELTIER_PWM  D4   // GPIO2  -> MD10 PWM, jumper JP5 = Arduino-D6 (Wemos D4)
 #define PIN_PELTIER_DIR  D0   // GPIO16 -> MD10 DIR, jumper JP8 = Arduino-D2 (Wemos D0)
 
 // --- Light panel (logic-level N-MOSFET gate, e.g. 30N06L low-side switch) ---
