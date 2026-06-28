@@ -38,11 +38,17 @@ void begin() {
   bool connected = wm.autoConnect(ap);     // blocks only during first-time provisioning
 
   int new_id = atoi(p_node_id.getValue());
-  if (new_id > 0 && new_id != cfg.node_id) {
+  if (connected && new_id > 0 && new_id != cfg.node_id) {
+    // Persist the new node_id and reboot. Without this, the rename happens AFTER
+    // WiFi+mDNS are already initialising with the old hostname; the ESP8266 mDNS
+    // library handles the rename poorly and the _incubator._tcp service ends up
+    // un-advertised (only _sensor._tcp survives — both on the bus, only one
+    // visible to discovery). Rebooting lets the next boot start with the new
+    // hostname already in cfg, before any network init runs.
     cfg.node_id = new_id;
     ConfigStore::save();
-    makeHostname();
-    WiFi.hostname(host);
+    delay(200);            // brief grace period for the LittleFS write to flush
+    ESP.restart();         // does not return
   }
 
   state.wifi_connected = connected;

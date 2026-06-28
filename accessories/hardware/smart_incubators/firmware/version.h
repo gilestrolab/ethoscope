@@ -6,5 +6,5 @@
 #pragma once
 
 #define FW_VERSION     "3.2.0-wifi"
-#define FW_BUILD       14
+#define FW_BUILD       15
 #define FW_BUILD_DATE  __DATE__ " " __TIME__
