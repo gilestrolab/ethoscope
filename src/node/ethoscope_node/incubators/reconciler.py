@@ -106,6 +106,9 @@ class Reconciler:
             record = self._find_record_by_hostname(hostname)
             if record is None:
                 continue
+            # Identity convergence: keep the unit's sensor name/location in sync
+            # with the incubator name (handles a rename done while it was offline).
+            self._reconcile_identity(record, telemetry, hostname)
             if not schedule_drifted(record, telemetry):
                 continue
             payload = build_firmware_payload(record)
@@ -125,6 +128,33 @@ class Reconciler:
                     e,
                 )
         return pushed
+
+    def _reconcile_identity(self, record: dict, telemetry: dict, hostname: str) -> None:
+        """Re-push the incubator name to the unit's sensor name/location on drift.
+
+        Only acts when the firmware reports its identity (newer firmware exposes
+        ``name``/``location`` in ``/telemetry``) and it differs from the record
+        name — so older firmware that omits these fields is left untouched and
+        the immediate push on rename is relied upon instead.
+        """
+        desired = record.get("name")
+        if not desired:
+            return
+        dev_name = telemetry.get("name")
+        dev_location = telemetry.get("location")
+        if dev_name is None and dev_location is None:
+            return
+        if dev_name == desired and dev_location == desired:
+            return
+        try:
+            self._scanner.set_identity(hostname, name=desired, location=desired)
+            self._logger.info(
+                "Reconciler re-pushed identity '%s' to %s", desired, hostname
+            )
+        except Exception as e:
+            self._logger.warning(
+                "Reconciler identity push to %s failed (will retry): %s", hostname, e
+            )
 
     def _find_record_by_hostname(self, hostname: str) -> dict | None:
         """Linear scan over storage; cheap given small N (single-digit incubators)."""

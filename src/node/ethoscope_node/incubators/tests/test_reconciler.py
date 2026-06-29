@@ -147,6 +147,41 @@ class TestRunOnce:
         reconciler.run_once()
         client.push_config.assert_not_called()
 
+    def test_identity_drift_repushes_name(self, reconciler, scanner, storage, client):
+        """A unit reporting a stale sensor name is re-synced to the record name."""
+        rec = self._bound_record()
+        tele = _matching_telemetry(rec)
+        tele["name"] = "incubator-1"  # stale (renamed while offline)
+        tele["location"] = "incubator-1"
+        scanner.get_all_devices_info.return_value = {"incubator-1": tele}
+        storage.list_all.return_value = {"Inc1": rec}
+        reconciler.run_once()
+        scanner.set_identity.assert_called_once_with(
+            "incubator-1", name="Inc1", location="Inc1"
+        )
+
+    def test_identity_match_no_push(self, reconciler, scanner, storage, client):
+        rec = self._bound_record()
+        tele = _matching_telemetry(rec)
+        tele["name"] = "Inc1"
+        tele["location"] = "Inc1"
+        scanner.get_all_devices_info.return_value = {"incubator-1": tele}
+        storage.list_all.return_value = {"Inc1": rec}
+        reconciler.run_once()
+        scanner.set_identity.assert_not_called()
+
+    def test_identity_absent_in_telemetry_skipped(
+        self, reconciler, scanner, storage, client
+    ):
+        """Older firmware that omits name/location is left untouched."""
+        rec = self._bound_record()
+        scanner.get_all_devices_info.return_value = {
+            "incubator-1": _matching_telemetry(rec)  # no name/location keys
+        }
+        storage.list_all.return_value = {"Inc1": rec}
+        reconciler.run_once()
+        scanner.set_identity.assert_not_called()
+
 
 class TestLifecycle:
     def test_start_then_stop_is_idempotent(self, reconciler):

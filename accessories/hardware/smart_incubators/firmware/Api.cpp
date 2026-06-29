@@ -50,6 +50,10 @@ static String fmtLux(float v) {
 // Build the telemetry object (also used by the root status page).
 static void fillTelemetry(JsonObject o) {
   o["node_id"]              = cfg.node_id;
+  // Sensor identity (name/location) so the node can detect and reconcile a
+  // rename even if the unit was offline when the incubator was renamed.
+  o["name"]                 = sensorName();
+  o["location"]             = sensorLocation();
   o["fw"]                   = FW_VERSION;
   o["build"]                = FW_BUILD;
   o["built"]                = FW_BUILD_DATE;
