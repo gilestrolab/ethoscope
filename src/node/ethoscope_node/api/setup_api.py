@@ -766,7 +766,14 @@ class SetupAPI(BaseAPI):
                 if busy:
                     return self._busy_error(busy)
 
-            result = db.updateIncubator(name=original_name, **update_data)
+            # Look up the row by id so a rename (new name inside update_data) does
+            # not collide with the `name` lookup keyword. Fall back to the name
+            # lookup when the id is unavailable (no rename in that case).
+            incubator_id = current.get("id")
+            if incubator_id is not None:
+                result = db.updateIncubator(incubator_id=incubator_id, **update_data)
+            else:
+                result = db.updateIncubator(name=original_name, **update_data)
 
             if result >= 0:
                 self._auto_push_schedule(new_name or original_name)

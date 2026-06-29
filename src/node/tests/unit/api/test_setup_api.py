@@ -698,6 +698,28 @@ class TestSetupAPI(unittest.TestCase):
 
     @patch("bottle.request")
     @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_update_incubator_rename(self, mock_db_class, mock_request):
+        """Renaming looks the row up by id so the new name does not collide with
+        the `name` lookup keyword (regression: 'multiple values for name')."""
+        mock_request.json = {"original_name": "Old name", "name": "New name"}
+
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {"id": 5, "name": "Old name"}
+        mock_db.updateIncubator.return_value = 1
+        # No devices running here, so the busy guard does not block the rename.
+        self.api._devices_running_in_incubator = Mock(return_value=[])
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        call_args = mock_db.updateIncubator.call_args.kwargs
+        self.assertEqual(call_args["incubator_id"], 5)
+        self.assertEqual(call_args["name"], "New name")
+        self.assertNotIn("original_name", call_args)
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
     def test_setup_update_incubator_missing_original(self, mock_db_class, mock_request):
         """Test updating incubator without original name."""
         mock_request.json = {"location": "Room 102"}
