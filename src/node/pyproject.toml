@@ -41,6 +41,16 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 requires-python = ">=3.9"
+# Default install = the full ethoscope-node stack. The smart-incubator
+# subsystem under ``ethoscope_node.incubators`` is structured to also run on
+# a stripped-down dependency set (bottle + zeroconf + requests) — that's a
+# CODE property, not an install default. Users with only incubators and no
+# ethoscopes can opt into a minimal venv manually:
+#
+#     python -m venv inc-venv
+#     inc-venv/bin/pip install --no-deps -e src/node
+#     inc-venv/bin/pip install bottle zeroconf requests
+#     inc-venv/bin/ethoscope-incubator-server --port 8090
 dependencies = [
     "bottle>=0.13.4",
     "cherrypy>=18.10.0",
@@ -85,6 +95,12 @@ Repository = "https://github.com/gilestrolab/ethoscope"
 Documentation = "http://lab.gilest.ro/ethoscope"
 
 [project.scripts]
+# Standalone smart-incubator-only server. Works on a stripped-down venv too
+# (see the install header for the manual minimal-install recipe).
+ethoscope-incubator-server = "ethoscope_node.incubators.standalone:main"
+# Companion CLI to talk to a remote smart-incubator firmware over HTTP.
+# Same minimal-install footprint as the server (requests is enough).
+ethoscope-incubator = "ethoscope_node.incubators.cli:main"
 backup_tool = "scripts.backup_tool:main"
 make_index = "scripts.make_index:main"
 server = "scripts.server:main"
@@ -95,7 +111,7 @@ where = ["."]
 include = ["ethoscope_node*"]
 
 [tool.setuptools.package-data]
-ethoscope_node = ["static/**/*"]
+ethoscope_node = ["static/**/*", "incubators/web/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -7,6 +7,7 @@
 
         // Initialize scope variables
         $scope.incubators = {};
+        $scope.liveIncubators = {};   // live telemetry of discovered WiFi units, keyed by hostname
         $scope.sensors = {};
         $scope.devices = {};       // keyed by device id; carries status + experimental_info
         $scope.activeUsers = [];
@@ -124,6 +125,100 @@
             return $scope.runningDevicesInIncubator(name).length > 0;
         };
 
+        // Load live telemetry of discovered WiFi incubators, re-keyed by hostname.
+        var loadLive = function() {
+            $http.get('/incubators/live')
+                .then(function(response) {
+                    var live = response.data || {};
+                    var byHost = {};
+                    for (var id in live) {
+                        var info = live[id];
+                        var host = info.hostname || id;
+                        byHost[host] = info;
+                    }
+                    $scope.liveIncubators = byHost;
+                })
+                .catch(function(error) {
+                    console.error('Error loading live incubators:', error);
+                });
+        };
+
+        // Live telemetry for a DB incubator record (bound by hostname), or null.
+        $scope.liveForIncubator = function(incubator) {
+            if (!incubator || !incubator.hostname) return null;
+            return $scope.liveIncubators[incubator.hostname] || null;
+        };
+
+        // True if the live unit was successfully polled (status not offline).
+        $scope.isLiveOnline = function(live) {
+            return !!live && (live.status && live.status !== 'offline');
+        };
+
+        // Discovered WiFi units not yet bound to any incubator record.
+        $scope.discoveredUnbound = function() {
+            var bound = {};
+            for (var key in $scope.incubators) {
+                var h = $scope.incubators[key].hostname;
+                if (h) bound[h] = true;
+            }
+            var out = [];
+            for (var host in $scope.liveIncubators) {
+                if (!bound[host]) out.push($scope.liveIncubators[host]);
+            }
+            return out;
+        };
+
+        // All discovered hostnames (for the bind dropdown in the modal).
+        $scope.availableHostnames = function() {
+            return Object.keys($scope.liveIncubators);
+        };
+
+        // Comma-joined hostnames of discovered-but-unbound units (for the banner).
+        $scope.discoveredUnboundNames = function() {
+            return $scope.discoveredUnbound().map(function(u) { return u.hostname; }).join(', ');
+        };
+
+        // Bind (or, with hostname null/empty, unbind) a DB record to a physical unit.
+        // Pushes the incubator name into the unit's sensor location server-side.
+        $scope.bindIncubator = function(name, hostname) {
+            if (!name) return;
+            $http.post('/incubator/bind', { name: name, hostname: hostname || null })
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        if ($scope.selectedIncubator) {
+                            $scope.selectedIncubator.hostname = hostname || null;
+                        }
+                        loadIncubators();
+                        loadLive();
+                    } else {
+                        alert('Error binding incubator: ' + (response.data.message || 'Unknown error'));
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error binding incubator:', error);
+                    alert('Error binding incubator. Please try again.');
+                });
+        };
+
+        // Manual schedule re-push to the bound firmware. Auto-push fires on save,
+        // and the reconciler covers reboots — this is a power-user button.
+        $scope.pushIncubatorSchedule = function(name) {
+            if (!name) return;
+            $http.post('/incubator/push-schedule', { name: name })
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        loadLive();
+                    } else {
+                        alert('Could not push schedule: ' +
+                              (response.data.message || 'unit offline or unbound'));
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error pushing schedule:', error);
+                    alert('Network error while pushing schedule.');
+                });
+        };
+
         // Get sensor associated with an incubator (matched by location field)
         $scope.getSensorForIncubator = function(incubatorName) {
             if (!incubatorName || !$scope.sensors) return null;
@@ -170,6 +265,10 @@
                 lights_off: null,
                 light_period_hours: 24,
                 light_cycle_anchor: null,
+                fade_in_seconds: 1,
+                fade_out_seconds: 1,
+                max_light: 100,
+                crepuscular: false,
                 owner: ''
             };
         };
@@ -197,6 +296,19 @@
                 (incubator.light_cycle_anchor !== undefined && incubator.light_cycle_anchor !== null)
                     ? Number(incubator.light_cycle_anchor)
                     : null;
+
+            // Phase-2 fade timing + peak brightness. Defaults match the firmware.
+            $scope.selectedIncubator.fade_in_seconds =
+                Number.isFinite(parseInt(incubator.fade_in_seconds, 10))
+                    ? parseInt(incubator.fade_in_seconds, 10) : 1;
+            $scope.selectedIncubator.fade_out_seconds =
+                Number.isFinite(parseInt(incubator.fade_out_seconds, 10))
+                    ? parseInt(incubator.fade_out_seconds, 10) : 1;
+            $scope.selectedIncubator.max_light =
+                Number.isFinite(parseInt(incubator.max_light, 10))
+                    ? parseInt(incubator.max_light, 10) : 100;
+            // Crepuscular toggle — bool in the UI, int 0/1 on the wire.
+            $scope.selectedIncubator.crepuscular = !!incubator.crepuscular;
         };
 
         // Format a unix timestamp for display in the modal. Returns '—' if absent.
@@ -265,7 +377,11 @@
                     lights_on: lightsOn,
                     lights_off: lightsOff,
                     light_period_minutes: periodMinutes,
-                    active: data.active ? 1 : 0
+                    active: data.active ? 1 : 0,
+                    fade_in_seconds: parseInt(data.fade_in_seconds, 10) || 0,
+                    fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
+                    max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100)),
+                    crepuscular: data.crepuscular ? 1 : 0
                 };
                 // Anchor is server-managed when period changes; only emit it
                 // explicitly if the user has one (so we don't accidentally
@@ -296,7 +412,11 @@
                     description: data.description || '',
                     lights_on: lightsOn,
                     lights_off: lightsOff,
-                    light_period_minutes: periodMinutes
+                    light_period_minutes: periodMinutes,
+                    fade_in_seconds: parseInt(data.fade_in_seconds, 10) || 0,
+                    fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
+                    max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100)),
+                    crepuscular: data.crepuscular ? 1 : 0
                 };
 
                 $http.post('/setup/add-incubator', addPayload)
@@ -370,11 +490,23 @@
             return dateToTimeString(val);
         };
 
+        // Live telemetry polling (every 15 s). Rescheduled recursively and
+        // cancelled on view destroy.
+        var livePoll = null;
+        var startLivePolling = function() {
+            loadLive();
+            livePoll = $timeout(startLivePolling, 15000);
+        };
+        $scope.$on('$destroy', function() {
+            if (livePoll) $timeout.cancel(livePoll);
+        });
+
         // Initial load
         loadIncubators();
         loadUsers();
         loadSensors();
         loadDevices();
+        startLivePolling();
     };
 
     angular.module('flyApp').controller('incubatorsController', incubatorsController);

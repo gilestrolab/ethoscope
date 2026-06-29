@@ -63,6 +63,11 @@ dependencies = [
     "netifaces>=0.11.0",
     "requests>=2.32.4",
     "picamera2",
+    # Light daemon's preferred PWM backend (DMA software PWM or hardware PWM
+    # depending on the pin). The daemon falls back to `pinctrl` shell-outs at
+    # runtime if pigpio isn't installed or `pigpiod` isn't running, so this
+    # dep is best-effort even when missing.
+    "pigpio>=1.78",
 ]
 
 [project.urls]

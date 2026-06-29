@@ -59,6 +59,7 @@ class BaseAPI:
         self.config = server_instance.config
         self.device_scanner = server_instance.device_scanner
         self.sensor_scanner = server_instance.sensor_scanner
+        self.incubator_scanner = server_instance.incubator_scanner
         self.database = server_instance.database
 
         # Common directories

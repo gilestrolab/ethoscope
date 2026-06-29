@@ -204,7 +204,12 @@ class ExperimentalDB(multiprocessing.Process):
                                 lights_on TEXT DEFAULT '',
                                 lights_off TEXT DEFAULT '',
                                 light_period_minutes INTEGER DEFAULT 1440,
-                                light_cycle_anchor REAL
+                                light_cycle_anchor REAL,
+                                hostname TEXT,
+                                fade_in_seconds INTEGER DEFAULT 1,
+                                fade_out_seconds INTEGER DEFAULT 1,
+                                max_light INTEGER DEFAULT 100,
+                                crepuscular INTEGER DEFAULT 0
                             );"""
 
         # device_interventions: append-only log of user-originated mutating actions
@@ -258,6 +263,16 @@ class ExperimentalDB(multiprocessing.Process):
             self._migrate_incubators_add_period_and_anchor()
             # Migration 9: Add termination_reason column to runs table
             self._migrate_runs_add_termination_reason()
+            # Migration 10: Add hostname column to incubators (binds a record to a
+            # physical WiFi incubator unit, e.g. "incubator-1")
+            self._migrate_incubators_add_hostname()
+            # Migration 11: Add per-incubator fade-in/out timing and peak
+            # brightness — pushed to the firmware along with the schedule.
+            self._migrate_incubators_add_fade()
+            # Migration 12: Add 'crepuscular' toggle that selects between
+            # hard on/off transitions (default 0) and a smoothstep-curve
+            # fade using the fade_in/out timings.
+            self._migrate_incubators_add_crepuscular()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
 
@@ -702,6 +717,87 @@ class ExperimentalDB(multiprocessing.Process):
 
         except Exception as e:
             logging.error(f"Error migrating incubators table (period/anchor): {e}")
+
+    def _migrate_incubators_add_hostname(self):
+        """
+        Add a ``hostname`` column to the incubators table if absent. It binds a
+        DB incubator record to a physical WiFi incubator unit by its mDNS
+        hostname (``incubator-<id>``); NULL means the record is not yet bound to
+        any hardware.
+        """
+        try:
+            check_columns = f"PRAGMA table_info({self._incubators_table_name})"
+            table_info = self.executeSQL(check_columns)
+
+            if not isinstance(table_info, list):
+                return
+
+            has_hostname = any(col[1] == "hostname" for col in table_info)
+            if not has_hostname:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN hostname TEXT"
+                )
+                logging.info("Added hostname to incubators table")
+
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (hostname): {e}")
+
+    def _migrate_incubators_add_fade(self):
+        """
+        Add ``fade_in_seconds`` / ``fade_out_seconds`` / ``max_light`` columns
+        to the incubators table if absent. Together they parameterise how the
+        smart-incubator firmware ramps its panel LED at each light transition:
+        the schedule decides when, these decide how steep and how bright.
+        """
+        try:
+            table_info = self.executeSQL(
+                f"PRAGMA table_info({self._incubators_table_name})"
+            )
+            if not isinstance(table_info, list):
+                return
+
+            existing = {col[1] for col in table_info}
+            to_add = [
+                ("fade_in_seconds", "INTEGER DEFAULT 1"),
+                ("fade_out_seconds", "INTEGER DEFAULT 1"),
+                ("max_light", "INTEGER DEFAULT 100"),
+            ]
+            for col_name, col_def in to_add:
+                if col_name not in existing:
+                    self.executeSQL(
+                        f"ALTER TABLE {self._incubators_table_name} "
+                        f"ADD COLUMN {col_name} {col_def}"
+                    )
+                    logging.info("Added %s to incubators table", col_name)
+
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (fade): {e}")
+
+    def _migrate_incubators_add_crepuscular(self):
+        """
+        Add a ``crepuscular`` integer column (0/1) to the incubators table if
+        absent. When 0 (default), light transitions are hard on/off. When 1,
+        the daemon (and the smart-incubator firmware) ramp along a smoothstep
+        S-curve over the configured fade_in_seconds / fade_out_seconds, for a
+        sunset-like dusk and dawn.
+        """
+        try:
+            table_info = self.executeSQL(
+                f"PRAGMA table_info({self._incubators_table_name})"
+            )
+            if not isinstance(table_info, list):
+                return
+
+            existing = {col[1] for col in table_info}
+            if "crepuscular" not in existing:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN crepuscular INTEGER DEFAULT 0"
+                )
+                logging.info("Added crepuscular to incubators table")
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (crepuscular): {e}")
 
     def getRun(self, run_id, asdict=False):
         """
@@ -1399,6 +1495,11 @@ class ExperimentalDB(multiprocessing.Process):
         lights_off: str = "",
         light_period_minutes: int = 1440,
         light_cycle_anchor: float = None,
+        hostname: str = None,
+        fade_in_seconds: int = 1,
+        fade_out_seconds: int = 1,
+        max_light: int = 100,
+        crepuscular: int = 0,
     ):
         """
         Add a new incubator to the database.
@@ -1414,6 +1515,14 @@ class ExperimentalDB(multiprocessing.Process):
             lights_off: Lights-off time HH:MM
             light_period_minutes: Cycle length in minutes (default 1440 = 24h)
             light_cycle_anchor: Unix timestamp marking ZT0; None = wall-clock midnight
+            hostname: mDNS hostname of the bound physical unit (e.g. "incubator-1");
+                None = not bound to any hardware
+            fade_in_seconds: Panel-LED ramp-up duration in seconds (firmware default 1)
+            fade_out_seconds: Panel-LED ramp-down duration in seconds (firmware default 1)
+            max_light: Peak brightness for the panel LED (0–100, default 100)
+            crepuscular: 1 to enable a sunset-like smoothstep fade between
+                0 % and max_light at each transition; 0 (default) keeps the
+                legacy hard on/off behaviour and ignores the fade timings
 
         Returns:
             ID of the inserted incubator or -1 if error
@@ -1443,15 +1552,26 @@ class ExperimentalDB(multiprocessing.Process):
             anchor_sql = (
                 "NULL" if light_cycle_anchor is None else f"{float(light_cycle_anchor)}"
             )
+            hostname_sql = (
+                "NULL"
+                if hostname is None
+                else f"'{hostname.replace(chr(39), chr(39) * 2)}'"
+            )
+            fade_in_sql = int(fade_in_seconds) if fade_in_seconds is not None else 1
+            fade_out_sql = int(fade_out_seconds) if fade_out_seconds is not None else 1
+            max_light_sql = int(max_light) if max_light is not None else 100
+            crepuscular_sql = 1 if int(crepuscular or 0) else 0
 
             sql_add_incubator = f"""
             INSERT INTO {self._incubators_table_name}
             (name, location, owner, description, created, active,
-             lights_on, lights_off, light_period_minutes, light_cycle_anchor)
+             lights_on, lights_off, light_period_minutes, light_cycle_anchor, hostname,
+             fade_in_seconds, fade_out_seconds, max_light, crepuscular)
             VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}',
                     '{escaped_description}', '{created}', {active},
                     '{escaped_lights_on}', '{escaped_lights_off}',
-                    {period_sql}, {anchor_sql})
+                    {period_sql}, {anchor_sql}, {hostname_sql},
+                    {fade_in_sql}, {fade_out_sql}, {max_light_sql}, {crepuscular_sql})
             """
 
             result = self.executeSQL(sql_add_incubator)
@@ -1510,7 +1630,13 @@ class ExperimentalDB(multiprocessing.Process):
                     set_clauses.append(f"{field} = '{escaped_value}'")
                 elif field in ["active"]:
                     set_clauses.append(f"{field} = {int(value)}")
-                elif field == "light_period_minutes":
+                elif field in (
+                    "light_period_minutes",
+                    "fade_in_seconds",
+                    "fade_out_seconds",
+                    "max_light",
+                    "crepuscular",
+                ):
                     set_clauses.append(f"{field} = {int(value)}")
                 elif field == "light_cycle_anchor":
                     # Explicit None clears the anchor (returns cycle to legacy wall-clock mode).
@@ -1518,6 +1644,13 @@ class ExperimentalDB(multiprocessing.Process):
                         set_clauses.append(f"{field} = NULL")
                     else:
                         set_clauses.append(f"{field} = {float(value)}")
+                elif field == "hostname":
+                    # Explicit None unbinds the record from any physical unit.
+                    if value is None:
+                        set_clauses.append(f"{field} = NULL")
+                    else:
+                        escaped_value = str(value).replace("'", "''")
+                        set_clauses.append(f"{field} = '{escaped_value}'")
                 elif field == "created":
                     set_clauses.append(f"{field} = '{value}'")
                 else:

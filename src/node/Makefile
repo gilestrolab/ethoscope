@@ -1,5 +1,11 @@
 # Ethoscope Node Server Build System
 # Handles Python backend installation (frontend is now source-only)
+#
+# The default install pulls the full node stack (CherryPy, MariaDB backups,
+# tunnel, ROI templates, sensors, etc.). The smart-incubator subsystem under
+# ``ethoscope_node.incubators`` can be deployed on a stripped-down venv
+# (bottle + zeroconf + requests + ``--no-deps``) for the rare incubator-only
+# case — see pyproject.toml for the recipe.
 
 .PHONY: all install-all install-dev install-production test test-unit test-integration test-functional test-coverage test-fast test-slow clean help
 

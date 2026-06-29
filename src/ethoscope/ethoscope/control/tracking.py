@@ -121,6 +121,34 @@ class ExperimentalInformation(DescribedObject):
                 "default": "",
                 "hidden": "true",
             },
+            {
+                "type": "int",
+                "name": "fade_in_seconds",
+                "description": "Light schedule: panel ramp-up duration at sunrise (s)",
+                "default": 1,
+                "hidden": "true",
+            },
+            {
+                "type": "int",
+                "name": "fade_out_seconds",
+                "description": "Light schedule: panel ramp-down duration at sunset (s)",
+                "default": 1,
+                "hidden": "true",
+            },
+            {
+                "type": "int",
+                "name": "max_light",
+                "description": "Light schedule: peak panel brightness (0..100 %)",
+                "default": 100,
+                "hidden": "true",
+            },
+            {
+                "type": "int",
+                "name": "crepuscular",
+                "description": "Light schedule: 1 = sunset-like S-curve fade, 0 = hard on/off",
+                "default": 0,
+                "hidden": "true",
+            },
         ],
     }
 
@@ -134,6 +162,10 @@ class ExperimentalInformation(DescribedObject):
         lights_off="",
         light_period_minutes=1440,
         light_cycle_anchor="",
+        fade_in_seconds=1,
+        fade_out_seconds=1,
+        max_light=100,
+        crepuscular=0,
     ):
         self._check_code(code)
         self._info_dic = {
@@ -145,6 +177,10 @@ class ExperimentalInformation(DescribedObject):
             "lights_off": lights_off,
             "light_period_minutes": light_period_minutes,
             "light_cycle_anchor": light_cycle_anchor,
+            "fade_in_seconds": fade_in_seconds,
+            "fade_out_seconds": fade_out_seconds,
+            "max_light": max_light,
+            "crepuscular": crepuscular,
         }
 
     def _check_code(self, code):
@@ -1424,12 +1460,35 @@ class ControlThread(Thread):
             except (TypeError, ValueError):
                 anchor = None
 
+            # Fade timing + peak brightness. Defaults mirror the firmware so an
+            # unconfigured ethoscope behaves like a binary on/off transition.
+            def _coerce_int(raw, default, lo=None, hi=None):
+                try:
+                    v = int(raw) if raw not in (None, "") else default
+                except (TypeError, ValueError):
+                    return default
+                if lo is not None and v < lo:
+                    return lo
+                if hi is not None and v > hi:
+                    return hi
+                return v
+
+            fade_in_seconds = _coerce_int(exp_info.get("fade_in_seconds"), 1, lo=0)
+            fade_out_seconds = _coerce_int(exp_info.get("fade_out_seconds"), 1, lo=0)
+            max_light = _coerce_int(exp_info.get("max_light"), 100, lo=0, hi=100)
+            # crepuscular: any truthy value → 1; defaults to legacy hard-transition behaviour.
+            crepuscular = bool(_coerce_int(exp_info.get("crepuscular"), 0))
+
             schedule = {
                 "lights_on": lights_on,
                 "lights_off": lights_off,
                 "active": bool(lights_on and lights_off),
                 "period_minutes": period_minutes,
                 "anchor": anchor,
+                "fade_in_seconds": fade_in_seconds,
+                "fade_out_seconds": fade_out_seconds,
+                "max_light": max_light,
+                "crepuscular": crepuscular,
                 "updated_at": time.time(),
             }
 
@@ -1518,6 +1577,10 @@ class ControlThread(Thread):
                 "lights_on": "",
                 "lights_off": "",
                 "active": False,
+                "fade_in_seconds": 1,
+                "fade_out_seconds": 1,
+                "max_light": 100,
+                "crepuscular": False,
                 "updated_at": time.time(),
             }
 
