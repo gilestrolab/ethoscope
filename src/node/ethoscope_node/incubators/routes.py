@@ -46,6 +46,8 @@ _WRITE_FIELDS = (
     "fade_out_seconds",
     "max_light",
     "crepuscular",
+    "type",
+    "set_temp",
 )
 
 
@@ -215,7 +217,13 @@ class IncubatorRoutes:
             if hostname is not None and str(hostname).strip()
             else None
         )
-        rows = self._storage.update(name=name, hostname=clean_hostname)
+        # Binding a physical unit makes the record 'smart' (firmware-backed,
+        # light + temperature). Unbinding leaves the category untouched so the
+        # user can decide whether it becomes a plain manual incubator.
+        update_fields: dict[str, Any] = {"hostname": clean_hostname}
+        if clean_hostname:
+            update_fields["type"] = "smart"
+        rows = self._storage.update(name=name, **update_fields)
         if rows < 0:
             return _err(f"Could not bind incubator '{name}'")
         location_pushed = False

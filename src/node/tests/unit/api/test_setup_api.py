@@ -983,6 +983,49 @@ class TestSetupAPI(unittest.TestCase):
 
     @patch("bottle.request")
     @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_incubator_with_hostname_forces_smart_with_setpoint(
+        self, mock_db_class, mock_request
+    ):
+        """Adopting a discovered unit forces type='smart' and forwards set_temp."""
+        mock_request.json = {
+            "name": "incubator-50",
+            "hostname": "incubator-50",
+            "set_temp": 24.0,
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 3
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "success")
+        kwargs = mock_db.addIncubator.call_args[1]
+        self.assertEqual(kwargs["type"], "smart")
+        self.assertEqual(kwargs["hostname"], "incubator-50")
+        self.assertEqual(kwargs["set_temp"], 24.0)
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_virtual_incubator_drops_setpoint(self, mock_db_class, mock_request):
+        """A virtual (manual) incubator keeps its category and ignores set_temp."""
+        mock_request.json = {
+            "name": "Shoebox",
+            "type": "virtual",
+            "set_temp": 24.0,  # ignored: non-smart units have no temperature control
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 4
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "success")
+        kwargs = mock_db.addIncubator.call_args[1]
+        self.assertEqual(kwargs["type"], "virtual")
+        self.assertNotIn("set_temp", kwargs)
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
     def test_add_incubator_triggers_auto_push(self, mock_db_class, mock_request):
         """Successful add fires the auto-push for new units."""
         fake_api = self._install_fake_incubator_api()

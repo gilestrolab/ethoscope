@@ -703,6 +703,63 @@ class TestIncubatorCRUD:
         assert rec["fade_out_seconds"] == 10
         assert rec["max_light"] == 50
 
+    def test_incubator_has_type_and_set_temp_columns(self, test_db):
+        """Newly created incubators table includes the category + setpoint columns."""
+        import sqlite3
+
+        conn = sqlite3.connect(test_db._db_name)
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({test_db._incubators_table_name})")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "type" in cols
+        assert "set_temp" in cols
+
+    def test_add_incubator_defaults_to_normal_no_setpoint(self, test_db):
+        """Expected use: omitting category/setpoint defaults to 'normal' / NULL."""
+        assert test_db.addIncubator(name="Plain_box") > 0
+        rec = test_db.getIncubatorByName("Plain_box", asdict=True)
+        assert rec["type"] == "normal"
+        assert rec["set_temp"] is None
+
+    def test_add_smart_incubator_with_setpoint_round_trips(self, test_db):
+        """A smart incubator persists its category and temperature setpoint."""
+        assert test_db.addIncubator(name="Smart_box", type="smart", set_temp=23.5) > 0
+        rec = test_db.getIncubatorByName("Smart_box", asdict=True)
+        assert rec["type"] == "smart"
+        assert rec["set_temp"] == 23.5
+
+    def test_add_virtual_incubator(self, test_db):
+        """Virtual (shoe-box) category round-trips and carries no setpoint."""
+        assert test_db.addIncubator(name="Shoebox", type="virtual") > 0
+        rec = test_db.getIncubatorByName("Shoebox", asdict=True)
+        assert rec["type"] == "virtual"
+        assert rec["set_temp"] is None
+
+    def test_add_incubator_invalid_type_falls_back_to_normal(self, test_db):
+        """Failure case: an unknown category is coerced to 'normal'."""
+        assert test_db.addIncubator(name="Weird_box", type="bogus") > 0
+        rec = test_db.getIncubatorByName("Weird_box", asdict=True)
+        assert rec["type"] == "normal"
+
+    def test_update_incubator_type_and_set_temp(self, populated_db):
+        """updateIncubator can change category and set/clear the setpoint."""
+        assert (
+            populated_db.updateIncubator(
+                name="Incubator_01", type="smart", set_temp=20.0
+            )
+            >= 0
+        )
+        rec = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert rec["type"] == "smart"
+        assert rec["set_temp"] == 20.0
+
+        # Edge case: clearing the setpoint with None returns it to NULL.
+        assert populated_db.updateIncubator(name="Incubator_01", set_temp=None) >= 0
+        rec = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert rec["set_temp"] is None
+
 
 class TestDeviceManagement:
     """Test ethoscope device management."""

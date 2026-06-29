@@ -635,10 +635,27 @@ class SetupAPI(BaseAPI):
                         if fade_key == "crepuscular"
                         else int(data[fade_key])
                     )
+            bound_hostname = ""
             if data.get("hostname") is not None:
                 hostname = str(data.get("hostname")).strip()
                 if hostname:
                     incubator_data["hostname"] = hostname
+                    bound_hostname = hostname
+
+            # Category: binding a physical unit makes it 'smart'; otherwise honour
+            # the requested category ('normal' default, or 'virtual' shoe-box).
+            requested_type = str(data.get("type", "")).strip().lower()
+            if bound_hostname:
+                incubator_data["type"] = "smart"
+            elif requested_type in ("normal", "smart", "virtual"):
+                incubator_data["type"] = requested_type
+
+            # Temperature setpoint — smart units only.
+            if incubator_data.get("type") == "smart" and data.get("set_temp") not in (
+                None,
+                "",
+            ):
+                incubator_data["set_temp"] = float(data["set_temp"])
 
             if not incubator_data["name"]:
                 return {"result": "error", "message": "Incubator name is required"}
@@ -693,6 +710,15 @@ class SetupAPI(BaseAPI):
                 update_data["lights_off"] = data["lights_off"].strip()
             if "active" in data:
                 update_data["active"] = int(data["active"])
+            if "type" in data:
+                requested_type = str(data["type"]).strip().lower()
+                if requested_type in ("normal", "smart", "virtual"):
+                    update_data["type"] = requested_type
+            # Temperature setpoint — empty/None clears it (NULL), a value sets it.
+            if "set_temp" in data:
+                update_data["set_temp"] = (
+                    None if data["set_temp"] in (None, "") else float(data["set_temp"])
+                )
             # Phase-2/3 fade timing / max brightness / crepuscular toggle —
             # pushed to firmware on save.
             for fade_key in (

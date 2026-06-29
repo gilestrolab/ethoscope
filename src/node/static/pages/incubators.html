@@ -26,12 +26,13 @@
     </label>
 </div>
 
-<!-- Discovered-but-unlinked WiFi units -->
+<!-- Discovered-but-unadopted WiFi units -->
 <div class="alert alert-info" ng-if="discoveredUnbound().length > 0" ng-cloak style="margin-top: 10px;">
     <i class="fa fa-wifi"></i>
-    {{discoveredUnbound().length}} smart incubator(s) discovered on the network are not yet
-    linked to a record: <strong>{{discoveredUnboundNames()}}</strong>.
-    Open an incubator's <i class="fa fa-edit"></i> edit dialog to link one.
+    {{discoveredUnbound().length}} smart incubator(s) discovered on the network:
+    <strong>{{discoveredUnboundNames()}}</strong>.
+    They appear highlighted below — use <i class="fa fa-plus-circle" style="color:#5cb85c;"></i>
+    <strong>Add &amp; bind</strong> to adopt one.
 </div>
 
 <!-- INCUBATORS TABLE -->
@@ -42,6 +43,13 @@
                 Name
                 <span ng-show="sortType == 'name' && !sortReverse" class="fa fa-caret-down"></span>
                 <span ng-show="sortType == 'name' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+        </th>
+        <th>
+            <a href="#" ng-click="sortType = 'type'; sortReverse = !sortReverse">
+                Type
+                <span ng-show="sortType == 'type' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'type' && sortReverse" class="fa fa-caret-up"></span>
             </a>
         </th>
         <th>
@@ -82,6 +90,18 @@
                 <span ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
                     <i class="fa fa-thermometer-half"></i>
                     {{incubator.name}}
+                </span>
+            </td>
+            <td>
+                <span class="badge"
+                      ng-class="{'badge-info': incubatorType(incubator) === 'smart',
+                                 'badge-secondary': incubatorType(incubator) === 'normal',
+                                 'badge-warning': incubatorType(incubator) === 'virtual'}"
+                      title="{{incubatorTypeTitle(incubatorType(incubator))}}">
+                    <i class="fa" ng-class="{'fa-wifi': incubatorType(incubator) === 'smart',
+                                             'fa-thermometer-half': incubatorType(incubator) === 'normal',
+                                             'fa-box': incubatorType(incubator) === 'virtual'}"></i>
+                    {{incubatorType(incubator)}}
                 </span>
             </td>
             <td>
@@ -153,6 +173,49 @@
                 </a>
             </td>
         </tr>
+
+        <!-- Discovered smart units not yet adopted into a record. They appear here
+             spontaneously (mDNS); "Add & bind" creates a smart record bound to the unit. -->
+        <tr ng-repeat="unit in discoveredUnbound()" style="background-color:#f0f8ff;">
+            <td>
+                <i class="fa fa-wifi" style="color:#5bc0de;"></i>
+                {{unit.name || unit.hostname}}
+            </td>
+            <td>
+                <span class="badge badge-info" title="Discovered smart incubator, not yet adopted">
+                    <i class="fa fa-wifi"></i> smart (new)
+                </span>
+            </td>
+            <td><span style="color:grey;">—</span></td>
+            <td><span style="color:grey;">—</span></td>
+            <td>
+                <span ng-if="unit.lights_on !== undefined && unit.lights_off !== undefined" style="color:#888;">
+                    <i class="fa fa-sun"></i>
+                    {{minutesToTime(unit.lights_on)}} &ndash; {{minutesToTime(unit.lights_off)}}
+                </span>
+                <span ng-if="unit.lights_on === undefined || unit.lights_off === undefined" style="color:grey;">—</span>
+            </td>
+            <td><span style="color:grey;">—</span></td>
+            <td>
+                <span title="Live readings from the discovered unit">
+                    <i class="fa fa-circle" style="color:#5cb85c; font-size:0.6em; vertical-align:middle;"></i>
+                    {{unit.temperature | number:1}}&deg;C
+                    <span ng-if="unit.set_temp !== undefined && unit.set_temp !== null" style="font-size:0.85em; color:#888;">
+                        &rarr; {{unit.set_temp | number:1}}&deg;C
+                    </span>
+                    <span ng-if="unit.light_level !== undefined && unit.light_level !== null"
+                          style="font-size:0.85em; color:#888;" title="Light level">
+                        · <i class="fa fa-lightbulb"></i> {{unit.light_level}}%
+                    </span>
+                </span>
+            </td>
+            <td><span style="color:grey;">—</span></td>
+            <td>
+                <a href="" ng-click="adoptDiscovered(unit)" title="Add this smart incubator and bind it">
+                    <span class="fa fa-plus-circle" style="color:#5cb85c;"></span> Add &amp; bind
+                </a>
+            </td>
+        </tr>
     </tbody>
 </table>
 
@@ -193,6 +256,28 @@
                                        name="location"
                                        ng-model="selectedIncubator.location"
                                        placeholder="Room 101">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label">Category</label>
+                                <!-- Smart units are firmware-backed (light + temperature); the
+                                     category is set by binding a unit and shown read-only here. -->
+                                <div ng-if="isSmart(selectedIncubator)" class="form-control-plaintext" style="padding-top:7px;">
+                                    <span class="badge badge-info"><i class="fa fa-wifi"></i> smart</span>
+                                    <small class="text-muted">firmware-backed: light &amp; temperature control</small>
+                                </div>
+                                <!-- Manual categories: normal (permanent) or virtual (short-lived shoe-box). -->
+                                <select ng-if="!isSmart(selectedIncubator)"
+                                        class="form-control"
+                                        name="type"
+                                        ng-model="selectedIncubator.type">
+                                    <option value="normal">Normal — manual, light only</option>
+                                    <option value="virtual">Virtual — short-lived "shoe box"</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -404,8 +489,56 @@
                         </div>
                     </div>
 
-                    <!-- Physical unit (WiFi) — link a discovered smart incubator -->
-                    <div class="row" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
+                    <!-- Temperature control — smart units only (Peltier-backed). -->
+                    <div class="row" ng-if="isSmart(selectedIncubator)"
+                         style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
+                        <div class="col-12">
+                            <label class="form-label" style="font-weight: bold;">
+                                <i class="fa fa-temperature-half"></i> Temperature
+                            </label>
+                            <small class="form-text text-muted" style="margin-top: -5px; margin-bottom: 10px;">
+                                Target temperature pushed to the unit's Peltier controller. The Peltier is
+                                enabled automatically while a setpoint is set. Humidity control is not supported.
+                            </small>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label class="form-label" for="setTemp">Target temperature (&deg;C)</label>
+                                <input type="number"
+                                       class="form-control"
+                                       id="setTemp"
+                                       name="set_temp"
+                                       ng-model="selectedIncubator.set_temp"
+                                       min="5"
+                                       max="45"
+                                       step="0.5"
+                                       placeholder="25">
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label class="form-label">Live</label>
+                                <div class="form-control-plaintext" style="padding-top: 7px;">
+                                    <span ng-if="isLiveOnline(liveForIncubator(selectedIncubator))">
+                                        <i class="fa fa-circle" style="color:#5cb85c; font-size:0.6em; vertical-align:middle;"></i>
+                                        Now {{liveForIncubator(selectedIncubator).temperature | number:1}}&deg;C,
+                                        humidity {{liveForIncubator(selectedIncubator).humidity | number:0}}%
+                                        <span ng-if="liveForIncubator(selectedIncubator).peltier_dir && liveForIncubator(selectedIncubator).peltier_dir !== 'off'">
+                                            · Peltier {{liveForIncubator(selectedIncubator).peltier_dir}}
+                                        </span>
+                                    </span>
+                                    <span ng-if="!isLiveOnline(liveForIncubator(selectedIncubator))" style="color:grey;">
+                                        Unit offline — setpoint will be pushed when it reconnects.
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Physical unit (WiFi) — link a discovered smart incubator.
+                         Hidden for virtual (shoe-box) incubators, which have no hardware. -->
+                    <div class="row" ng-if="selectedIncubator.type !== 'virtual'"
+                         style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
                         <div class="col-12">
                             <label class="form-label" style="font-weight: bold;">
                                 <i class="fa fa-wifi"></i> Physical unit (WiFi)

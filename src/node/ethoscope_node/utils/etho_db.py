@@ -209,7 +209,9 @@ class ExperimentalDB(multiprocessing.Process):
                                 fade_in_seconds INTEGER DEFAULT 1,
                                 fade_out_seconds INTEGER DEFAULT 1,
                                 max_light INTEGER DEFAULT 100,
-                                crepuscular INTEGER DEFAULT 0
+                                crepuscular INTEGER DEFAULT 0,
+                                type TEXT DEFAULT 'normal',
+                                set_temp REAL
                             );"""
 
         # device_interventions: append-only log of user-originated mutating actions
@@ -273,6 +275,9 @@ class ExperimentalDB(multiprocessing.Process):
             # hard on/off transitions (default 0) and a smoothstep-curve
             # fade using the fade_in/out timings.
             self._migrate_incubators_add_crepuscular()
+            # Migration 13: Add incubator category ('type': normal/smart/virtual)
+            # and a temperature setpoint ('set_temp') used only by smart units.
+            self._migrate_incubators_add_type_and_set_temp()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
 
@@ -798,6 +803,38 @@ class ExperimentalDB(multiprocessing.Process):
                 logging.info("Added crepuscular to incubators table")
         except Exception as e:
             logging.error(f"Error migrating incubators table (crepuscular): {e}")
+
+    def _migrate_incubators_add_type_and_set_temp(self):
+        """
+        Add the incubator category and temperature-setpoint columns if absent.
+
+        ``type`` is the incubator category — one of 'normal' (manual, light only),
+        'smart' (firmware-backed, light + temperature) or 'virtual' (short-lived
+        manual "shoe box" used to fragment a light regime). Existing rows default
+        to 'normal'. ``set_temp`` is the target temperature in °C, used only by
+        smart units and pushed to the firmware; NULL for non-smart incubators.
+        """
+        try:
+            table_info = self.executeSQL(
+                f"PRAGMA table_info({self._incubators_table_name})"
+            )
+            if not isinstance(table_info, list):
+                return
+
+            existing = {col[1] for col in table_info}
+            if "type" not in existing:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN type TEXT DEFAULT 'normal'"
+                )
+                logging.info("Added type to incubators table")
+            if "set_temp" not in existing:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} ADD COLUMN set_temp REAL"
+                )
+                logging.info("Added set_temp to incubators table")
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (type/set_temp): {e}")
 
     def getRun(self, run_id, asdict=False):
         """
@@ -1500,6 +1537,8 @@ class ExperimentalDB(multiprocessing.Process):
         fade_out_seconds: int = 1,
         max_light: int = 100,
         crepuscular: int = 0,
+        type: str = "normal",
+        set_temp: float = None,
     ):
         """
         Add a new incubator to the database.
@@ -1523,6 +1562,11 @@ class ExperimentalDB(multiprocessing.Process):
             crepuscular: 1 to enable a sunset-like smoothstep fade between
                 0 % and max_light at each transition; 0 (default) keeps the
                 legacy hard on/off behaviour and ignores the fade timings
+            type: Incubator category — 'normal' (manual, light only),
+                'smart' (firmware-backed, light + temperature) or 'virtual'
+                (short-lived manual unit). Invalid values fall back to 'normal'.
+            set_temp: Target temperature in °C for smart units (pushed to the
+                firmware); None for non-smart incubators
 
         Returns:
             ID of the inserted incubator or -1 if error
@@ -1561,17 +1605,20 @@ class ExperimentalDB(multiprocessing.Process):
             fade_out_sql = int(fade_out_seconds) if fade_out_seconds is not None else 1
             max_light_sql = int(max_light) if max_light is not None else 100
             crepuscular_sql = 1 if int(crepuscular or 0) else 0
+            type_sql = type if type in ("normal", "smart", "virtual") else "normal"
+            set_temp_sql = "NULL" if set_temp is None else f"{float(set_temp)}"
 
             sql_add_incubator = f"""
             INSERT INTO {self._incubators_table_name}
             (name, location, owner, description, created, active,
              lights_on, lights_off, light_period_minutes, light_cycle_anchor, hostname,
-             fade_in_seconds, fade_out_seconds, max_light, crepuscular)
+             fade_in_seconds, fade_out_seconds, max_light, crepuscular, type, set_temp)
             VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}',
                     '{escaped_description}', '{created}', {active},
                     '{escaped_lights_on}', '{escaped_lights_off}',
                     {period_sql}, {anchor_sql}, {hostname_sql},
-                    {fade_in_sql}, {fade_out_sql}, {max_light_sql}, {crepuscular_sql})
+                    {fade_in_sql}, {fade_out_sql}, {max_light_sql}, {crepuscular_sql},
+                    '{type_sql}', {set_temp_sql})
             """
 
             result = self.executeSQL(sql_add_incubator)
@@ -1625,6 +1672,7 @@ class ExperimentalDB(multiprocessing.Process):
                     "description",
                     "lights_on",
                     "lights_off",
+                    "type",
                 ]:
                     escaped_value = str(value).replace("'", "''")
                     set_clauses.append(f"{field} = '{escaped_value}'")
@@ -1640,6 +1688,12 @@ class ExperimentalDB(multiprocessing.Process):
                     set_clauses.append(f"{field} = {int(value)}")
                 elif field == "light_cycle_anchor":
                     # Explicit None clears the anchor (returns cycle to legacy wall-clock mode).
+                    if value is None:
+                        set_clauses.append(f"{field} = NULL")
+                    else:
+                        set_clauses.append(f"{field} = {float(value)}")
+                elif field == "set_temp":
+                    # Explicit None clears the setpoint (e.g. when a unit becomes non-smart).
                     if value is None:
                         set_clauses.append(f"{field} = NULL")
                     else:

@@ -164,6 +164,14 @@ def build_firmware_payload(record: dict[str, Any]) -> dict[str, Any]:
         # ignores fade_in_ms / fade_out_ms when off).
         "crepuscular": 1 if record.get("crepuscular") else 0,
     }
+    # Temperature setpoint: only smart units carry one. Emit it only when set so
+    # non-smart records (no set_temp) never touch the firmware's Peltier config.
+    set_temp = record.get("set_temp")
+    if set_temp is not None:
+        try:
+            payload["set_temp"] = float(set_temp)
+        except (TypeError, ValueError):
+            pass
     return payload
 
 
@@ -187,5 +195,14 @@ def schedule_drifted(record: dict[str, Any], telemetry: dict[str, Any]) -> bool:
         if field not in telemetry:
             return True
         if telemetry[field] != expected[field]:
+            return True
+    # Temperature is reconciled only for smart units (those with a setpoint).
+    # A small tolerance avoids spurious re-pushes from float round-tripping.
+    if "set_temp" in expected:
+        reported = telemetry.get("set_temp")
+        try:
+            if reported is None or abs(float(reported) - expected["set_temp"]) > 0.05:
+                return True
+        except (TypeError, ValueError):
             return True
     return False

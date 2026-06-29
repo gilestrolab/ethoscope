@@ -41,12 +41,14 @@ INCUBATOR_FIELDS = (
     "fade_out_seconds",
     "max_light",
     "crepuscular",
+    "type",
+    "set_temp",
 )
 
 IncubatorRecord = dict[str, Any]
 
 _UPDATABLE_TEXT_FIELDS = frozenset(
-    {"name", "location", "owner", "description", "lights_on", "lights_off"}
+    {"name", "location", "owner", "description", "lights_on", "lights_off", "type"}
 )
 _UPDATABLE_INT_FIELDS = frozenset(
     {
@@ -58,7 +60,8 @@ _UPDATABLE_INT_FIELDS = frozenset(
         "crepuscular",
     }
 )
-_UPDATABLE_NULLABLE_FLOAT_FIELDS = frozenset({"light_cycle_anchor"})
+# Temperature setpoint is nullable (NULL = no temperature control / non-smart).
+_UPDATABLE_NULLABLE_FLOAT_FIELDS = frozenset({"light_cycle_anchor", "set_temp"})
 _UPDATABLE_NULLABLE_TEXT_FIELDS = frozenset({"hostname"})
 
 
@@ -120,7 +123,7 @@ class SQLiteIncubatorStorage(IncubatorStorage):
     Bottle server.
     """
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, db_path: str):
         self._db_path = db_path
@@ -154,7 +157,9 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                     fade_in_seconds INTEGER DEFAULT 1,
                     fade_out_seconds INTEGER DEFAULT 1,
                     max_light INTEGER DEFAULT 100,
-                    crepuscular INTEGER DEFAULT 0
+                    crepuscular INTEGER DEFAULT 0,
+                    type TEXT DEFAULT 'normal',
+                    set_temp REAL
                 )
                 """
             )
@@ -162,6 +167,17 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                 "CREATE TABLE IF NOT EXISTS schema_version "
                 "(version INTEGER NOT NULL PRIMARY KEY)"
             )
+            # Idempotent column migrations for DB files created by older versions
+            # (CREATE TABLE IF NOT EXISTS won't add columns to an existing table).
+            existing_cols = {
+                r[1] for r in conn.execute("PRAGMA table_info(incubators)").fetchall()
+            }
+            if "type" not in existing_cols:
+                conn.execute(
+                    "ALTER TABLE incubators ADD COLUMN type TEXT DEFAULT 'normal'"
+                )
+            if "set_temp" not in existing_cols:
+                conn.execute("ALTER TABLE incubators ADD COLUMN set_temp REAL")
             current = conn.execute(
                 "SELECT version FROM schema_version LIMIT 1"
             ).fetchone()
@@ -169,6 +185,10 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                 conn.execute(
                     "INSERT INTO schema_version (version) VALUES (?)",
                     (self.SCHEMA_VERSION,),
+                )
+            elif current[0] < self.SCHEMA_VERSION:
+                conn.execute(
+                    "UPDATE schema_version SET version = ?", (self.SCHEMA_VERSION,)
                 )
 
     # --- helpers -----------------------------------------------------------------
@@ -232,14 +252,19 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                     self._logger.error("Incubator '%s' already exists", name)
                     return -1
 
+                inc_type = record.get("type") or "normal"
+                if inc_type not in ("normal", "smart", "virtual"):
+                    inc_type = "normal"
+                set_temp = record.get("set_temp")
                 cur = conn.execute(
                     """
                     INSERT INTO incubators (
                         name, location, owner, description, created, active,
                         lights_on, lights_off, light_period_minutes,
                         light_cycle_anchor, hostname,
-                        fade_in_seconds, fade_out_seconds, max_light, crepuscular
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        fade_in_seconds, fade_out_seconds, max_light, crepuscular,
+                        type, set_temp
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         name,
@@ -257,6 +282,8 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                         int(record.get("fade_out_seconds") or 1),
                         int(record.get("max_light") or 100),
                         1 if int(record.get("crepuscular") or 0) else 0,
+                        inc_type,
+                        None if set_temp is None else float(set_temp),
                     ),
                 )
                 return int(cur.lastrowid or -1)

@@ -48,6 +48,26 @@ class TestAdd:
         assert rec["fade_in_seconds"] == 1
         assert rec["fade_out_seconds"] == 1
         assert rec["max_light"] == 100
+        # New incubators default to the 'normal' category with no setpoint.
+        assert rec["type"] == "normal"
+        assert rec["set_temp"] is None
+
+    def test_smart_record_with_setpoint(self, storage):
+        assert storage.add({"name": "Smart", "type": "smart", "set_temp": 23.5}) > 0
+        rec = storage.get(name="Smart")
+        assert rec["type"] == "smart"
+        assert rec["set_temp"] == pytest.approx(23.5)
+
+    def test_invalid_type_falls_back_to_normal(self, storage):
+        assert storage.add({"name": "Weird", "type": "bogus"}) > 0
+        assert storage.get(name="Weird")["type"] == "normal"
+
+    def test_update_type_and_clear_setpoint(self, storage):
+        storage.add({"name": "Inc1", "type": "smart", "set_temp": 20.0})
+        assert storage.update(name="Inc1", type="virtual", set_temp=None) >= 0
+        rec = storage.get(name="Inc1")
+        assert rec["type"] == "virtual"
+        assert rec["set_temp"] is None
 
     def test_full_record_round_trip(self, storage):
         storage.add(

@@ -257,10 +257,13 @@
             $scope.incubatorToDelete = null;
         };
 
-        // Clear selected incubator (for add new)
+        // Clear selected incubator (for add new). New incubators default to the
+        // 'normal' category (manual, light only); binding a unit makes them smart.
         $scope.clearSelectedIncubator = function() {
             $scope.selectedIncubator = {
                 active: true,
+                type: 'normal',
+                set_temp: null,
                 lights_on: null,
                 lights_off: null,
                 light_period_hours: 24,
@@ -271,6 +274,73 @@
                 crepuscular: false,
                 owner: ''
             };
+        };
+
+        // --- Category helpers --------------------------------------------------
+
+        // An incubator is 'smart' when its category is smart or it is bound to a
+        // physical WiFi unit. Falls back to 'normal' for legacy/unset records.
+        $scope.isSmart = function(incubator) {
+            if (!incubator) return false;
+            return incubator.type === 'smart' || !!incubator.hostname;
+        };
+
+        // Display category for a record: 'smart' | 'normal' | 'virtual'.
+        $scope.incubatorType = function(incubator) {
+            if (!incubator) return 'normal';
+            if ($scope.isSmart(incubator)) return 'smart';
+            return incubator.type === 'virtual' ? 'virtual' : 'normal';
+        };
+
+        $scope.incubatorTypeTitle = function(type) {
+            if (type === 'smart') return 'Smart: firmware-backed, light and temperature control';
+            if (type === 'virtual') return 'Virtual: short-lived "shoe box", light only';
+            return 'Normal: manually added, light only';
+        };
+
+        // Convert firmware minutes-of-day (0–1440) to an HH:MM display string.
+        $scope.minutesToTime = function(mins) {
+            var m = parseInt(mins, 10);
+            if (!Number.isFinite(m)) return '—';
+            m = ((m % 1440) + 1440) % 1440;
+            return ('0' + Math.floor(m / 60)).slice(-2) + ':' + ('0' + (m % 60)).slice(-2);
+        };
+
+        // Adopt a discovered (unbound) smart unit: create a smart record bound to
+        // the unit, seeding the node record from the unit's current firmware state
+        // so we do not disrupt a running schedule. One-click "Add & bind".
+        $scope.adoptDiscovered = function(unit) {
+            if (!unit || !unit.hostname) return;
+            var payload = {
+                name: unit.name || unit.hostname,
+                hostname: unit.hostname,
+                type: 'smart'
+            };
+            // Seed schedule + temperature from live telemetry where available.
+            if (unit.lights_on !== undefined && unit.lights_off !== undefined) {
+                payload.lights_on = $scope.minutesToTime(unit.lights_on);
+                payload.lights_off = $scope.minutesToTime(unit.lights_off);
+            }
+            if (unit.light_period_minutes) payload.light_period_minutes = parseInt(unit.light_period_minutes, 10);
+            if (unit.max_light !== undefined) payload.max_light = parseInt(unit.max_light, 10);
+            if (unit.crepuscular !== undefined) payload.crepuscular = unit.crepuscular ? 1 : 0;
+            if (unit.fade_in_ms !== undefined) payload.fade_in_seconds = Math.round(unit.fade_in_ms / 1000);
+            if (unit.fade_out_ms !== undefined) payload.fade_out_seconds = Math.round(unit.fade_out_ms / 1000);
+            if (unit.set_temp !== undefined && unit.set_temp !== null) payload.set_temp = unit.set_temp;
+
+            $http.post('/setup/add-incubator', payload)
+                .then(function(response) {
+                    if (response.data.result === 'success') {
+                        loadIncubators();
+                        loadLive();
+                    } else {
+                        alert('Error adopting incubator: ' + (response.data.message || 'Unknown error'));
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error adopting incubator:', error);
+                    alert('Error adopting incubator. Please try again.');
+                });
         };
 
         // Edit incubator - convert DB types to Angular model types
@@ -309,6 +379,14 @@
                     ? parseInt(incubator.max_light, 10) : 100;
             // Crepuscular toggle — bool in the UI, int 0/1 on the wire.
             $scope.selectedIncubator.crepuscular = !!incubator.crepuscular;
+
+            // Category + temperature setpoint. Default legacy/unset records to
+            // 'normal'; a bound record reads as 'smart' via isSmart().
+            $scope.selectedIncubator.type = incubator.type || 'normal';
+            $scope.selectedIncubator.set_temp =
+                (incubator.set_temp !== undefined && incubator.set_temp !== null)
+                    ? Number(incubator.set_temp)
+                    : null;
         };
 
         // Format a unix timestamp for display in the modal. Returns '—' if absent.
@@ -381,8 +459,15 @@
                     fade_in_seconds: parseInt(data.fade_in_seconds, 10) || 0,
                     fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
                     max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100)),
-                    crepuscular: data.crepuscular ? 1 : 0
+                    crepuscular: data.crepuscular ? 1 : 0,
+                    type: data.type || 'normal'
                 };
+                // Temperature setpoint — smart units only. Empty clears it.
+                if ($scope.isSmart(data)) {
+                    updatePayload.set_temp =
+                        (data.set_temp === null || data.set_temp === undefined || data.set_temp === '')
+                            ? '' : Number(data.set_temp);
+                }
                 // Anchor is server-managed when period changes; only emit it
                 // explicitly if the user has one (so we don't accidentally
                 // clear an existing T-cycle anchor by omission).
@@ -416,8 +501,12 @@
                     fade_in_seconds: parseInt(data.fade_in_seconds, 10) || 0,
                     fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
                     max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100)),
-                    crepuscular: data.crepuscular ? 1 : 0
+                    crepuscular: data.crepuscular ? 1 : 0,
+                    type: data.type || 'normal'
                 };
+                if ($scope.isSmart(data) && data.set_temp !== null && data.set_temp !== undefined && data.set_temp !== '') {
+                    addPayload.set_temp = Number(data.set_temp);
+                }
 
                 $http.post('/setup/add-incubator', addPayload)
                     .then(function(response) {

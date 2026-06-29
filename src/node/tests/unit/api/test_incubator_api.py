@@ -150,8 +150,12 @@ class TestIncubatorAPI(unittest.TestCase):
 
         self.assertEqual(result["result"], "success")
         self.assertTrue(result["location_pushed"])
+        # Binding a physical unit also promotes the record to the 'smart' category.
         self.mock_server.database.updateIncubator.assert_called_with(
-            name="Incubator 1", incubator_id=None, hostname="incubator-1"
+            name="Incubator 1",
+            incubator_id=None,
+            hostname="incubator-1",
+            type="smart",
         )
         scanner.set_location.assert_called_once_with("incubator-1", "Incubator 1")
 

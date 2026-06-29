@@ -33,6 +33,8 @@ _ADD_FIELDS = {
     "fade_out_seconds",
     "max_light",
     "crepuscular",
+    "type",
+    "set_temp",
 }
 
 

@@ -219,6 +219,21 @@ class TestBuildFirmwarePayload:
             payload = schedule.build_firmware_payload({"crepuscular": falsy})
             assert payload["crepuscular"] == 0, f"failed for {falsy!r}"
 
+    def test_set_temp_emitted_when_present(self):
+        """Smart units carry a setpoint; it is sent as a float."""
+        payload = schedule.build_firmware_payload({"name": "Inc1", "set_temp": 23.5})
+        assert payload["set_temp"] == 23.5
+
+    def test_set_temp_omitted_when_absent(self):
+        """Non-smart records (no setpoint) never touch the Peltier config."""
+        payload = schedule.build_firmware_payload({"name": "Inc1"})
+        assert "set_temp" not in payload
+
+    def test_set_temp_none_is_omitted(self):
+        """An explicit None setpoint is treated as 'no temperature control'."""
+        payload = schedule.build_firmware_payload({"set_temp": None})
+        assert "set_temp" not in payload
+
 
 class TestScheduleDrifted:
     def _record(self):
@@ -247,4 +262,25 @@ class TestScheduleDrifted:
         rec = self._record()
         telemetry = schedule.build_firmware_payload(rec)
         telemetry["lights_on"] = "10:00"
+        assert schedule.schedule_drifted(rec, telemetry) is True
+
+    def test_no_temperature_drift_within_tolerance(self):
+        rec = self._record()
+        rec["set_temp"] = 24.0
+        telemetry = schedule.build_firmware_payload(rec)
+        telemetry["set_temp"] = 24.0
+        assert schedule.schedule_drifted(rec, telemetry) is False
+
+    def test_temperature_drift_when_setpoint_differs(self):
+        rec = self._record()
+        rec["set_temp"] = 24.0
+        telemetry = schedule.build_firmware_payload(rec)
+        telemetry["set_temp"] = 21.0
+        assert schedule.schedule_drifted(rec, telemetry) is True
+
+    def test_temperature_drift_when_telemetry_missing_setpoint(self):
+        rec = self._record()
+        rec["set_temp"] = 24.0
+        telemetry = schedule.build_firmware_payload(rec)
+        telemetry.pop("set_temp", None)
         assert schedule.schedule_drifted(rec, telemetry) is True
