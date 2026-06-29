@@ -758,10 +758,16 @@ class SetupAPI(BaseAPI):
                 if anchor != current.get("light_cycle_anchor"):
                     update_data["light_cycle_anchor"] = anchor
 
-            # Busy guard: if any locked field is in the patch and devices are
-            # running, reject the whole update.
-            touched_locked = _LOCKED_INCUBATOR_FIELDS & set(update_data.keys())
-            if touched_locked:
+            # Busy guard: reject only when a locked field's value actually
+            # *changes* while a device is running. The frontend resends every
+            # field on each save, so checking mere presence would block harmless
+            # edits (owner, description, category) on a recording incubator.
+            changed_locked = {
+                field
+                for field in _LOCKED_INCUBATOR_FIELDS & set(update_data.keys())
+                if str(update_data[field]) != str(current.get(field))
+            }
+            if changed_locked:
                 busy = self._devices_running_in_incubator(original_name)
                 if busy:
                     return self._busy_error(busy)

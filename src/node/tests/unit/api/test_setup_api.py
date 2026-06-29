@@ -889,6 +889,51 @@ class TestSetupAPI(unittest.TestCase):
 
     @patch("bottle.request")
     @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_change_category_while_running_resends_unchanged_locked_fields(
+        self, mock_db_class, mock_request
+    ):
+        """The frontend resends every field on save; changing only the category
+        (with locked fields unchanged) must not be blocked while a device runs."""
+        mock_request.json = {
+            "original_name": "Box1",
+            "name": "Box1",
+            "type": "virtual",
+            # Locked fields resent verbatim (unchanged) by the form.
+            "lights_on": "09:00",
+            "lights_off": "21:00",
+            "active": 1,
+            "fade_in_seconds": 1,
+            "fade_out_seconds": 1,
+            "max_light": 100,
+            "crepuscular": 0,
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "id": 2,
+            "name": "Box1",
+            "lights_on": "09:00",
+            "lights_off": "21:00",
+            "active": 1,
+            "fade_in_seconds": 1,
+            "fade_out_seconds": 1,
+            "max_light": 100,
+            "crepuscular": 0,
+            "light_period_minutes": 1440,
+            "light_cycle_anchor": None,
+        }
+        mock_db.updateIncubator.return_value = 1
+        self.mock_server.device_scanner.get_all_devices_info.return_value = {
+            "etho_1": self._running_device("ETHO_001", "Box1"),
+        }
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        self.assertEqual(mock_db.updateIncubator.call_args.kwargs["type"], "virtual")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
     def test_update_busy_check_ignores_other_incubators(
         self, mock_db_class, mock_request
     ):
