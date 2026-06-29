@@ -15,8 +15,33 @@
         $scope.incubatorToDelete = null;
         $scope.searchText = '';
         $scope.showAll = false;
-        $scope.sortType = 'name';
+        $scope.sortType = 'type';   // default: group by category, then name
         $scope.sortReverse = false;
+
+        // Natural sort key: pad each run of digits so "Incubator 10" sorts
+        // after "Incubator 9" (lexicographic order would put 10 before 9).
+        function naturalKey(value) {
+            var s = (value === null || value === undefined) ? '' : String(value);
+            return s.toLowerCase().replace(/\d+/g, function(num) {
+                return ('0000000000' + num).slice(-10);
+            });
+        }
+        $scope.nameSortKey = function(incubator) {
+            return naturalKey(incubator && incubator.name);
+        };
+
+        // orderBy predicate: the active column first, then name (natural order)
+        // as a stable tiebreaker. For the 'type' column we sort on the derived
+        // category (so legacy/hostname-bound rows group correctly), then name.
+        $scope.sortPredicate = function() {
+            if ($scope.sortType === 'type') {
+                return [$scope.incubatorType, $scope.nameSortKey];
+            }
+            if ($scope.sortType === 'name') {
+                return [$scope.nameSortKey];
+            }
+            return [$scope.sortType, $scope.nameSortKey];
+        };
 
         // Filter function for incubators
         $scope.incubatorFilter = function(incubators, searchText, showAll) {
@@ -168,9 +193,19 @@
             return out;
         };
 
-        // All discovered hostnames (for the bind dropdown in the modal).
+        // Discovered hostnames available to link in the modal: all live units
+        // minus those already claimed by another incubator record (the currently
+        // edited incubator's own binding is kept selectable).
         $scope.availableHostnames = function() {
-            return Object.keys($scope.liveIncubators);
+            var ownHost = $scope.selectedIncubator ? $scope.selectedIncubator.hostname : null;
+            var claimed = {};
+            for (var key in $scope.incubators) {
+                var h = $scope.incubators[key].hostname;
+                if (h && h !== ownHost) claimed[h] = true;
+            }
+            return Object.keys($scope.liveIncubators).filter(function(host) {
+                return !claimed[host];
+            });
         };
 
         // Comma-joined hostnames of discovered-but-unbound units (for the banner).

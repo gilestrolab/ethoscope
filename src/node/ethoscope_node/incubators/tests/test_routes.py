@@ -139,7 +139,7 @@ class TestBind:
         self, routes, storage, scanner, client
     ):
         device = _bind_live_unit(scanner, hostname="incubator-1")
-        scanner.set_location.return_value = {"status": "ok"}
+        scanner.set_identity.return_value = {"status": "ok"}
         storage.add({"name": "Inc1", "lights_on": "09:00", "lights_off": "21:00"})
 
         result = routes.bind("Inc1", "incubator-1")
@@ -148,7 +148,9 @@ class TestBind:
         assert result["hostname"] == "incubator-1"
         assert result["location_pushed"] is True
         assert result["schedule_pushed"] is True
-        scanner.set_location.assert_called_once_with("incubator-1", "Inc1")
+        scanner.set_identity.assert_called_once_with(
+            "incubator-1", name="Inc1", location="Inc1"
+        )
         assert client.push_config.call_count == 1
         assert storage.get(name="Inc1")["hostname"] == "incubator-1"
         assert device is not None  # bound to silence unused
@@ -159,7 +161,23 @@ class TestBind:
         assert result["result"] == "success"
         assert result["hostname"] is None
         assert storage.get(name="Inc1")["hostname"] is None
-        scanner.set_location.assert_not_called()
+        scanner.set_identity.assert_not_called()
+
+    def test_push_identity_mirrors_name_to_unit(self, routes, storage, scanner):
+        """push_identity sends the incubator name as the unit's sensor name+location."""
+        _bind_live_unit(scanner, hostname="incubator-1")
+        scanner.set_identity.return_value = {"status": "ok"}
+        storage.add({"name": "Inc1", "hostname": "incubator-1"})
+
+        assert routes.push_identity("Inc1") is True
+        scanner.set_identity.assert_called_once_with(
+            "incubator-1", name="Inc1", location="Inc1"
+        )
+
+    def test_push_identity_unbound_is_noop(self, routes, storage, scanner):
+        storage.add({"name": "Inc1"})  # no hostname
+        assert routes.push_identity("Inc1") is False
+        scanner.set_identity.assert_not_called()
 
     def test_bind_missing_record_is_error(self, routes):
         result = routes.bind("Nope", "incubator-1")

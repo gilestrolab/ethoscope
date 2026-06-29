@@ -218,11 +218,12 @@ class IncubatorRoutes:
             else None
         )
         # Binding a physical unit makes the record 'smart' (firmware-backed,
-        # light + temperature). Unbinding leaves the category untouched so the
-        # user can decide whether it becomes a plain manual incubator.
-        update_fields: dict[str, Any] = {"hostname": clean_hostname}
-        if clean_hostname:
-            update_fields["type"] = "smart"
+        # light + temperature); unbinding reverts it to a plain manual 'normal'
+        # incubator since it no longer has any hardware.
+        update_fields: dict[str, Any] = {
+            "hostname": clean_hostname,
+            "type": "smart" if clean_hostname else "normal",
+        }
         rows = self._storage.update(name=name, **update_fields)
         if rows < 0:
             return _err(f"Could not bind incubator '{name}'")
@@ -234,11 +235,13 @@ class IncubatorRoutes:
             device = self._scanner.get_device_by_hostname(clean_hostname)
             if device is not None:
                 try:
-                    self._scanner.set_location(clean_hostname, name)
+                    # The unit also acts as a sensor; mirror the incubator name
+                    # onto its sensor name + location so it groups correctly.
+                    self._scanner.set_identity(clean_hostname, name=name, location=name)
                     location_pushed = True
                 except Exception as e:
                     self._logger.warning(
-                        "Bound %s -> %s but could not push location: %s",
+                        "Bound %s -> %s but could not push identity: %s",
                         name,
                         clean_hostname,
                         e,
@@ -256,6 +259,30 @@ class IncubatorRoutes:
         if self._maybe_push(name, force=True):
             return _ok(name=name)
         return _err(f"Could not push schedule for '{name}' (unbound or unit offline)")
+
+    def push_identity(self, name: str) -> bool:
+        """Mirror the incubator name onto its bound unit's sensor name+location.
+
+        Best-effort: returns True only when actually pushed to an online unit.
+        Used after a rename (and on adopt) so the associated sensor follows the
+        incubator name. Silently returns False when unbound or offline.
+        """
+        record = self._storage.get(name=name)
+        if record is None:
+            return False
+        hostname = record.get("hostname")
+        if not hostname or self._scanner is None:
+            return False
+        if self._scanner.get_device_by_hostname(hostname) is None:
+            return False
+        try:
+            self._scanner.set_identity(hostname, name=name, location=name)
+            return True
+        except Exception as e:
+            self._logger.warning(
+                "Could not push identity for '%s' -> %s: %s", name, hostname, e
+            )
+            return False
 
     def reset_anchor(self, name: str) -> dict[str, Any]:
         """Stamp ``light_cycle_anchor = now()`` on the record and push."""

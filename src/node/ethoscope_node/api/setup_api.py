@@ -664,6 +664,10 @@ class SetupAPI(BaseAPI):
 
             if result > 0:
                 self._auto_push_schedule(incubator_data["name"])
+                # Adopting a discovered unit (hostname set): mirror the incubator
+                # name onto its sensor identity so the sensor groups under it.
+                if incubator_data.get("hostname"):
+                    self._auto_push_identity(incubator_data["name"])
                 return {
                     "result": "success",
                     "message": f'Incubator {incubator_data["name"]} created successfully',
@@ -782,7 +786,12 @@ class SetupAPI(BaseAPI):
                 result = db.updateIncubator(name=original_name, **update_data)
 
             if result >= 0:
-                self._auto_push_schedule(new_name or original_name)
+                final_name = new_name or original_name
+                self._auto_push_schedule(final_name)
+                # On rename, mirror the new name onto the bound unit's sensor
+                # identity so the associated sensor follows the incubator.
+                if new_name and new_name != original_name:
+                    self._auto_push_identity(final_name)
                 return {
                     "result": "success",
                     "message": "Incubator updated successfully",
@@ -870,6 +879,23 @@ class SetupAPI(BaseAPI):
                     return bool(api.push_schedule_to_unit(name))
         except Exception as e:
             self.logger.warning("Auto-push for incubator '%s' raised: %s", name, e)
+        return False
+
+    def _auto_push_identity(self, name: str) -> bool:
+        """Best-effort push of the incubator name onto its unit's sensor identity.
+
+        Called after a rename/adopt so the bound smart unit's sensor name and
+        location follow the new incubator name. Silently no-ops when unbound,
+        offline, or the bridge isn't ready. Never raises.
+        """
+        try:
+            for api in getattr(self.server, "api_modules", []):
+                if api.__class__.__name__ == "IncubatorAPI" and hasattr(
+                    api, "push_identity_to_unit"
+                ):
+                    return bool(api.push_identity_to_unit(name))
+        except Exception as e:
+            self.logger.warning("Identity push for incubator '%s' raised: %s", name, e)
         return False
 
     def _setup_add_sensor(self):

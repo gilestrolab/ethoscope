@@ -1638,12 +1638,23 @@ class ExperimentalDB(multiprocessing.Process):
 
         Args:
             incubator_id: Database ID of incubator to update (either incubator_id or name required)
-            name: Name of incubator to update (either incubator_id or name required)
-            **updates: Fields to update (location, owner, description, active)
+            name: Name of incubator to look up. When ``incubator_id`` is also
+                given, the id is the lookup key and ``name`` is treated as the
+                new value to write (i.e. a rename).
+            **updates: Fields to update (location, owner, description, active, ...)
 
         Returns:
             Number of rows affected or -1 if error
         """
+        # Disambiguate the overloaded `name` argument: with an explicit id, the
+        # id is the lookup key and `name` is a value to persist (rename). Without
+        # an id, `name` is the lookup key. This is the only way to update the
+        # name column, since `name` is otherwise consumed as a named parameter
+        # and can never reach **updates.
+        if incubator_id is not None and name is not None:
+            updates = {"name": name, **updates}
+            name = None
+
         if not incubator_id and not name:
             logging.error(
                 "Either incubator_id or name must be provided for updating incubator"

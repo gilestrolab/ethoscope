@@ -431,16 +431,32 @@ class IncubatorScanner(_DeviceScanner):
                     return device  # type: ignore[return-value]
         return None
 
-    def set_location(self, hostname: str, location: str) -> dict[str, Any]:
-        """Push a sensor ``location`` to a discovered incubator via its ``POST /set``.
+    def set_identity(
+        self,
+        hostname: str,
+        *,
+        name: str | None = None,
+        location: str | None = None,
+    ) -> dict[str, Any]:
+        """Push sensor ``name`` / ``location`` to a discovered incubator via ``POST /set``.
 
-        Returns the firmware's JSON response. Raises ``ValueError`` when no
-        online unit with that hostname is known.
+        Only the provided fields are sent. Returns the firmware's JSON response.
+        Raises ``ValueError`` when no online unit with that hostname is known.
         """
         device = self.get_device_by_hostname(hostname)
         if device is None:
             raise ValueError(f"No live incubator found for hostname '{hostname}'")
 
+        payload: dict[str, str] = {}
+        if name is not None:
+            payload["name"] = name
+        if location is not None:
+            payload["location"] = location
+
         url = f"http://{device.ip()}:{device._port}/set"
-        data = json.dumps({"location": location}).encode("utf-8")
+        data = json.dumps(payload).encode("utf-8")
         return device._get_json(url, post_data=data)
+
+    def set_location(self, hostname: str, location: str) -> dict[str, Any]:
+        """Backwards-compatible wrapper: push only the sensor ``location``."""
+        return self.set_identity(hostname, location=location)

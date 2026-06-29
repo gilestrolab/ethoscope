@@ -743,6 +743,27 @@ class TestIncubatorCRUD:
         rec = test_db.getIncubatorByName("Weird_box", asdict=True)
         assert rec["type"] == "normal"
 
+    def test_rename_incubator_by_id(self, populated_db):
+        """Renaming: with an id lookup, `name` is written as the new value."""
+        rec = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        result = populated_db.updateIncubator(
+            incubator_id=rec["id"], name="Renamed_box", location="Room Z"
+        )
+        assert result >= 0
+        # Old name is gone, new name carries the other edits.
+        assert populated_db.getIncubatorByName("Incubator_01", asdict=True) == {}
+        renamed = populated_db.getIncubatorByName("Renamed_box", asdict=True)
+        assert renamed["name"] == "Renamed_box"
+        assert renamed["location"] == "Room Z"
+
+    def test_update_by_name_only_still_uses_name_as_lookup(self, populated_db):
+        """Without an id, `name` remains the lookup key (no accidental rename)."""
+        result = populated_db.updateIncubator(name="Incubator_01", location="Room Q")
+        assert result >= 0
+        rec = populated_db.getIncubatorByName("Incubator_01", asdict=True)
+        assert rec["name"] == "Incubator_01"
+        assert rec["location"] == "Room Q"
+
     def test_update_incubator_type_and_set_temp(self, populated_db):
         """updateIncubator can change category and set/clear the setpoint."""
         assert (

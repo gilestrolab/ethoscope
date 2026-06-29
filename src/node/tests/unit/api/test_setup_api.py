@@ -720,6 +720,51 @@ class TestSetupAPI(unittest.TestCase):
 
     @patch("bottle.request")
     @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_rename_pushes_new_identity_to_bound_unit(
+        self, mock_db_class, mock_request
+    ):
+        """Renaming a bound incubator mirrors the new name onto its sensor."""
+        fake_api = self._install_fake_incubator_api()
+        mock_request.json = {"original_name": "incubator-1", "name": "Incubator_52"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "id": 3,
+            "name": "incubator-1",
+            "hostname": "incubator-1",
+        }
+        mock_db.updateIncubator.return_value = 1
+        self.api._devices_running_in_incubator = Mock(return_value=[])
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        fake_api.push_identity_to_unit.assert_called_once_with("Incubator_52")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_non_rename_update_does_not_push_identity(
+        self, mock_db_class, mock_request
+    ):
+        """A plain edit (no name change) does not re-push the sensor identity."""
+        fake_api = self._install_fake_incubator_api()
+        mock_request.json = {"original_name": "incubator-1", "location": "Room 5"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "id": 3,
+            "name": "incubator-1",
+            "hostname": "incubator-1",
+        }
+        mock_db.updateIncubator.return_value = 1
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        fake_api.push_identity_to_unit.assert_not_called()
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
     def test_setup_update_incubator_missing_original(self, mock_db_class, mock_request):
         """Test updating incubator without original name."""
         mock_request.json = {"location": "Room 102"}
@@ -1023,6 +1068,7 @@ class TestSetupAPI(unittest.TestCase):
         fake = Mock()
         fake.__class__.__name__ = "IncubatorAPI"
         fake.push_schedule_to_unit = Mock(return_value=True)
+        fake.push_identity_to_unit = Mock(return_value=True)
         self.mock_server.api_modules = [fake]
         return fake
 

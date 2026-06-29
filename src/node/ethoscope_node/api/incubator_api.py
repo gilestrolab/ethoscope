@@ -114,3 +114,14 @@ class IncubatorAPI(BaseAPI):
         if self._routes is None:
             return False
         return self._routes._maybe_push(name)
+
+    def push_identity_to_unit(self, name: str) -> bool:
+        """Best-effort push of the incubator name onto its unit's sensor identity.
+
+        Called from setup_api after a rename/adopt so the associated sensor
+        regroups under the new incubator name. Returns ``False`` silently when
+        the record is unbound or the unit is offline.
+        """
+        if self._routes is None:
+            return False
+        return self._routes.push_identity(name)
