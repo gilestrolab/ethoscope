@@ -426,6 +426,7 @@ class PiFrameGrabber(threading.Thread):
         video_prefix=None,
         record_video=False,
         quality=20,
+        exposure_decoupled=False,
         *args,
         **kwargs,
     ):
@@ -441,6 +442,12 @@ class PiFrameGrabber(threading.Thread):
         :type queue: :class:`~threading.JoinableQueue`
         :param stop_queue: a queue that can stop the async acquisition
         :type stop_queue: :class:`~threading.JoinableQueue`
+        :param exposure_decoupled: when True (tracking), the sensor exposure ceiling is\
+            decoupled from ``target_fps``: exposure may integrate up to\
+            ``_MAX_EXPOSURE_US`` and the tracking throughput is capped in software\
+            instead of by lowering the sensor frame rate. When False (video), the\
+            exact ``target_fps`` is pinned as the sensor frame rate. See issue #222.
+        :type exposure_decoupled: bool
         :param args: additional arguments
         :param kwargs: additional keyword arguments
         """
@@ -450,6 +457,7 @@ class PiFrameGrabber(threading.Thread):
         self._stop_queue = stop_queue
         self._target_fps = target_fps
         self._target_resolution = target_resolution
+        self._exposure_decoupled = exposure_decoupled
 
         # This stuff should not be here in principle but the video recording
         # must be done from the camera class or else it will be to slow
@@ -651,6 +659,18 @@ class PiFrameGrabber2(PiFrameGrabber):
     Same as PiFrameGrabber but uses picamera2
     """
 
+    # Upper bound on the auto-exposure integration time when the exposure ceiling
+    # is decoupled from the tracking frame rate (issue #222). 200 ms == 1/5 s,
+    # anchored to the empirically clean 5 FPS acquisition: it lets libcamera
+    # integrate long enough in dim light to average out sensor noise (which would
+    # otherwise jitter the tracked blob and inflate the movement signal), while
+    # staying short enough to avoid motion blur on a walking fly.
+    _MAX_EXPOSURE_US = 200000
+
+    # Lower bound on the frame duration => the sensor may run up to ~30 FPS in
+    # bright light. Frames in excess of the tracking cap are dropped in software.
+    _MIN_FRAME_DURATION_US = 33333
+
     def __init__(self, *args, **kwargs):
         """
         Initialize PiFrameGrabber2 with configurable gain from system settings.
@@ -658,6 +678,41 @@ class PiFrameGrabber2(PiFrameGrabber):
         # Get gain from system setting
         self._gain = pi.get_gain_setting()
         super().__init__(*args, **kwargs)
+
+    def _build_camera_controls(self):
+        """
+        Build the libcamera control dict for the current acquisition mode.
+
+        In exposure-decoupled (tracking) mode we set ``FrameDurationLimits`` so
+        that auto-exposure may integrate up to ``_MAX_EXPOSURE_US`` regardless of
+        the tracking throughput cap. Pinning ``FrameRate`` instead (as the video
+        path does) would clamp the maximum exposure to ``1 / FrameRate``, forcing
+        shorter, noisier exposures at higher FPS caps and corrupting the movement
+        signal used for sleep scoring (issue #222).
+
+        Returns:
+            dict: libcamera controls passed to ``create_video_configuration``.
+        """
+        controls = {
+            "ExposureTime": 0,  # 0 = auto-exposure (libcamera 0.5.0 compatible)
+            "AnalogueGain": self._gain,  # Fixed gain to avoid tracking artifacts
+            "AwbEnable": False,  # Disable auto-white balance (NoIR cameras)
+        }
+
+        if self._exposure_decoupled and not self._record_video:
+            # Reason: decouple the exposure ceiling from the tracking FPS cap.
+            # Allow long exposures (clean images) and throttle throughput in
+            # software instead of by starving the sensor of integration time.
+            controls["FrameDurationLimits"] = (
+                self._MIN_FRAME_DURATION_US,
+                self._MAX_EXPOSURE_US,
+            )
+        else:
+            # Video path (or recording during tracking): honour the exact
+            # requested frame rate for correct playback timing.
+            controls["FrameRate"] = self._target_fps
+
+        return controls
 
     def run(self):
         """
@@ -735,15 +790,12 @@ class PiFrameGrabber2(PiFrameGrabber):
                     f"Configuring camera with resolution: {w}x{h}, fps: {self._target_fps}"
                 )
 
-                # Configure camera controls optimized for tracking (prioritize exposure over gain)
-                camera_controls = {
-                    "FrameRate": self._target_fps,
-                    "ExposureTime": 0,  # 0 = auto-exposure (libcamera 0.5.0 compatible)
-                    "AnalogueGain": self._gain,  # Fixed gain to avoid tracking artifacts
-                    "AwbEnable": False,  # Disable auto-white balance (NoIR cameras)
-                    # Prioritize exposure adjustments over gain to minimize noise artifacts
-                    # that interfere with background subtraction tracking algorithms
-                }
+                # Configure camera controls optimized for tracking (prioritize
+                # exposure over gain to minimize noise artifacts that interfere
+                # with background subtraction tracking algorithms). In tracking
+                # mode the exposure ceiling is decoupled from the FPS cap; in
+                # video mode the exact frame rate is pinned. See issue #222.
+                camera_controls = self._build_camera_controls()
 
                 # Note: Automatic tuning detection allows libcamera to choose optimal settings
                 # for current illumination conditions (day/night, visible/IR light)
@@ -823,6 +875,18 @@ class PiFrameGrabber2(PiFrameGrabber):
                 else:
                     capture.start()
 
+                    # Reason: when the exposure ceiling is decoupled from the FPS
+                    # cap, the sensor may free-run faster than we want to track.
+                    # Cap the *emission* rate in software so CPU load stays
+                    # bounded (the role maxfps_setting used to play) without
+                    # constraining exposure. See issue #222.
+                    min_interval = (
+                        1.0 / self._target_fps
+                        if self._exposure_decoupled and self._target_fps
+                        else 0.0
+                    )
+                    last_emit = time.time()
+
                     while self._stop_queue.empty():
                         frame = capture.capture_array("main")
 
@@ -833,6 +897,12 @@ class PiFrameGrabber2(PiFrameGrabber):
                         # take the fixed value 255
 
                         self._queue.put(frame[:h, :])
+
+                        if min_interval:
+                            elapsed = time.time() - last_emit
+                            if elapsed < min_interval:
+                                time.sleep(min_interval - elapsed)
+                            last_emit = time.time()
 
                     logging.info(
                         "The stop queue is not empty. This signals it is time to stop acquiring frames"
@@ -968,11 +1038,15 @@ class OurPiCameraAsync(BaseCamera):
             self._perform_camera_cleanup(delay=1.0)
 
         # The maxfps_setting is a *tracking* speed limit, used to cap CPU load
-        # during real-time analysis. It must NOT throttle video acquisition.
+        # during real-time analysis. It must NOT throttle video acquisition, nor
+        # constrain the sensor exposure time (issue #222).
         # Reason: tracking instantiates the camera without an explicit target_fps,
         # so it falls back to (and is bounded by) maxfps_setting. The video
-        # recorder always passes an explicit fps, which we honour as-is.
-        if target_fps is None:
+        # recorder always passes an explicit fps, which we honour as-is. Only in
+        # the tracking case do we decouple the exposure ceiling from target_fps
+        # and enforce the throughput cap in software.
+        is_tracking = target_fps is None
+        if is_tracking:
             target_fps = pi.get_maxfps_setting()
 
         w, h = target_resolution
@@ -1028,6 +1102,7 @@ class OurPiCameraAsync(BaseCamera):
                     self._stop_queue,
                     *args,
                     video_prefix=video_prefix,
+                    exposure_decoupled=is_tracking,
                     **kwargs,
                 )
 
