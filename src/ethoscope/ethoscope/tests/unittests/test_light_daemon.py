@@ -546,9 +546,13 @@ class TestRampWalker:
             controller.ramp_to(0, fade_seconds=0.5)
         assert backend.set_pct.call_args_list[-1] == call(0)
         # Should be monotonically non-increasing.
+        # Reason: indexed rather than zip(values, values[1:]) — ruff targets
+        # py311 and requires an explicit strict=, but the device package
+        # supports 3.9, where zip() has no strict keyword at all.
         values = [c.args[0] for c in backend.set_pct.call_args_list]
-        for a, b in zip(values, values[1:], strict=True):
-            assert b <= a
+        assert len(values) > 1
+        for i in range(1, len(values)):
+            assert values[i] <= values[i - 1]
 
     def test_ramp_follows_smoothstep_shape(self):
         """The walker should follow an S-curve, not a straight line.
