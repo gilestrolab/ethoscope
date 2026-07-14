@@ -10,10 +10,12 @@ from unittest.mock import Mock, patch
 
 from ethoscope.stimulators.triggers import (
     TRIGGER_REGISTRY,
+    ActivityTrigger,
     BaseTrigger,
     InactivityTrigger,
     MidlineCrossingTrigger,
     PeriodicTrigger,
+    ScheduledTrigger,
     TimeRestrictedInactivityTrigger,
 )
 
@@ -71,7 +73,7 @@ class TestInactivityTrigger(unittest.TestCase):
             min_inactive_time=120,
             stimulus_probability=0.5,
         )
-        self.assertEqual(trigger._inactivity_time_threshold_ms, 120000)
+        self.assertEqual(trigger._bout_threshold_ms, 120000)
         self.assertEqual(trigger._p, 0.5)
 
     def test_init_invalid_probability(self):
@@ -180,6 +182,121 @@ class TestInactivityTrigger(unittest.TestCase):
         trigger._t0 = 100000
         trigger.check()
         self.assertEqual(trigger._t0, 200000)
+
+
+# ===========================================================================
+# ActivityTrigger
+# ===========================================================================
+
+
+def _moving_tracker(last_time_point=200000, times=None):
+    """Tracker whose animal registers as moving on the latest frame."""
+    return _make_mock_tracker(
+        last_time_point=last_time_point,
+        positions=[
+            [{"xy_dist_log10x1000": 3000}],
+            [{"xy_dist_log10x1000": 3000}],
+        ],
+        times=times or [last_time_point - 1000, last_time_point],
+    )
+
+
+def _still_tracker(last_time_point=200000, times=None):
+    """Tracker whose animal registers as stationary on the latest frame."""
+    return _make_mock_tracker(
+        last_time_point=last_time_point,
+        positions=[
+            [{"xy_dist_log10x1000": -3000}],
+            [{"xy_dist_log10x1000": -3000}],
+        ],
+        times=times or [last_time_point - 1000, last_time_point],
+    )
+
+
+class TestActivityTrigger(unittest.TestCase):
+    """Test ActivityTrigger, the mirror image of InactivityTrigger."""
+
+    def test_init_valid(self):
+        trigger = ActivityTrigger(
+            velocity_correction_coef=3.0e-3,
+            min_active_time=30,
+            stimulus_probability=0.5,
+        )
+        self.assertEqual(trigger._bout_threshold_ms, 30000)
+        self.assertEqual(trigger._p, 0.5)
+        self.assertTrue(trigger._fires_when_moving)
+
+    def test_default_threshold_is_short(self):
+        """Continuous-activity bouts are short-lived, so the default is 10 s."""
+        self.assertEqual(ActivityTrigger()._bout_threshold_ms, 10000)
+
+    def test_init_invalid_probability(self):
+        with self.assertRaises(ValueError):
+            ActivityTrigger(stimulus_probability=1.5)
+        with self.assertRaises(ValueError):
+            ActivityTrigger(stimulus_probability=-0.1)
+
+    def test_check_no_trigger_when_still(self):
+        """No trigger while the animal is stationary, however long it stays so."""
+        trigger = ActivityTrigger(min_active_time=0)
+        trigger.bind_tracker(_still_tracker())
+        trigger._t0 = 0
+        code, _meta = trigger.check()
+        self.assertEqual(code, 0)
+
+    def test_check_real_trigger(self):
+        """Code 1 once active beyond threshold and the probability draw passes."""
+        trigger = ActivityTrigger(min_active_time=0, stimulus_probability=1.0)
+        trigger.bind_tracker(_moving_tracker())
+        trigger._t0 = 0
+        code, _meta = trigger.check()
+        self.assertEqual(code, 1)
+
+    def test_check_ghost_trigger(self):
+        """Code 2 once active beyond threshold but the probability draw fails."""
+        trigger = ActivityTrigger(min_active_time=0, stimulus_probability=0.0)
+        trigger.bind_tracker(_moving_tracker())
+        trigger._t0 = 0
+        code, _meta = trigger.check()
+        self.assertEqual(code, 2)
+
+    def test_check_below_threshold(self):
+        """Moving, but not yet for long enough."""
+        trigger = ActivityTrigger(min_active_time=120)
+        trigger.bind_tracker(_moving_tracker())
+        trigger._t0 = 199000  # only 1 s of activity so far
+        code, _meta = trigger.check()
+        self.assertEqual(code, 0)
+
+    def test_check_resets_t0_on_pause(self):
+        """A single non-moving frame restarts the activity clock."""
+        trigger = ActivityTrigger(min_active_time=120)
+        trigger.bind_tracker(_still_tracker())
+        trigger._t0 = 100000  # 100 s of activity accumulated...
+        trigger.check()
+        self.assertEqual(trigger._t0, 200000)  # ...thrown away by one pause
+
+    def test_check_fires_after_sustained_activity(self):
+        """A bout of continuous movement eventually fires; a pause defers it."""
+        trigger = ActivityTrigger(min_active_time=5, stimulus_probability=1.0)
+
+        # 4 s of movement: not enough yet.
+        for t in range(196000, 200001, 1000):
+            trigger.bind_tracker(_moving_tracker(last_time_point=t))
+            code, _meta = trigger.check()
+            self.assertEqual(code, 0)
+
+        # A pause resets the clock.
+        trigger.bind_tracker(_still_tracker(last_time_point=201000))
+        self.assertEqual(trigger.check()[0], 0)
+
+        # Movement resumes; the 6 s that follow now clear the 5 s threshold.
+        codes = []
+        for t in range(202000, 208001, 1000):
+            trigger.bind_tracker(_moving_tracker(last_time_point=t))
+            codes.append(trigger.check()[0])
+
+        self.assertIn(1, codes)
 
 
 # ===========================================================================
@@ -300,6 +417,55 @@ class TestPeriodicTrigger(unittest.TestCase):
 
 
 # ===========================================================================
+# ScheduledTrigger
+# ===========================================================================
+
+
+class TestScheduledTrigger(unittest.TestCase):
+    """ScheduledTrigger gates an arbitrary inner trigger to a daily window."""
+
+    def test_init_invalid_schedule(self):
+        from ethoscope.utils.scheduler import DailyScheduleError
+
+        with self.assertRaises(DailyScheduleError):
+            ScheduledTrigger(PeriodicTrigger(), daily_duration_hours=30)  # > 24h
+
+    def test_bind_tracker_propagates(self):
+        inner = ActivityTrigger()
+        trigger = ScheduledTrigger(inner)
+        tracker = Mock()
+        trigger.bind_tracker(tracker)
+        self.assertIs(trigger._tracker, tracker)
+        self.assertIs(inner._tracker, tracker)
+
+    def test_suppressed_outside_active_period(self):
+        """Even a trigger that would fire is silenced outside the window."""
+        inner = ActivityTrigger(min_active_time=0, stimulus_probability=1.0)
+        trigger = ScheduledTrigger(inner)
+        trigger.bind_tracker(_moving_tracker())
+        inner._t0 = 0
+
+        with patch.object(
+            trigger._daily_scheduler, "is_active_period", return_value=False
+        ):
+            code, _meta = trigger.check()
+        self.assertEqual(code, 0)
+
+    def test_delegates_inside_active_period(self):
+        """Wraps any trigger, not just inactivity: here, an activity trigger."""
+        inner = ActivityTrigger(min_active_time=0, stimulus_probability=1.0)
+        trigger = ScheduledTrigger(inner)
+        trigger.bind_tracker(_moving_tracker())
+        inner._t0 = 0
+
+        with patch.object(
+            trigger._daily_scheduler, "is_active_period", return_value=True
+        ):
+            code, _meta = trigger.check()
+        self.assertEqual(code, 1)
+
+
+# ===========================================================================
 # TimeRestrictedInactivityTrigger
 # ===========================================================================
 
@@ -314,7 +480,7 @@ class TestTimeRestrictedInactivityTrigger(unittest.TestCase):
             interval_hours=24,
             daily_start_time="09:00:00",
         )
-        self.assertIsNotNone(trigger._inactivity_trigger)
+        self.assertIsNotNone(trigger._trigger)
         self.assertIsNotNone(trigger._daily_scheduler)
 
     def test_init_invalid_schedule(self):
@@ -330,7 +496,7 @@ class TestTimeRestrictedInactivityTrigger(unittest.TestCase):
         tracker = Mock()
         trigger.bind_tracker(tracker)
         self.assertIs(trigger._tracker, tracker)
-        self.assertIs(trigger._inactivity_trigger._tracker, tracker)
+        self.assertIs(trigger._trigger._tracker, tracker)
 
     def test_check_inactive_period(self):
         """Returns 0 when daily scheduler says inactive."""
@@ -357,7 +523,7 @@ class TestTimeRestrictedInactivityTrigger(unittest.TestCase):
             times=[199000, 200000],
         )
         trigger.bind_tracker(tracker)
-        trigger._inactivity_trigger._t0 = 0
+        trigger._trigger._t0 = 0
 
         with patch.object(
             trigger._daily_scheduler, "is_active_period", return_value=True
@@ -375,11 +541,18 @@ class TestTriggerRegistry(unittest.TestCase):
     """Test the trigger registry mapping."""
 
     def test_registry_keys(self):
-        expected = {"inactivity", "midline_crossing", "periodic", "time_restricted"}
+        expected = {
+            "inactivity",
+            "activity",
+            "midline_crossing",
+            "periodic",
+            "time_restricted",
+        }
         self.assertEqual(set(TRIGGER_REGISTRY.keys()), expected)
 
     def test_registry_values(self):
         self.assertIs(TRIGGER_REGISTRY["inactivity"], InactivityTrigger)
+        self.assertIs(TRIGGER_REGISTRY["activity"], ActivityTrigger)
         self.assertIs(TRIGGER_REGISTRY["midline_crossing"], MidlineCrossingTrigger)
         self.assertIs(TRIGGER_REGISTRY["periodic"], PeriodicTrigger)
         self.assertIs(

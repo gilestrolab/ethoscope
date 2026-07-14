@@ -4,6 +4,10 @@ Trigger conditions for the ComposedStimulator.
 Each trigger encapsulates the behavioral logic for deciding WHEN to stimulate,
 independent of WHAT stimulus to deliver. Triggers are bound to a tracker and
 called via check() to determine if a stimulus should fire.
+
+Time restriction is not a trigger in its own right: ScheduledTrigger wraps any
+other trigger and gates it to a recurring daily window, so it composes with all
+current and future triggers.
 """
 
 import logging
@@ -37,22 +41,29 @@ class BaseTrigger:
         raise NotImplementedError
 
 
-class InactivityTrigger(BaseTrigger):
+class MovementBoutTrigger(BaseTrigger):
     """
-    Fire when animal is inactive for min_inactive_time seconds.
+    Fire after a sustained bout of movement, or of stillness.
 
-    Logic extracted from IsMovingStimulator._has_moved() and SleepDepStimulator._decide().
+    Subclasses pick the polarity with _fires_when_moving: False waits for the
+    animal to hold still (sleep deprivation), True waits for it to keep moving.
+    The bout clock resets whenever the animal switches to the other state.
+
+    Movement logic extracted from IsMovingStimulator._has_moved() and
+    SleepDepStimulator._decide().
     """
+
+    _fires_when_moving = False
 
     def __init__(
         self,
         velocity_correction_coef=3.0e-3,
-        min_inactive_time=120,
+        bout_duration_s=120,
         stimulus_probability=1.0,
     ):
         super().__init__()
         self._velocity_correction_coef = float(velocity_correction_coef)
-        self._inactivity_time_threshold_ms = float(min_inactive_time) * 1000
+        self._bout_threshold_ms = float(bout_duration_s) * 1000
         self._t0 = None
 
         p = float(stimulus_probability)
@@ -98,18 +109,63 @@ class InactivityTrigger(BaseTrigger):
         if self._t0 is None:
             self._t0 = now
 
-        if not has_moved:
-            if float(now - self._t0) > self._inactivity_time_threshold_ms:
+        if has_moved == self._fires_when_moving:
+            if float(now - self._t0) > self._bout_threshold_ms:
+                self._t0 = None
                 if random.uniform(0, 1) <= self._p:
-                    self._t0 = None
                     return 1, {}
-                else:
-                    self._t0 = None
-                    return 2, {}
+                return 2, {}
         else:
+            # The bout was broken: restart the clock.
             self._t0 = now
 
         return 0, {}
+
+
+class InactivityTrigger(MovementBoutTrigger):
+    """
+    Fire when animal is inactive for min_inactive_time seconds.
+    """
+
+    _fires_when_moving = False
+
+    def __init__(
+        self,
+        velocity_correction_coef=3.0e-3,
+        min_inactive_time=120,
+        stimulus_probability=1.0,
+    ):
+        super().__init__(
+            velocity_correction_coef=velocity_correction_coef,
+            bout_duration_s=min_inactive_time,
+            stimulus_probability=stimulus_probability,
+        )
+
+
+class ActivityTrigger(MovementBoutTrigger):
+    """
+    Fire when animal has been continuously active for min_active_time seconds.
+
+    The mirror image of InactivityTrigger. Note that the bout is *continuous*:
+    any frame in which the animal does not register as moving — a micro-pause, a
+    grooming bout, or a frame where the tracker failed to spot it — restarts the
+    clock. Thresholds of a few seconds are therefore the useful range; a long
+    threshold will rarely be reached by a real animal.
+    """
+
+    _fires_when_moving = True
+
+    def __init__(
+        self,
+        velocity_correction_coef=3.0e-3,
+        min_active_time=10,
+        stimulus_probability=1.0,
+    ):
+        super().__init__(
+            velocity_correction_coef=velocity_correction_coef,
+            bout_duration_s=min_active_time,
+            stimulus_probability=stimulus_probability,
+        )
 
 
 class MidlineCrossingTrigger(BaseTrigger):
@@ -191,28 +247,24 @@ class PeriodicTrigger(BaseTrigger):
         return 0, {}
 
 
-class TimeRestrictedInactivityTrigger(BaseTrigger):
+class ScheduledTrigger(BaseTrigger):
     """
-    Inactivity trigger that only operates during specified daily windows.
+    Gate any trigger to a recurring daily window.
 
-    Combines InactivityTrigger logic with DailyScheduler for sleep restriction.
+    Wraps an inner trigger and suppresses it outside the active period, so that
+    time restriction composes with every trigger rather than being a trigger of
+    its own.
     """
 
     def __init__(
         self,
-        velocity_correction_coef=3.0e-3,
-        min_inactive_time=120,
-        stimulus_probability=1.0,
+        trigger,
         daily_duration_hours=8,
         interval_hours=24,
         daily_start_time="09:00:00",
     ):
         super().__init__()
-        self._inactivity_trigger = InactivityTrigger(
-            velocity_correction_coef=velocity_correction_coef,
-            min_inactive_time=min_inactive_time,
-            stimulus_probability=stimulus_probability,
-        )
+        self._trigger = trigger
 
         try:
             self._daily_scheduler = DailyScheduler(
@@ -226,19 +278,50 @@ class TimeRestrictedInactivityTrigger(BaseTrigger):
 
     def bind_tracker(self, tracker):
         super().bind_tracker(tracker)
-        self._inactivity_trigger.bind_tracker(tracker)
+        self._trigger.bind_tracker(tracker)
 
     def check(self):
         if not self._daily_scheduler.is_active_period():
             return 0, {}
 
-        return self._inactivity_trigger.check()
+        return self._trigger.check()
+
+
+class TimeRestrictedInactivityTrigger(ScheduledTrigger):
+    """
+    Deprecated: an InactivityTrigger pre-wrapped in a daily schedule.
+
+    Kept so that configurations saved with trigger_type="time_restricted" keep
+    working. New configurations should pick any trigger and set time_restricted.
+    """
+
+    def __init__(
+        self,
+        velocity_correction_coef=3.0e-3,
+        min_inactive_time=120,
+        stimulus_probability=1.0,
+        daily_duration_hours=8,
+        interval_hours=24,
+        daily_start_time="09:00:00",
+    ):
+        super().__init__(
+            InactivityTrigger(
+                velocity_correction_coef=velocity_correction_coef,
+                min_inactive_time=min_inactive_time,
+                stimulus_probability=stimulus_probability,
+            ),
+            daily_duration_hours=daily_duration_hours,
+            interval_hours=interval_hours,
+            daily_start_time=daily_start_time,
+        )
 
 
 # Registry mapping trigger_type string values to classes
 TRIGGER_REGISTRY = {
     "inactivity": InactivityTrigger,
+    "activity": ActivityTrigger,
     "midline_crossing": MidlineCrossingTrigger,
     "periodic": PeriodicTrigger,
+    # Deprecated: superseded by the time_restricted modifier on any trigger.
     "time_restricted": TimeRestrictedInactivityTrigger,
 }

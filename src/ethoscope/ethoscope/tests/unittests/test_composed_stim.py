@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 from ethoscope.stimulators.composed_stimulator import ComposedStimulator
 from ethoscope.stimulators.stimulators import HasInteractedVariable
+from ethoscope.stimulators.triggers import ActivityTrigger, ScheduledTrigger
 
 
 def _make_mock_tracker(roi_id=1, last_time_point=200000, positions=None, times=None):
@@ -65,12 +66,27 @@ class TestComposedStimulatorInit(unittest.TestCase):
         )
         self.assertIsNotNone(stim._trigger)
 
+    def test_init_activity_motor(self):
+        """Test init with activity trigger and motor action."""
+        stim = self._create_stimulator(
+            trigger_type="activity", action_type="motor_pulse", min_active_time=15
+        )
+        self.assertIsInstance(stim._trigger, ActivityTrigger)
+        self.assertEqual(stim._trigger._bout_threshold_ms, 15000)
+
     def test_init_time_restricted(self):
-        """Test init with time-restricted trigger."""
+        """Test init with the deprecated time-restricted trigger."""
         stim = self._create_stimulator(
             trigger_type="time_restricted", action_type="valve_pulse"
         )
         self.assertIsNotNone(stim._trigger)
+
+    def test_init_time_restricted_modifier_wraps_trigger(self):
+        """time_restricted=True gates whichever trigger was selected."""
+        stim = self._create_stimulator(
+            trigger_type="periodic", action_type="led_pulse", time_restricted=True
+        )
+        self.assertIsInstance(stim._trigger, ScheduledTrigger)
 
     def test_init_invalid_trigger_raises(self):
         """Test ValueError for unknown trigger type."""

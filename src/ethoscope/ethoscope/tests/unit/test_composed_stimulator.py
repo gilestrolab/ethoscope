@@ -20,9 +20,11 @@ from ethoscope.stimulators.composed_stimulator import ComposedStimulator
 from ethoscope.stimulators.stimulators import HasInteractedVariable
 from ethoscope.stimulators.triggers import (
     TRIGGER_REGISTRY,
+    ActivityTrigger,
     InactivityTrigger,
     MidlineCrossingTrigger,
     PeriodicTrigger,
+    ScheduledTrigger,
     TimeRestrictedInactivityTrigger,
 )
 
@@ -293,6 +295,7 @@ class TestRegistries:
     def test_trigger_registry(self):
         assert set(TRIGGER_REGISTRY.keys()) == {
             "inactivity",
+            "activity",
             "midline_crossing",
             "periodic",
             "time_restricted",
@@ -330,6 +333,84 @@ class TestComposedStimulator:
         assert int(interact) == 1
         assert result["channel"] == 1  # ROI 1 -> motor channel 1
         assert result["duration"] == 1000
+
+    def test_activity_motor_pulse(self):
+        """Activity trigger + motor pulse: fires on a sustained movement bout."""
+        hw = MagicMock()
+        stim = ComposedStimulator(
+            hardware_connection=hw,
+            trigger_type="activity",
+            action_type="motor_pulse",
+            min_active_time=0,
+            stimulus_probability=1.0,
+            pulse_duration=1000,
+        )
+        assert isinstance(stim._trigger, ActivityTrigger)
+
+        stim.bind_tracker(_make_moving_tracker(roi_idx=1))
+        stim._trigger._t0 = 0  # Simulate prior initialization
+
+        interact, result = stim._decide()
+        assert int(interact) == 1
+        assert result["channel"] == 1
+        assert result["duration"] == 1000
+
+    def test_activity_does_not_fire_when_still(self):
+        """The mirror holds: a stationary animal never trips the activity trigger."""
+        hw = MagicMock()
+        stim = ComposedStimulator(
+            hardware_connection=hw,
+            trigger_type="activity",
+            action_type="motor_pulse",
+            min_active_time=0,
+            stimulus_probability=1.0,
+        )
+
+        stim.bind_tracker(_make_inactive_tracker(inactive_time_ms=200_000, roi_idx=1))
+        stim._trigger._t0 = 0
+
+        interact, result = stim._decide()
+        assert int(interact) == 0
+        assert result == {}
+
+    def test_min_active_time_reaches_the_trigger(self):
+        """Guards the plumbing: the user's value must not be silently dropped."""
+        stim = ComposedStimulator(
+            hardware_connection=MagicMock(),
+            trigger_type="activity",
+            min_active_time=42,
+        )
+        assert stim._trigger._bout_threshold_ms == 42000
+
+    def test_time_restricted_wraps_any_trigger(self):
+        """time_restricted is a modifier: it gates the selected trigger."""
+        stim = ComposedStimulator(
+            hardware_connection=MagicMock(),
+            trigger_type="activity",
+            time_restricted=True,
+            daily_duration_hours=8,
+            interval_hours=24,
+            daily_start_time="09:00:00",
+        )
+        assert isinstance(stim._trigger, ScheduledTrigger)
+        assert isinstance(stim._trigger._trigger, ActivityTrigger)
+
+    def test_not_time_restricted_by_default(self):
+        stim = ComposedStimulator(
+            hardware_connection=MagicMock(),
+            trigger_type="activity",
+        )
+        assert not isinstance(stim._trigger, ScheduledTrigger)
+
+    def test_legacy_time_restricted_trigger_is_not_double_wrapped(self):
+        """The deprecated trigger_type already schedules itself."""
+        stim = ComposedStimulator(
+            hardware_connection=MagicMock(),
+            trigger_type="time_restricted",
+            time_restricted=True,
+        )
+        assert isinstance(stim._trigger, TimeRestrictedInactivityTrigger)
+        assert isinstance(stim._trigger._trigger, InactivityTrigger)
 
     def test_inactivity_led_pulse_train(self):
         """Inactivity trigger + LED pulse train action."""
@@ -460,6 +541,37 @@ class TestComposedStimulator:
                 for opt in arg["options"]:
                     assert "value" in opt
                     assert "label" in opt
+
+    def test_description_exposes_activity_trigger(self):
+        """The _description IS the UI contract served at /user_options/<id>.
+
+        An argument missing "activity" from its depends_on never renders, is
+        never sent, and the trigger then silently runs on the default instead.
+        """
+        args = {a["name"]: a for a in ComposedStimulator._description["arguments"]}
+
+        trigger_values = [o["value"] for o in args["trigger_type"]["options"]]
+        assert "activity" in trigger_values
+
+        assert args["min_active_time"]["depends_on"]["trigger_type"] == ["activity"]
+
+        for name in ("velocity_correction_coef", "stimulus_probability"):
+            assert "activity" in args[name]["depends_on"]["trigger_type"], name
+
+    def test_description_exposes_time_restriction_as_a_modifier(self):
+        """Time restriction is a checkbox, not a trigger_type."""
+        args = {a["name"]: a for a in ComposedStimulator._description["arguments"]}
+
+        assert args["time_restricted"]["type"] == "boolean"
+        assert args["time_restricted"]["default"] is False
+        assert "depends_on" not in args["time_restricted"]  # always offered
+
+        # The daily-schedule fields now hang off the checkbox, not the dropdown.
+        for name in ("daily_duration_hours", "interval_hours", "daily_start_time"):
+            assert args[name]["depends_on"] == {"time_restricted": [True]}, name
+
+        trigger_values = [o["value"] for o in args["trigger_type"]["options"]]
+        assert "time_restricted" not in trigger_values
 
     def test_midline_crossing_with_motor(self):
         """Midline crossing trigger + motor pulse."""

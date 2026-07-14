@@ -9,13 +9,14 @@ All mAGO-based hardware uses the same OptoMotor interface; the channel
 mapping is derived automatically from the action's channel_type.
 """
 
+import inspect
 import logging
 
 from ethoscope.hardware.interfaces.optomotor import OptoMotor
 from ethoscope.stimulators.actions import ACTION_REGISTRY
 from ethoscope.stimulators.channel_maps import get_channel_map
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
-from ethoscope.stimulators.triggers import TRIGGER_REGISTRY
+from ethoscope.stimulators.triggers import TRIGGER_REGISTRY, ScheduledTrigger
 
 
 class ComposedStimulator(BaseStimulator):
@@ -23,8 +24,11 @@ class ComposedStimulator(BaseStimulator):
     Configurable stimulator that composes a trigger condition with a stimulus action.
 
     This is the recommended stimulator for all mAGO-based hardware. Users select:
-    1. A trigger condition (inactivity, midline crossing, periodic, time-restricted)
+    1. A trigger condition (inactivity, activity, midline crossing, periodic)
     2. A stimulus action (motor pulse, LED pulse, LED pulse train, valve pulse)
+
+    Any trigger can additionally be restricted to a recurring daily window by
+    setting time_restricted, which wraps it in a ScheduledTrigger.
 
     The ComposedStimulator handles channel mapping automatically based on the
     selected action type.
@@ -43,12 +47,9 @@ class ComposedStimulator(BaseStimulator):
                 "default": "inactivity",
                 "options": [
                     {"value": "inactivity", "label": "Inactivity (sleep deprivation)"},
+                    {"value": "activity", "label": "Activity (sustained movement)"},
                     {"value": "midline_crossing", "label": "Midline crossing"},
                     {"value": "periodic", "label": "Periodic (constitutive)"},
-                    {
-                        "value": "time_restricted",
-                        "label": "Time-restricted inactivity",
-                    },
                 ],
             },
             # --- Trigger-specific arguments ---
@@ -61,7 +62,7 @@ class ComposedStimulator(BaseStimulator):
                 "description": "Velocity correction coefficient",
                 "default": 3.0e-3,
                 "depends_on": {
-                    "trigger_type": ["inactivity", "time_restricted"],
+                    "trigger_type": ["inactivity", "activity", "time_restricted"],
                 },
             },
             {
@@ -78,6 +79,18 @@ class ComposedStimulator(BaseStimulator):
             },
             {
                 "type": "number",
+                "min": 1,
+                "max": 3600,
+                "step": 1,
+                "name": "min_active_time",
+                "description": "Minimal continuous activity before stimulation (s)",
+                "default": 10,
+                "depends_on": {
+                    "trigger_type": ["activity"],
+                },
+            },
+            {
+                "type": "number",
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.01,
@@ -87,6 +100,7 @@ class ComposedStimulator(BaseStimulator):
                 "depends_on": {
                     "trigger_type": [
                         "inactivity",
+                        "activity",
                         "midline_crossing",
                         "periodic",
                         "time_restricted",
@@ -113,6 +127,13 @@ class ComposedStimulator(BaseStimulator):
                 "default": 60,
                 "depends_on": {"trigger_type": ["periodic"]},
             },
+            # --- Time restriction: a modifier that applies to any trigger ---
+            {
+                "type": "boolean",
+                "name": "time_restricted",
+                "description": "Restrict stimulation to a daily time window",
+                "default": False,
+            },
             {
                 "type": "number",
                 "min": 1,
@@ -121,7 +142,7 @@ class ComposedStimulator(BaseStimulator):
                 "name": "daily_duration_hours",
                 "description": "Hours active per day",
                 "default": 8,
-                "depends_on": {"trigger_type": ["time_restricted"]},
+                "depends_on": {"time_restricted": [True]},
             },
             {
                 "type": "number",
@@ -131,14 +152,14 @@ class ComposedStimulator(BaseStimulator):
                 "name": "interval_hours",
                 "description": "Hours between active periods",
                 "default": 24,
-                "depends_on": {"trigger_type": ["time_restricted"]},
+                "depends_on": {"time_restricted": [True]},
             },
             {
                 "type": "str",
                 "name": "daily_start_time",
                 "description": "Daily start time (HH:MM:SS)",
                 "default": "09:00:00",
-                "depends_on": {"trigger_type": ["time_restricted"]},
+                "depends_on": {"time_restricted": [True]},
             },
             # --- Action selection ---
             {
@@ -211,15 +232,17 @@ class ComposedStimulator(BaseStimulator):
         hardware_connection,
         trigger_type="inactivity",
         action_type="motor_pulse",
-        # Inactivity / time-restricted trigger args
+        # Inactivity / activity trigger args
         velocity_correction_coef=3.0e-3,
         min_inactive_time=120,
+        min_active_time=10,
         stimulus_probability=1.0,
         # Midline crossing trigger args
         refractory_period_s=60,
         # Periodic trigger args
         interval_seconds=60,
-        # Time-restricted trigger args
+        # Time restriction: applies to any trigger
+        time_restricted=False,
         daily_duration_hours=8,
         interval_hours=24,
         daily_start_time="09:00:00",
@@ -232,7 +255,6 @@ class ComposedStimulator(BaseStimulator):
         date_range="",
         roi_template_config=None,
     ):
-        # Build trigger kwargs based on trigger type
         trigger_cls = TRIGGER_REGISTRY.get(trigger_type)
         if trigger_cls is None:
             raise ValueError(
@@ -240,34 +262,36 @@ class ComposedStimulator(BaseStimulator):
                 f"Options: {list(TRIGGER_REGISTRY.keys())}"
             )
 
-        trigger_kwargs = {}
-        if trigger_type == "inactivity":
-            trigger_kwargs = {
-                "velocity_correction_coef": velocity_correction_coef,
-                "min_inactive_time": min_inactive_time,
-                "stimulus_probability": stimulus_probability,
-            }
-        elif trigger_type == "midline_crossing":
-            trigger_kwargs = {
-                "stimulus_probability": stimulus_probability,
-                "refractory_period_s": refractory_period_s,
-            }
-        elif trigger_type == "periodic":
-            trigger_kwargs = {
-                "interval_seconds": interval_seconds,
-                "stimulus_probability": stimulus_probability,
-            }
-        elif trigger_type == "time_restricted":
-            trigger_kwargs = {
-                "velocity_correction_coef": velocity_correction_coef,
-                "min_inactive_time": min_inactive_time,
-                "stimulus_probability": stimulus_probability,
-                "daily_duration_hours": daily_duration_hours,
-                "interval_hours": interval_hours,
-                "daily_start_time": daily_start_time,
-            }
+        # Reason: dispatching on trigger_type with an if/elif chain fails open —
+        # a trigger whose branch is missing would be built with all defaults and
+        # silently discard the user's parameters. Matching against the trigger's
+        # own signature instead means a new trigger wires itself up.
+        candidate_args = {
+            "velocity_correction_coef": velocity_correction_coef,
+            "min_inactive_time": min_inactive_time,
+            "min_active_time": min_active_time,
+            "stimulus_probability": stimulus_probability,
+            "refractory_period_s": refractory_period_s,
+            "interval_seconds": interval_seconds,
+            "daily_duration_hours": daily_duration_hours,
+            "interval_hours": interval_hours,
+            "daily_start_time": daily_start_time,
+        }
+        accepted = inspect.signature(trigger_cls.__init__).parameters
+        trigger_kwargs = {k: v for k, v in candidate_args.items() if k in accepted}
 
         self._trigger = trigger_cls(**trigger_kwargs)
+
+        # Time restriction is a modifier, not a trigger: it wraps whatever was
+        # selected. The deprecated "time_restricted" trigger_type already embeds
+        # its own scheduler, so it must not be wrapped a second time.
+        if time_restricted and trigger_type != "time_restricted":
+            self._trigger = ScheduledTrigger(
+                self._trigger,
+                daily_duration_hours=daily_duration_hours,
+                interval_hours=interval_hours,
+                daily_start_time=daily_start_time,
+            )
 
         # Build action
         action_cls = ACTION_REGISTRY.get(action_type)
@@ -310,7 +334,8 @@ class ComposedStimulator(BaseStimulator):
 
         logging.info(
             f"ComposedStimulator initialized: trigger={trigger_type}, "
-            f"action={action_type}, channels={self._action.channel_type}, "
+            f"time_restricted={bool(time_restricted)}, action={action_type}, "
+            f"channels={self._action.channel_type}, "
             f"mapped_rois={len(self._roi_to_channel)}"
         )
 
