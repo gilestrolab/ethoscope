@@ -44,12 +44,13 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Image Processing",
     "Topic :: Multimedia :: Video :: Capture",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
 
-requires-python = ">=3.9"
+# 3.11+: the code uses PEP 604 unions (X | None) and zip(..., strict=), both
+# 3.10+, and ruff/black already target py311. Raspbian Bullseye (3.9) is out.
+requires-python = ">=3.11"
 dependencies = [
     "numpy>=1.21.0",
     "scipy>=1.7.0",

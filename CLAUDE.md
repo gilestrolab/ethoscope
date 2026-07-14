@@ -276,7 +276,7 @@ ssh-copy-id -i /etc/ethoscope/keys/id_rsa.pub ethoscope@<device-ip>
 The project uses GitHub Actions for continuous integration and deployment:
 
 **Workflows:**
-- **CI Workflow** (`.github/workflows/ci.yml`): Runs tests across Python 3.8-3.12, generates coverage reports
+- **CI Workflow** (`.github/workflows/ci.yml`): Runs tests across Python 3.11-3.12, generates coverage reports
 - **Code Quality** (`.github/workflows/quality.yml`): Linting, type checking, security scanning
 - **Release** (`.github/workflows/release.yml`): Automated releases from version tags
 
@@ -410,7 +410,9 @@ If using MySQLResultWriter, the default credentials are:
 
 ## Important Notes
 
-- Python 3.7+ required for device package, 3.8+ for node package
+- Python 3.11+ required for both device and node packages. The code uses PEP 604
+  unions (`X | None`) and `zip(..., strict=)`, which are 3.10+, and ruff/black
+  target py311. Raspbian Bullseye (3.9) is no longer supported.
 - OpenCV is used extensively for computer vision operations
 - CherryPy/Bottle used for web servers
 - Frontend uses Angular.js (legacy version, source-only)

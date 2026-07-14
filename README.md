@@ -5,7 +5,7 @@ Ethoscope
 [![Code Quality](https://github.com/gilestrolab/ethoscope/actions/workflows/quality.yml/badge.svg?branch=main)](https://github.com/gilestrolab/ethoscope/actions/workflows/quality.yml)
 [![codecov](https://codecov.io/gh/gilestrolab/ethoscope/branch/main/graph/badge.svg)](https://codecov.io/gh/gilestrolab/ethoscope)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Python 3.7+](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub release](https://img.shields.io/github/v/release/gilestrolab/ethoscope)](https://github.com/gilestrolab/ethoscope/releases)
 [![Documentation](https://img.shields.io/badge/docs-lab.gilest.ro-brightgreen)](https://lab.gilest.ro/ethoscope-manual)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
@@ -135,7 +135,7 @@ Hooks include:
 - **Database Management**: SQLite and MySQL support with caching and resilience
 
 ### Infrastructure
-- **CI/CD**: Automated testing across Python 3.9-3.12, quality checks, and releases
+- **CI/CD**: Automated testing across Python 3.11-3.12, quality checks, and releases
 - **Testing**: 80%+ code coverage with unit, integration, and functional tests
 - **Docker**: Development environments for node, virtuascope, and sandbox testing
 - **Pre-commit Hooks**: Automated code formatting, linting, and security scanning
