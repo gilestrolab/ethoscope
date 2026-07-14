@@ -59,7 +59,10 @@ dependencies = [
     "cherrypy>=18.10.0",
     "pyserial>=3.5",
     "bottle>=0.13.4",
-    "opencv-python>=4.8.0",
+    # Cap at <5: the code branches on CV_VERSION (core/roi.py, target_roi_builder,
+    # img_roi_builder, the trackers) and has no OpenCV 5 path. opencv-python 5.0
+    # was published in July 2026 and breaks the drawers and ROI builders.
+    "opencv-python>=4.8.0,<5.0",
     "zeroconf>=0.147.0",
     "netifaces>=0.11.0",
     "requests>=2.32.4",
