@@ -527,12 +527,12 @@ class BareRepoUpdater:
         # After fetching, all remote-tracking branches are up-to-date in the bare repo's refs.
         # For bare repositories, we also need to update the local branches to match remote ones.
         for remote_ref in self._remote.refs:
-            # We are interested in actual branches, not HEAD or other special refs
-            if (
-                remote_ref.name.startswith(f"{self._remote_name}/")
-                and remote_ref.name.count("/") == 1
-            ):
-                branch_name = remote_ref.name.split("/", 1)[1]
+            # We are interested in actual branches, not HEAD or other special refs.
+            # `remote_head` strips the remote prefix regardless of how many slashes
+            # the branch name itself contains, so namespaced branches such as
+            # 'fix/222' survive here (a naive count("/") == 1 check would drop them).
+            branch_name = remote_ref.remote_head
+            if branch_name != "HEAD":
 
                 try:
                     # Update local branch to match remote branch in bare repository
