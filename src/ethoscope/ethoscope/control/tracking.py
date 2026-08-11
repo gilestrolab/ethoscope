@@ -720,22 +720,25 @@ class ControlThread(Thread):
         )
         logging.info(f"Number of ROIs: {len(rois)}")
 
+        # Reason: this used to fall back to DefaultStimulator when construction
+        # failed, so a bad parameter or an unknown trigger_type produced an
+        # experiment that tracked perfectly, looked healthy in the UI and
+        # delivered nothing at all — undetectable until the data came back days
+        # later. A stimulator the user asked for must either work or say so.
         stimulators = []
         for i, _roi in enumerate(rois):
             try:
                 stimulator = StimulatorClass(hardware_connection, **stimulator_kwargs)
-                logging.info(
-                    f"Successfully created stimulator {i+1}/{len(rois)}: {type(stimulator).__name__}"
-                )
-                stimulators.append(stimulator)
             except Exception as e:
-                logging.error(f"Failed to create stimulator {i+1}/{len(rois)}: {e}")
-                # Fall back to DefaultStimulator
-                from ethoscope.stimulators.stimulators import DefaultStimulator
-
-                fallback_stimulator = DefaultStimulator(None)
-                logging.warning(f"Using DefaultStimulator fallback for ROI {i+1}")
-                stimulators.append(fallback_stimulator)
+                raise EthoscopeException(
+                    f"Could not build {StimulatorClass.__name__} for ROI {i+1} "
+                    f"with {stimulator_kwargs}: {e}. Refusing to start an "
+                    f"experiment that would silently deliver no stimulus."
+                ) from e
+            logging.info(
+                f"Successfully created stimulator {i+1}/{len(rois)}: {type(stimulator).__name__}"
+            )
+            stimulators.append(stimulator)
 
         kwargs = self._monit_kwargs.copy()
         kwargs.update(tracker_kwargs)
