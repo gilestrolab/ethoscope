@@ -202,6 +202,31 @@ class DailyScheduler:
                 f"Invalid time format: {time_str}. Expected HH:MM:SS"
             ) from e
 
+    def _daily_start_timestamp(self, t):
+        """
+        The configured start time, as a timestamp, on the local day holding `t`.
+
+        Anchored to the LOCAL wall clock. Reason: this used to be computed as
+        `int(t // 86400) * 86400 + start_seconds`, which counts days from the
+        UTC epoch — so "09:00:00" was applied as 09:00 UTC and an experiment
+        configured for 09:00 in London actually ran 10:00-18:00 through BST.
+        Building a local datetime rather than adding seconds to midnight also
+        keeps the start at 09:00 on the 23 h and 25 h days DST produces.
+
+        Args:
+            t (float): Unix timestamp identifying the day.
+
+        Returns:
+            float: Unix timestamp of the daily start time on that day.
+        """
+        dt = datetime.datetime.fromtimestamp(t)
+        return dt.replace(
+            hour=self._start_time_seconds // 3600,
+            minute=(self._start_time_seconds % 3600) // 60,
+            second=self._start_time_seconds % 60,
+            microsecond=0,
+        ).timestamp()
+
     def _load_state(self):
         """Load scheduler state from file."""
         if not self._state_file_path or not os.path.exists(self._state_file_path):
@@ -239,13 +264,7 @@ class DailyScheduler:
         if t is None:
             t = time.time()
 
-        # Get current time components
-        dt = datetime.datetime.fromtimestamp(t)
-        dt.hour * 3600 + dt.minute * 60 + dt.second
-
-        # Calculate time since the most recent start time
-        days_since_epoch = int(t // 86400)  # 86400 seconds per day
-        start_timestamp = days_since_epoch * 86400 + self._start_time_seconds
+        start_timestamp = self._daily_start_timestamp(t)
 
         # Handle interval periods (multiple periods per day or multi-day intervals)
         interval_seconds = self._interval_hours * 3600
@@ -290,9 +309,7 @@ class DailyScheduler:
         if t is None:
             t = time.time()
 
-        # Calculate next period start
-        days_since_epoch = int(t // 86400)
-        start_timestamp = days_since_epoch * 86400 + self._start_time_seconds
+        start_timestamp = self._daily_start_timestamp(t)
 
         interval_seconds = self._interval_hours * 3600
         active_seconds = self._daily_duration_hours * 3600
@@ -340,9 +357,7 @@ class DailyScheduler:
         if t is None:
             t = time.time()
 
-        # Calculate current period end
-        days_since_epoch = int(t // 86400)
-        start_timestamp = days_since_epoch * 86400 + self._start_time_seconds
+        start_timestamp = self._daily_start_timestamp(t)
 
         interval_seconds = self._interval_hours * 3600
         active_seconds = self._daily_duration_hours * 3600

@@ -23,6 +23,19 @@ except ImportError:
     HAS_MAGO = False
 
 
+def _local_midnight(t):
+    """
+    Midnight local time on the day containing `t`.
+
+    DailyScheduler anchors its daily window to the local wall clock, so tests
+    must too. They previously used `int(t // 86400) * 86400`, which is midnight
+    *UTC* — that agreed with the scheduler only because the scheduler had the
+    same bug, and both drifted by the UTC offset.
+    """
+    d = datetime.fromtimestamp(t)
+    return datetime(d.year, d.month, d.day).timestamp()
+
+
 class TestSchedulerTiming(unittest.TestCase):
     """Test scheduler date range parsing and timing logic."""
 
@@ -575,8 +588,7 @@ class TestDailyScheduler(unittest.TestCase):
 
         # Test at 1 hour after midnight (should be active)
         now = time.time()
-        days_since_epoch = int(now // 86400)
-        test_time = days_since_epoch * 86400 + 3600  # 1 hour after midnight
+        test_time = _local_midnight(now) + 3600  # 1 hour after midnight
 
         self.assertTrue(scheduler.is_active_period(test_time))
 
@@ -589,8 +601,7 @@ class TestDailyScheduler(unittest.TestCase):
 
         # Test at 3 hours after midnight (should be inactive)
         now = time.time()
-        days_since_epoch = int(now // 86400)
-        test_time = days_since_epoch * 86400 + 10800  # 3 hours after midnight
+        test_time = _local_midnight(now) + 10800  # 3 hours after midnight
 
         self.assertFalse(scheduler.is_active_period(test_time))
 
@@ -603,13 +614,12 @@ class TestDailyScheduler(unittest.TestCase):
 
         # Test from a time well past midnight
         now = time.time()
-        days_since_epoch = int(now // 86400)
-        test_time = days_since_epoch * 86400 + 43200  # Noon
+        test_time = _local_midnight(now) + 43200  # Noon
 
         next_start, next_end = scheduler.get_next_active_period(test_time)
 
         # Next period should start tomorrow at midnight
-        expected_start = (days_since_epoch + 1) * 86400
+        expected_start = _local_midnight(now) + 86400
         expected_end = expected_start + 7200  # 2 hours later
 
         self.assertEqual(next_start, expected_start)
@@ -624,8 +634,7 @@ class TestDailyScheduler(unittest.TestCase):
 
         # Test from noon
         now = time.time()
-        days_since_epoch = int(now // 86400)
-        test_time = days_since_epoch * 86400 + 43200  # Noon
+        test_time = _local_midnight(now) + 43200  # Noon
 
         time_until = scheduler.get_time_until_next_period(test_time)
 
@@ -641,8 +650,7 @@ class TestDailyScheduler(unittest.TestCase):
 
         # Test at 1 hour after midnight (1 hour remaining)
         now = time.time()
-        days_since_epoch = int(now // 86400)
-        test_time = days_since_epoch * 86400 + 3600  # 1 hour after midnight
+        test_time = _local_midnight(now) + 3600  # 1 hour after midnight
 
         remaining = scheduler.get_remaining_active_time(test_time)
         self.assertEqual(remaining, 3600)  # 1 hour remaining
@@ -656,8 +664,7 @@ class TestDailyScheduler(unittest.TestCase):
 
         # Test at 3 hours after midnight (inactive)
         now = time.time()
-        days_since_epoch = int(now // 86400)
-        test_time = days_since_epoch * 86400 + 10800  # 3 hours after midnight
+        test_time = _local_midnight(now) + 10800  # 3 hours after midnight
 
         remaining = scheduler.get_remaining_active_time(test_time)
         self.assertEqual(remaining, 0)
@@ -671,8 +678,7 @@ class TestDailyScheduler(unittest.TestCase):
 
         # Mock time to 1 hour after midnight
         now = time.time()
-        days_since_epoch = int(now // 86400)
-        test_time = days_since_epoch * 86400 + 3600  # 1 hour after midnight
+        test_time = _local_midnight(now) + 3600  # 1 hour after midnight
 
         with patch("time.time", return_value=test_time):
             info = scheduler.get_schedule_info()
@@ -693,8 +699,7 @@ class TestDailyScheduler(unittest.TestCase):
 
         # Mock time to noon (inactive)
         now = time.time()
-        days_since_epoch = int(now // 86400)
-        test_time = days_since_epoch * 86400 + 43200  # Noon
+        test_time = _local_midnight(now) + 43200  # Noon
 
         with patch("time.time", return_value=test_time):
             info = scheduler.get_schedule_info()
@@ -784,8 +789,7 @@ class TestDailyScheduler(unittest.TestCase):
         scheduler = DailyScheduler(8, 24, daily_start_time="10:00:00")
 
         # Test at 08:00 (before start time)
-        days_since_epoch = int(time.time() // 86400)
-        test_time = days_since_epoch * 86400 + (8 * 3600)  # 08:00 today
+        test_time = _local_midnight(time.time()) + (8 * 3600)  # 08:00 today
 
         is_active = scheduler.is_active_period(test_time)
         # Should be inactive before start time
@@ -838,13 +842,12 @@ class TestDailyScheduler(unittest.TestCase):
         scheduler = DailyScheduler(8, 24, daily_start_time="12:00:00")
 
         # Test at 08:00 (before start time)
-        days_since_epoch = int(time.time() // 86400)
-        test_time = days_since_epoch * 86400 + (8 * 3600)  # 08:00 today
+        test_time = _local_midnight(time.time()) + (8 * 3600)  # 08:00 today
 
         next_start, next_end = scheduler.get_next_active_period(test_time)
 
         # Next period should be at 12:00 today
-        expected_start = days_since_epoch * 86400 + (12 * 3600)
+        expected_start = _local_midnight(time.time()) + (12 * 3600)
         self.assertEqual(next_start, expected_start)
 
     def test_get_time_until_next_period_with_none(self):
