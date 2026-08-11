@@ -1102,6 +1102,13 @@ pre.command {
     margin-bottom: 5px !important;
     display: flex !important;
     align-items: center !important;
+    /*
+     * Bootstrap's .input-group is flex-wrap: wrap. The date-range rules above
+     * pin the group to 260px and the input inside it to 220px, which leaves
+     * too little room for the append button -- it wrapped onto its own line.
+     * Keep the field and its button on one row.
+     */
+    flex-wrap: nowrap !important;
 }
 
 .modal .input-group .form-control {

@@ -999,9 +999,15 @@
                                                     <option ng-repeat="opt in group.options" value="{{opt.value}}">{{opt.text}}</option>
                                                 </optgroup>
                                             </select>
-                                            <div ng-if="arg.type == 'boolean'" class="form-check" style="margin-top: 5px;">
-                                                <input type="checkbox" class="form-check-input" ng-model="stimulator.arguments[arg.name]" id="stim-{{$parent.$index}}-{{arg.name}}" style="transform: scale(1.2); margin-right: 8px;">
-                                                <label class="form-check-label" for="stim-{{$parent.$index}}-{{arg.name}}" style="font-size: 14px;">{{arg.description}}</label>
+                                            <!-- Toggle, matching the Machine Information modal. A `transform: scale()`d
+                                                 checkbox does not resize its layout box, and Bootstrap's .form-check-input
+                                                 is absolutely positioned into the row's left padding, so the scaled box
+                                                 overhangs its own footprint and lands on top of the label text. -->
+                                            <div ng-if="arg.type == 'boolean'" style="display: flex; align-items: center; justify-content: space-between; margin-top: 5px;">
+                                                <label for="stim-{{$parent.$index}}-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1; font-size: 14px;">{{arg.description}}</label>
+                                                <label class="switch" style="margin: 0;">
+                                                    <input type="checkbox" id="stim-{{$parent.$index}}-{{arg.name}}" ng-model="stimulator.arguments[arg.name]"><span class="slider"></span>
+                                                </label>
                                             </div>
 
                                             <div ng-if="arg.type == 'date_range' && stimulator.arguments" class="form-group" style="margin-bottom: 15px;">
