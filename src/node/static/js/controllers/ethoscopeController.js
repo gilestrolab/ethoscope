@@ -498,6 +498,10 @@
             return ethoscopeFormService.isArgumentVisible(arg, currentArgValues);
         };
 
+        $scope.isSectionStart = function(arg, index, args, currentArgValues) {
+            return ethoscopeFormService.isSectionStart(arg, index, args, currentArgValues);
+        };
+
         /**
          * Filter action_type options based on detected module capabilities.
          * Falls back to showing all options if module info is unavailable.

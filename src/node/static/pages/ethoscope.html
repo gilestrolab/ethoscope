@@ -964,6 +964,7 @@
                                             <i class="fa fa-cog"></i> Configuration:
                                         </h6>
                                         <div ng-repeat="arg in getInteractorOptionByName(stimulator.name).arguments" ng-if="isArgumentVisible(arg, stimulator.arguments)" class="form-group" style="margin-bottom: 15px;">
+                                            <div ng-if="isSectionStart(arg, $index, getInteractorOptionByName(stimulator.name).arguments, stimulator.arguments)" class="config-section-heading">{{arg.section}}</div>
                                             <label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" style="font-size: 14px; margin-bottom: 5px; font-weight: 500;">{{arg.description}}</label>
 
                                             <!-- Select type (for trigger_type, action_type dropdowns) -->
@@ -1046,6 +1047,7 @@
                                     </div>
                                     <ul ng-if="selected_options.tracking[name]['name']==opt.name">
                                         <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.tracking[name]['arguments'])">
+                                            <div ng-if="isSectionStart(arg, $index, opt.arguments, selected_options.tracking[name]['arguments'])" class="config-section-heading">{{arg.section}}</div>
                                             <label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
 
                                             <!-- Select type (for ComposedStimulator trigger/action dropdowns) -->

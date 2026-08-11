@@ -454,6 +454,33 @@
             },
 
             /**
+             * Check whether an argument opens a new section, so the form can draw a
+             * heading before it. Backends group arguments by declaring a "section"
+             * on each one (see ComposedStimulator._description); arguments without a
+             * section never start one, so stimulators that don't opt in are unaffected.
+             *
+             * Compares against the previous *visible* argument rather than the
+             * previous one, so hiding a whole section via depends_on does not leave
+             * its heading stranded, or suppress the next section's heading.
+             *
+             * @param {Object} arg - The argument definition
+             * @param {number} index - Its index in the full argument list
+             * @param {Array} args - The full argument list for this stimulator
+             * @param {Object} currentArgValues - Current argument values
+             * @returns {boolean} True if a section heading belongs above this argument
+             */
+            isSectionStart: function(arg, index, args, currentArgValues) {
+                if (!arg || !arg.section || !args) return false;
+                if (!this.isArgumentVisible(arg, currentArgValues)) return false;
+
+                for (var i = index - 1; i >= 0; i--) {
+                    if (!this.isArgumentVisible(args[i], currentArgValues)) continue;
+                    return args[i].section !== arg.section;
+                }
+                return true; // nothing visible above it: it opens the first section
+            },
+
+            /**
              * Check if ROI template is properly selected for tracking
              * @param {Object} $scope - Controller scope
              * @returns {boolean} True if ROI template is properly selected

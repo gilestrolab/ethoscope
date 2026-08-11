@@ -51,6 +51,7 @@ class ComposedStimulator(BaseStimulator):
                     {"value": "midline_crossing", "label": "Midline crossing"},
                     {"value": "periodic", "label": "Periodic (constitutive)"},
                 ],
+                "section": "Trigger",
             },
             # --- Trigger-specific arguments ---
             {
@@ -64,6 +65,7 @@ class ComposedStimulator(BaseStimulator):
                 "depends_on": {
                     "trigger_type": ["inactivity", "activity", "time_restricted"],
                 },
+                "section": "Trigger",
             },
             {
                 "type": "number",
@@ -76,6 +78,7 @@ class ComposedStimulator(BaseStimulator):
                 "depends_on": {
                     "trigger_type": ["inactivity", "time_restricted"],
                 },
+                "section": "Trigger",
             },
             {
                 "type": "number",
@@ -88,6 +91,7 @@ class ComposedStimulator(BaseStimulator):
                 "depends_on": {
                     "trigger_type": ["activity"],
                 },
+                "section": "Trigger",
             },
             {
                 "type": "number",
@@ -100,6 +104,7 @@ class ComposedStimulator(BaseStimulator):
                 "depends_on": {
                     "trigger_type": ["activity"],
                 },
+                "section": "Trigger",
             },
             {
                 "type": "number",
@@ -118,6 +123,7 @@ class ComposedStimulator(BaseStimulator):
                         "time_restricted",
                     ],
                 },
+                "section": "Trigger",
             },
             {
                 "type": "number",
@@ -128,6 +134,7 @@ class ComposedStimulator(BaseStimulator):
                 "description": "Minimum seconds between stimulations",
                 "default": 60,
                 "depends_on": {"trigger_type": ["midline_crossing"]},
+                "section": "Trigger",
             },
             {
                 "type": "number",
@@ -138,40 +145,7 @@ class ComposedStimulator(BaseStimulator):
                 "description": "Seconds between periodic stimulations",
                 "default": 60,
                 "depends_on": {"trigger_type": ["periodic"]},
-            },
-            # --- Time restriction: a modifier that applies to any trigger ---
-            {
-                "type": "boolean",
-                "name": "time_restricted",
-                "description": "Restrict stimulation to a daily time window",
-                "default": False,
-            },
-            {
-                "type": "number",
-                "min": 1,
-                "max": 24,
-                "step": 0.5,
-                "name": "daily_duration_hours",
-                "description": "Hours active per day",
-                "default": 8,
-                "depends_on": {"time_restricted": [True]},
-            },
-            {
-                "type": "number",
-                "min": 1,
-                "max": 168,
-                "step": 0.5,
-                "name": "interval_hours",
-                "description": "Hours between active periods",
-                "default": 24,
-                "depends_on": {"time_restricted": [True]},
-            },
-            {
-                "type": "str",
-                "name": "daily_start_time",
-                "description": "Daily start time (HH:MM:SS)",
-                "default": "09:00:00",
-                "depends_on": {"time_restricted": [True]},
+                "section": "Trigger",
             },
             # --- Action selection ---
             {
@@ -185,6 +159,7 @@ class ComposedStimulator(BaseStimulator):
                     {"value": "led_pulse_train", "label": "LED pulse train"},
                     {"value": "valve_pulse", "label": "Valve/odour pulse"},
                 ],
+                "section": "Stimulus",
             },
             # --- Action-specific arguments ---
             {
@@ -198,6 +173,7 @@ class ComposedStimulator(BaseStimulator):
                 "depends_on": {
                     "action_type": ["motor_pulse", "led_pulse", "valve_pulse"],
                 },
+                "section": "Stimulus",
             },
             {
                 "type": "number",
@@ -208,6 +184,7 @@ class ComposedStimulator(BaseStimulator):
                 "description": "LED ON duration per cycle (ms)",
                 "default": 100,
                 "depends_on": {"action_type": ["led_pulse_train"]},
+                "section": "Stimulus",
             },
             {
                 "type": "number",
@@ -218,6 +195,7 @@ class ComposedStimulator(BaseStimulator):
                 "description": "LED OFF duration per cycle (ms)",
                 "default": 100,
                 "depends_on": {"action_type": ["led_pulse_train"]},
+                "section": "Stimulus",
             },
             {
                 "type": "number",
@@ -228,13 +206,53 @@ class ComposedStimulator(BaseStimulator):
                 "description": "Number of ON/OFF cycles",
                 "default": 5,
                 "depends_on": {"action_type": ["led_pulse_train"]},
+                "section": "Stimulus",
             },
-            # --- Schedule ---
+            # --- Timing: when the stimulator is live at all. Cross-cutting, so it
+            #     comes last rather than sitting among the trigger's own settings. ---
             {
                 "type": "date_range",
                 "name": "date_range",
                 "description": "Active time period",
                 "default": "",
+                "section": "Timing",
+            },
+            {
+                "type": "boolean",
+                "name": "time_restricted",
+                "description": "Restrict stimulation to a daily time window",
+                "default": False,
+                "section": "Timing",
+            },
+            {
+                "type": "number",
+                "min": 1,
+                "max": 24,
+                "step": 0.5,
+                "name": "daily_duration_hours",
+                "description": "Hours active per day",
+                "default": 8,
+                "depends_on": {"time_restricted": [True]},
+                "section": "Timing",
+            },
+            {
+                "type": "number",
+                "min": 1,
+                "max": 168,
+                "step": 0.5,
+                "name": "interval_hours",
+                "description": "Hours between active periods",
+                "default": 24,
+                "depends_on": {"time_restricted": [True]},
+                "section": "Timing",
+            },
+            {
+                "type": "str",
+                "name": "daily_start_time",
+                "description": "Daily start time (HH:MM:SS)",
+                "default": "09:00:00",
+                "depends_on": {"time_restricted": [True]},
+                "section": "Timing",
             },
         ],
     }
