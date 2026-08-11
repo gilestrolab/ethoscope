@@ -1089,7 +1089,15 @@
                                                     <option ng-repeat="opt in group.options" value="{{opt.value}}">{{opt.text}}</option>
                                                 </optgroup>
                                             </select>
-                                            <div ng-if="arg.type == 'boolean'"><label for="input-{{arg.name}}"><input style="transform: scale(1.5); margin: 3px; margin-right: 10px;" id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">{{arg.description}}</label></div>
+                                            <!-- Toggle, matching the Machine Information modal. A `transform: scale()`d
+                                                 checkbox does not resize its layout box, so no amount of margin lines it
+                                                 up with its own label. -->
+                                            <div ng-if="arg.type == 'boolean'" style="display: flex; align-items: center; justify-content: space-between; margin: 8px 0;">
+                                                <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}}</label>
+                                                <label class="switch" style="margin: 0;">
+                                                    <input id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]"><span class="slider"></span>
+                                                </label>
+                                            </div>
 
                                             <div ng-if="arg.type == 'date_range'" class="form-group">
                                                 <label for="input-{{arg.name}}">{{arg.description}}</label>

@@ -764,7 +764,17 @@ custom-select-wrap .select-icon svg {
     display: block;
 }
 
-.input span {
+/*
+ * Direct child only. `class="input"` sits on whole <form>s (trackingoptionsform,
+ * machineinfoform, recordingoptionsform, and two in more.html), so as a
+ * descendant selector this floating-label styling hit *every* bare <span> in
+ * those forms and stacked them all at the same absolute position in grey --
+ * which is what turned the "a user, a location must be selected." footer
+ * warning into overlapping gibberish. No <span> is a direct child of a
+ * `.input` element anywhere in the codebase today, so this only stops the
+ * leak; it changes nothing that currently renders on purpose.
+ */
+.input > span {
     position: absolute;
     z-index: 1;
     cursor: text;
