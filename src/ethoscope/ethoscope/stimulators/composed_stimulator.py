@@ -79,12 +79,24 @@ class ComposedStimulator(BaseStimulator):
             },
             {
                 "type": "number",
-                "min": 1,
+                "min": 10,
                 "max": 3600,
                 "step": 1,
                 "name": "min_active_time",
-                "description": "Minimal continuous activity before stimulation (s)",
-                "default": 10,
+                "description": "Activity window before stimulation (s)",
+                "default": 120,
+                "depends_on": {
+                    "trigger_type": ["activity"],
+                },
+            },
+            {
+                "type": "number",
+                "min": 0.05,
+                "max": 1.0,
+                "step": 0.05,
+                "name": "activity_threshold",
+                "description": "Fraction of the window the animal must be active for",
+                "default": 0.85,
                 "depends_on": {
                     "trigger_type": ["activity"],
                 },
@@ -235,7 +247,8 @@ class ComposedStimulator(BaseStimulator):
         # Inactivity / activity trigger args
         velocity_correction_coef=3.0e-3,
         min_inactive_time=120,
-        min_active_time=10,
+        min_active_time=120,
+        activity_threshold=0.85,
         stimulus_probability=1.0,
         # Midline crossing trigger args
         refractory_period_s=60,
@@ -270,6 +283,7 @@ class ComposedStimulator(BaseStimulator):
             "velocity_correction_coef": velocity_correction_coef,
             "min_inactive_time": min_inactive_time,
             "min_active_time": min_active_time,
+            "activity_threshold": activity_threshold,
             "stimulus_probability": stimulus_probability,
             "refractory_period_s": refractory_period_s,
             "interval_seconds": interval_seconds,

@@ -213,22 +213,53 @@ def _still_tracker(last_time_point=200000, times=None):
     )
 
 
+def _drive(trigger, duration_s, fps=5, moving_at=lambda t: True, t0=0):
+    """
+    Feed `trigger` frames for duration_s of wall clock at `fps`.
+
+    moving_at(t_ms) decides whether the animal registers as moving on that
+    frame. Returns the list of interaction codes, one per frame.
+    """
+    step = max(1, int(round(1000 / fps)))
+    codes = []
+    for t in range(t0, t0 + int(duration_s * 1000) + 1, step):
+        tracker = _moving_tracker(t) if moving_at(t) else _still_tracker(t)
+        trigger.bind_tracker(tracker)
+        codes.append(trigger.check()[0])
+    return codes
+
+
 class TestActivityTrigger(unittest.TestCase):
-    """Test ActivityTrigger, the mirror image of InactivityTrigger."""
+    """
+    ActivityTrigger scores a window of binned activity, rather than demanding
+    an unbroken run of moving frames.
+    """
 
     def test_init_valid(self):
         trigger = ActivityTrigger(
             velocity_correction_coef=3.0e-3,
-            min_active_time=30,
+            min_active_time=120,
+            activity_threshold=0.5,
             stimulus_probability=0.5,
         )
-        self.assertEqual(trigger._bout_threshold_ms, 30000)
+        self.assertEqual(trigger._window_ms, 120000)
+        self.assertEqual(trigger._threshold, 0.5)
         self.assertEqual(trigger._p, 0.5)
-        self.assertTrue(trigger._fires_when_moving)
 
-    def test_default_threshold_is_short(self):
-        """Continuous-activity bouts are short-lived, so the default is 10 s."""
-        self.assertEqual(ActivityTrigger()._bout_threshold_ms, 10000)
+    def test_defaults(self):
+        """Defaults mirror the inactivity protocol: a 120 s window, 85% active."""
+        trigger = ActivityTrigger()
+        self.assertEqual(trigger._window_ms, 120000)
+        self.assertEqual(trigger._threshold, 0.85)
+        self.assertEqual(trigger._n_bins, 12)
+
+    def test_bins_never_shrink_below_five_seconds(self):
+        """A bin must stay wide enough to saturate, or we are counting frames."""
+        for window in (10, 30, 60, 120, 300, 3600):
+            trigger = ActivityTrigger(min_active_time=window)
+            self.assertGreaterEqual(trigger._bin_ms, 5000)
+            self.assertGreaterEqual(trigger._n_bins, 2)
+            self.assertEqual(trigger._window_ms, window * 1000)
 
     def test_init_invalid_probability(self):
         with self.assertRaises(ValueError):
@@ -236,67 +267,116 @@ class TestActivityTrigger(unittest.TestCase):
         with self.assertRaises(ValueError):
             ActivityTrigger(stimulus_probability=-0.1)
 
-    def test_check_no_trigger_when_still(self):
-        """No trigger while the animal is stationary, however long it stays so."""
-        trigger = ActivityTrigger(min_active_time=0)
-        trigger.bind_tracker(_still_tracker())
-        trigger._t0 = 0
-        code, _meta = trigger.check()
-        self.assertEqual(code, 0)
+    def test_init_invalid_threshold(self):
+        with self.assertRaises(ValueError):
+            ActivityTrigger(activity_threshold=0.0)
+        with self.assertRaises(ValueError):
+            ActivityTrigger(activity_threshold=1.5)
 
-    def test_check_real_trigger(self):
-        """Code 1 once active beyond threshold and the probability draw passes."""
-        trigger = ActivityTrigger(min_active_time=0, stimulus_probability=1.0)
-        trigger.bind_tracker(_moving_tracker())
-        trigger._t0 = 0
-        code, _meta = trigger.check()
-        self.assertEqual(code, 1)
+    def test_init_invalid_window(self):
+        with self.assertRaises(ValueError):
+            ActivityTrigger(min_active_time=0)
 
-    def test_check_ghost_trigger(self):
-        """Code 2 once active beyond threshold but the probability draw fails."""
-        trigger = ActivityTrigger(min_active_time=0, stimulus_probability=0.0)
-        trigger.bind_tracker(_moving_tracker())
-        trigger._t0 = 0
-        code, _meta = trigger.check()
-        self.assertEqual(code, 2)
+    def test_no_trigger_while_still(self):
+        """A stationary animal never fires, however long it stays so."""
+        trigger = ActivityTrigger(min_active_time=60, stimulus_probability=1.0)
+        codes = _drive(trigger, duration_s=600, moving_at=lambda t: False)
+        self.assertNotIn(1, codes)
 
-    def test_check_below_threshold(self):
-        """Moving, but not yet for long enough."""
-        trigger = ActivityTrigger(min_active_time=120)
-        trigger.bind_tracker(_moving_tracker())
-        trigger._t0 = 199000  # only 1 s of activity so far
-        code, _meta = trigger.check()
-        self.assertEqual(code, 0)
+    def test_no_trigger_before_a_full_window(self):
+        """Nothing fires until a whole window has actually elapsed."""
+        trigger = ActivityTrigger(min_active_time=120, stimulus_probability=1.0)
+        codes = _drive(trigger, duration_s=110)
+        self.assertNotIn(1, codes)
 
-    def test_check_resets_t0_on_pause(self):
-        """A single non-moving frame restarts the activity clock."""
-        trigger = ActivityTrigger(min_active_time=120)
-        trigger.bind_tracker(_still_tracker())
-        trigger._t0 = 100000  # 100 s of activity accumulated...
-        trigger.check()
-        self.assertEqual(trigger._t0, 200000)  # ...thrown away by one pause
-
-    def test_check_fires_after_sustained_activity(self):
-        """A bout of continuous movement eventually fires; a pause defers it."""
-        trigger = ActivityTrigger(min_active_time=5, stimulus_probability=1.0)
-
-        # 4 s of movement: not enough yet.
-        for t in range(196000, 200001, 1000):
-            trigger.bind_tracker(_moving_tracker(last_time_point=t))
-            code, _meta = trigger.check()
-            self.assertEqual(code, 0)
-
-        # A pause resets the clock.
-        trigger.bind_tracker(_still_tracker(last_time_point=201000))
-        self.assertEqual(trigger.check()[0], 0)
-
-        # Movement resumes; the 6 s that follow now clear the 5 s threshold.
-        codes = []
-        for t in range(202000, 208001, 1000):
-            trigger.bind_tracker(_moving_tracker(last_time_point=t))
-            codes.append(trigger.check()[0])
-
+    def test_fires_after_a_fully_active_window(self):
+        trigger = ActivityTrigger(min_active_time=120, stimulus_probability=1.0)
+        codes = _drive(trigger, duration_s=130)
         self.assertIn(1, codes)
+
+    def test_ghost_trigger(self):
+        """Code 2 when the window qualifies but the probability draw fails."""
+        trigger = ActivityTrigger(min_active_time=120, stimulus_probability=0.0)
+        codes = _drive(trigger, duration_s=130)
+        self.assertIn(2, codes)
+        self.assertNotIn(1, codes)
+
+    def test_a_brief_pause_no_longer_throws_the_bout_away(self):
+        """
+        The regression this rule exists for. One quiet 10 s bin in 12 leaves the
+        window 92% active, which clears 85%. Under the old all-or-nothing rule
+        the same pause reset the clock and nothing ever fired.
+        """
+        trigger = ActivityTrigger(min_active_time=120, stimulus_probability=1.0)
+        codes = _drive(
+            trigger, duration_s=130, moving_at=lambda t: not (30000 <= t < 40000)
+        )
+        self.assertIn(1, codes)
+
+    def test_does_not_fire_below_the_threshold(self):
+        """Three quiet bins in 12 is 75% active, under the 85% asked for."""
+        trigger = ActivityTrigger(min_active_time=120, stimulus_probability=1.0)
+        codes = _drive(
+            trigger, duration_s=130, moving_at=lambda t: not (30000 <= t < 60000)
+        )
+        self.assertNotIn(1, codes)
+
+    def test_threshold_is_honoured(self):
+        """The same trace fires or not depending only on the threshold."""
+        quiet_quarter = lambda t: not (30000 <= t < 60000)  # noqa: E731  75% active
+        self.assertNotIn(
+            1,
+            _drive(
+                ActivityTrigger(min_active_time=120, stimulus_probability=1.0),
+                duration_s=130,
+                moving_at=quiet_quarter,
+            ),
+        )
+        self.assertIn(
+            1,
+            _drive(
+                ActivityTrigger(
+                    min_active_time=120,
+                    activity_threshold=0.7,
+                    stimulus_probability=1.0,
+                ),
+                duration_s=130,
+                moving_at=quiet_quarter,
+            ),
+        )
+
+    def test_requires_a_fresh_window_after_firing(self):
+        """One long bout must not re-fire on every subsequent frame."""
+        trigger = ActivityTrigger(min_active_time=120, stimulus_probability=1.0)
+        codes = _drive(trigger, duration_s=240)
+        self.assertEqual(codes.count(1), 2)  # one per elapsed window, not per frame
+
+    def test_is_frame_rate_independent(self):
+        """
+        The point of binning. A fraction-of-frames rule concentrates towards the
+        mean as the frame rate rises, so the same setting fired far less often
+        on a faster camera; 'moved at all in a bin' saturates instead.
+        """
+        pattern = lambda t: not (30000 <= t < 40000)  # noqa: E731  92% active
+        first_fire = {}
+        for fps in (2, 5, 10, 25):
+            trigger = ActivityTrigger(min_active_time=120, stimulus_probability=1.0)
+            codes = _drive(trigger, duration_s=130, fps=fps, moving_at=pattern)
+            self.assertIn(1, codes, f"failed to fire at {fps} fps")
+            step = max(1, int(round(1000 / fps)))
+            first_fire[fps] = codes.index(1) * step
+
+        spread = max(first_fire.values()) - min(first_fire.values())
+        self.assertLess(spread, 1000, f"fire time drifts with frame rate: {first_fire}")
+
+    def test_tracking_gap_closes_bins_inactive(self):
+        """Bins that saw no frame at all are honestly scored as inactive."""
+        trigger = ActivityTrigger(min_active_time=120, stimulus_probability=1.0)
+        # 120 s of movement, then a 60 s hole, then movement resumes.
+        codes = _drive(trigger, duration_s=40, t0=0)
+        self.assertNotIn(1, codes)
+        codes = _drive(trigger, duration_s=40, t0=100000)
+        self.assertNotIn(1, codes)
 
 
 # ===========================================================================
@@ -440,29 +520,25 @@ class TestScheduledTrigger(unittest.TestCase):
 
     def test_suppressed_outside_active_period(self):
         """Even a trigger that would fire is silenced outside the window."""
-        inner = ActivityTrigger(min_active_time=0, stimulus_probability=1.0)
-        trigger = ScheduledTrigger(inner)
-        trigger.bind_tracker(_moving_tracker())
-        inner._t0 = 0
-
+        trigger = ScheduledTrigger(
+            ActivityTrigger(min_active_time=10, stimulus_probability=1.0)
+        )
         with patch.object(
             trigger._daily_scheduler, "is_active_period", return_value=False
         ):
-            code, _meta = trigger.check()
-        self.assertEqual(code, 0)
+            codes = _drive(trigger, duration_s=60)
+        self.assertNotIn(1, codes)
 
     def test_delegates_inside_active_period(self):
         """Wraps any trigger, not just inactivity: here, an activity trigger."""
-        inner = ActivityTrigger(min_active_time=0, stimulus_probability=1.0)
-        trigger = ScheduledTrigger(inner)
-        trigger.bind_tracker(_moving_tracker())
-        inner._t0 = 0
-
+        trigger = ScheduledTrigger(
+            ActivityTrigger(min_active_time=10, stimulus_probability=1.0)
+        )
         with patch.object(
             trigger._daily_scheduler, "is_active_period", return_value=True
         ):
-            code, _meta = trigger.check()
-        self.assertEqual(code, 1)
+            codes = _drive(trigger, duration_s=60)
+        self.assertIn(1, codes)
 
 
 # ===========================================================================

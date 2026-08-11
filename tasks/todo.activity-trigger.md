@@ -1,7 +1,12 @@
 # Activity trigger + time restriction as a cross-cutting modifier
 
 Date: 2026-07-14
-Status: **Done** (device package only; no node/frontend changes needed)
+Status: **Superseded** — see `todo.activity-trigger-duty-cycle.md` (2026-08-11).
+
+> The "continuous bout, strict mirror" decision below did not survive contact with real
+> flies: at the `min_active_time` values users naturally pick (120–300 s, mirroring
+> `min_inactive_time`) it delivered ~0 stimuli. The "Deferred" item at the bottom of this
+> file is now implemented, as a binned duty cycle rather than a grace period.
 
 ## Goal
 

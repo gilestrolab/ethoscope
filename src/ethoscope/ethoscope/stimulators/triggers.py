@@ -10,6 +10,7 @@ other trigger and gates it to a recurring daily window, so it composes with all
 current and future triggers.
 """
 
+import collections
 import logging
 import random
 
@@ -43,33 +44,35 @@ class BaseTrigger:
 
 class MovementBoutTrigger(BaseTrigger):
     """
-    Fire after a sustained bout of movement, or of stillness.
+    Shared machinery for triggers that watch bouts of movement or stillness.
 
-    Subclasses pick the polarity with _fires_when_moving: False waits for the
-    animal to hold still (sleep deprivation), True waits for it to keep moving.
-    The bout clock resets whenever the animal switches to the other state.
+    Holds the per-frame movement test and the probability draw. The two
+    polarities score bouts differently and so implement their own check():
+    stillness is all-or-nothing (a sleeping animal really does produce no
+    moving frame at all), whereas activity is graded — see ActivityTrigger.
 
     Movement logic extracted from IsMovingStimulator._has_moved() and
     SleepDepStimulator._decide().
     """
 
-    _fires_when_moving = False
-
     def __init__(
         self,
         velocity_correction_coef=3.0e-3,
-        bout_duration_s=120,
         stimulus_probability=1.0,
     ):
         super().__init__()
         self._velocity_correction_coef = float(velocity_correction_coef)
-        self._bout_threshold_ms = float(bout_duration_s) * 1000
-        self._t0 = None
 
         p = float(stimulus_probability)
         if not 0 <= p <= 1.0:
             raise ValueError("Probability must be between 0.0 and 1.0")
         self._p = p
+
+    def _draw(self):
+        """Resolve a met condition into a real (1) or ghost (2) interaction."""
+        if random.uniform(0, 1) <= self._p:
+            return 1, {}
+        return 2, {}
 
     def _has_moved(self):
         """Check if the animal has moved. Extracted from IsMovingStimulator."""
@@ -102,32 +105,14 @@ class MovementBoutTrigger(BaseTrigger):
             return True
         return False
 
-    def check(self):
-        now = self._tracker.last_time_point
-        has_moved = self._has_moved()
-
-        if self._t0 is None:
-            self._t0 = now
-
-        if has_moved == self._fires_when_moving:
-            if float(now - self._t0) > self._bout_threshold_ms:
-                self._t0 = None
-                if random.uniform(0, 1) <= self._p:
-                    return 1, {}
-                return 2, {}
-        else:
-            # The bout was broken: restart the clock.
-            self._t0 = now
-
-        return 0, {}
-
 
 class InactivityTrigger(MovementBoutTrigger):
     """
-    Fire when animal is inactive for min_inactive_time seconds.
-    """
+    Fire when the animal is inactive for min_inactive_time seconds.
 
-    _fires_when_moving = False
+    All-or-nothing: a single moving frame restarts the clock. That is the
+    established sleep-deprivation criterion and is left unchanged.
+    """
 
     def __init__(
         self,
@@ -137,35 +122,122 @@ class InactivityTrigger(MovementBoutTrigger):
     ):
         super().__init__(
             velocity_correction_coef=velocity_correction_coef,
-            bout_duration_s=min_inactive_time,
             stimulus_probability=stimulus_probability,
         )
+        self._bout_threshold_ms = float(min_inactive_time) * 1000
+        self._t0 = None
+
+    def check(self):
+        now = self._tracker.last_time_point
+
+        if self._t0 is None:
+            self._t0 = now
+
+        if not self._has_moved():
+            if float(now - self._t0) > self._bout_threshold_ms:
+                self._t0 = None
+                return self._draw()
+        else:
+            # The bout was broken: restart the clock.
+            self._t0 = now
+
+        return 0, {}
 
 
 class ActivityTrigger(MovementBoutTrigger):
     """
-    Fire when animal has been continuously active for min_active_time seconds.
+    Fire when the animal has been active for most of the last min_active_time
+    seconds.
 
-    The mirror image of InactivityTrigger. Note that the bout is *continuous*:
-    any frame in which the animal does not register as moving — a micro-pause, a
-    grooming bout, or a frame where the tracker failed to spot it — restarts the
-    clock. Thresholds of a few seconds are therefore the useful range; a long
-    threshold will rarely be reached by a real animal.
+    Not the literal mirror of InactivityTrigger. Requiring *every* frame of the
+    window to register as moving looks symmetric but is not: a sleeping animal
+    genuinely produces no moving frame for minutes, whereas a walking animal
+    dips below the velocity threshold constantly. Measured on 20 flies over
+    three days, continuous 120 s movement bouts occur zero times, which is why
+    that setting delivered no stimuli at all.
+
+    Instead the window is cut into short bins, each scored active if the animal
+    moved *at all* within it, and the trigger fires once at least
+    activity_threshold of the bins are active. Binning is what keeps the rule
+    independent of camera frame rate: "moved at all in 10 s" saturates, whereas
+    a fraction-of-frames average concentrates towards the mean as the frame rate
+    rises, so the same setting fired 14x less often at 4 fps than at 2.4 fps.
+    It also reuses the criterion InactivityTrigger already applies, one bin wide.
     """
 
-    _fires_when_moving = True
+    # Aim for _TARGET_BINS bins per window, but never let a bin fall below
+    # _MIN_BIN_S: below that it stops saturating and we are back to counting
+    # frames. Windows shorter than ~60 s therefore get coarse threshold steps.
+    _MIN_BIN_S = 5.0
+    _MAX_BIN_S = 10.0
+    _TARGET_BINS = 12
 
     def __init__(
         self,
         velocity_correction_coef=3.0e-3,
-        min_active_time=10,
+        min_active_time=120,
+        activity_threshold=0.85,
         stimulus_probability=1.0,
     ):
         super().__init__(
             velocity_correction_coef=velocity_correction_coef,
-            bout_duration_s=min_active_time,
             stimulus_probability=stimulus_probability,
         )
+
+        window_s = float(min_active_time)
+        if window_s <= 0:
+            raise ValueError("min_active_time must be greater than 0")
+
+        threshold = float(activity_threshold)
+        if not 0 < threshold <= 1.0:
+            raise ValueError("activity_threshold must be between 0.0 and 1.0")
+        self._threshold = threshold
+
+        bin_s = min(self._MAX_BIN_S, max(self._MIN_BIN_S, window_s / self._TARGET_BINS))
+        self._n_bins = max(2, int(round(window_s / bin_s)))
+        self._bin_ms = window_s * 1000.0 / self._n_bins
+
+        self._bins = collections.deque(maxlen=self._n_bins)
+        self._bin_start = None
+        self._bin_active = False
+
+    @property
+    def _window_ms(self):
+        return self._bin_ms * self._n_bins
+
+    def check(self):
+        now = self._tracker.last_time_point
+        moved = self._has_moved()
+
+        if self._bin_start is None:
+            self._bin_start = now
+
+        # A gap longer than the whole window leaves nothing worth keeping, and
+        # bounds the loop below to _n_bins iterations.
+        if now - self._bin_start > self._window_ms:
+            self._bins.clear()
+            self._bin_start = now
+            self._bin_active = False
+
+        # Close every bin the clock has moved past. A bin that saw no frame at
+        # all — a tracking gap — closes inactive, which is the honest reading.
+        while now - self._bin_start >= self._bin_ms:
+            self._bins.append(self._bin_active)
+            self._bin_start += self._bin_ms
+            self._bin_active = False
+
+        self._bin_active = self._bin_active or moved
+
+        if len(self._bins) < self._n_bins:
+            return 0, {}
+
+        if sum(self._bins) / self._n_bins >= self._threshold:
+            # Reason: demand a fresh window after firing, otherwise a long bout
+            # re-fires on every subsequent frame.
+            self._bins.clear()
+            return self._draw()
+
+        return 0, {}
 
 
 class MidlineCrossingTrigger(BaseTrigger):

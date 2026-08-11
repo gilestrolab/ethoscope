@@ -65,18 +65,28 @@ def _make_inactive_tracker(inactive_time_ms=200_000, roi_idx=1):
     )
 
 
-def _make_moving_tracker(roi_idx=1):
-    """Create a tracker showing a moving animal."""
+def _make_moving_tracker(roi_idx=1, t=100):
+    """Create a tracker showing a moving animal at time `t` (ms)."""
     pos1 = {"xy_dist_log10x1000": 3000, "x": 20}  # dist=10^3 = 1000
     pos2 = {"xy_dist_log10x1000": 3000, "x": 80}
     positions = [[pos1], [pos2]]
-    times = [0, 100]  # 100ms apart
+    times = [t - 100, t]  # 100ms apart
     return _make_mock_tracker(
         positions=positions,
         times=times,
-        last_time_point=100,
+        last_time_point=t,
         roi_idx=roi_idx,
     )
+
+
+def _drive_stimulator(stim, duration_s, fps=5, roi_idx=1):
+    """Run `stim` over duration_s of wall clock with a continuously active animal."""
+    step = int(round(1000 / fps))
+    out = []
+    for t in range(0, int(duration_s * 1000) + 1, step):
+        stim.bind_tracker(_make_moving_tracker(roi_idx=roi_idx, t=t))
+        out.append(stim._decide())
+    return out
 
 
 # --- Trigger Tests ---
@@ -341,19 +351,16 @@ class TestComposedStimulator:
             hardware_connection=hw,
             trigger_type="activity",
             action_type="motor_pulse",
-            min_active_time=0,
+            min_active_time=30,
             stimulus_probability=1.0,
             pulse_duration=1000,
         )
         assert isinstance(stim._trigger, ActivityTrigger)
 
-        stim.bind_tracker(_make_moving_tracker(roi_idx=1))
-        stim._trigger._t0 = 0  # Simulate prior initialization
-
-        interact, result = stim._decide()
-        assert int(interact) == 1
-        assert result["channel"] == 1
-        assert result["duration"] == 1000
+        fired = [r for i, r in _drive_stimulator(stim, duration_s=40) if int(i) == 1]
+        assert fired, "an animal active throughout the window should be stimulated"
+        assert fired[0]["channel"] == 1  # ROI 1 -> motor channel 1
+        assert fired[0]["duration"] == 1000
 
     def test_activity_does_not_fire_when_still(self):
         """The mirror holds: a stationary animal never trips the activity trigger."""
@@ -362,25 +369,34 @@ class TestComposedStimulator:
             hardware_connection=hw,
             trigger_type="activity",
             action_type="motor_pulse",
-            min_active_time=0,
+            min_active_time=30,
             stimulus_probability=1.0,
         )
 
-        stim.bind_tracker(_make_inactive_tracker(inactive_time_ms=200_000, roi_idx=1))
-        stim._trigger._t0 = 0
-
-        interact, result = stim._decide()
-        assert int(interact) == 0
-        assert result == {}
+        for t in range(200, 60_000, 200):
+            tracker = _make_inactive_tracker(inactive_time_ms=t, roi_idx=1)
+            stim.bind_tracker(tracker)
+            interact, result = stim._decide()
+            assert int(interact) == 0
+            assert result == {}
 
     def test_min_active_time_reaches_the_trigger(self):
         """Guards the plumbing: the user's value must not be silently dropped."""
         stim = ComposedStimulator(
             hardware_connection=MagicMock(),
             trigger_type="activity",
-            min_active_time=42,
+            min_active_time=60,
         )
-        assert stim._trigger._bout_threshold_ms == 42000
+        assert stim._trigger._window_ms == 60000
+
+    def test_activity_threshold_reaches_the_trigger(self):
+        """The knob that actually sets the stimulation rate must be plumbed too."""
+        stim = ComposedStimulator(
+            hardware_connection=MagicMock(),
+            trigger_type="activity",
+            activity_threshold=0.6,
+        )
+        assert stim._trigger._threshold == 0.6
 
     def test_time_restricted_wraps_any_trigger(self):
         """time_restricted is a modifier: it gates the selected trigger."""

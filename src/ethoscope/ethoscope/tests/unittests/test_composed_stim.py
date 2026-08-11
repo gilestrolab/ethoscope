@@ -69,10 +69,10 @@ class TestComposedStimulatorInit(unittest.TestCase):
     def test_init_activity_motor(self):
         """Test init with activity trigger and motor action."""
         stim = self._create_stimulator(
-            trigger_type="activity", action_type="motor_pulse", min_active_time=15
+            trigger_type="activity", action_type="motor_pulse", min_active_time=60
         )
         self.assertIsInstance(stim._trigger, ActivityTrigger)
-        self.assertEqual(stim._trigger._bout_threshold_ms, 15000)
+        self.assertEqual(stim._trigger._window_ms, 60000)
 
     def test_init_time_restricted(self):
         """Test init with the deprecated time-restricted trigger."""
