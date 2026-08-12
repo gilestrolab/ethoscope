@@ -295,12 +295,6 @@ def update_machine_info(id):
         pi.loggingStatus(update_machine_json_data["remoteLogging"])
         haschanged = True
 
-    if "use_noir_tuning" in update_machine_json_data and update_machine_json_data[
-        "use_noir_tuning"
-    ] != machine_info.get("use_noir_tuning", True):
-        pi.set_noir_setting(update_machine_json_data["use_noir_tuning"])
-        haschanged = True
-
     if "has_light_hardware" in update_machine_json_data and update_machine_json_data[
         "has_light_hardware"
     ] != machine_info.get("has_light_hardware", False):
@@ -508,10 +502,20 @@ def get_machine_info(id):
     except Exception:
         machine_info["remoteLogging"] = False
 
+    # NoIR tuning is unconditional (an ethoscope has no other kind of camera), so
+    # what matters is not whether it is enabled but which file the sensor needs
+    # and which one the camera actually loaded. "DEFAULT" means it fell back to
+    # libcamera's colour tuning and this device's auto-exposure is not comparable
+    # with a correctly tuned one.
     try:
-        machine_info["use_noir_tuning"] = pi.get_noir_setting()
+        machine_info["camera_tuning_expected"] = pi.get_camera_tuning_file()
     except Exception:
-        machine_info["use_noir_tuning"] = True
+        machine_info["camera_tuning_expected"] = None
+
+    try:
+        machine_info["camera_tuning_loaded"] = pi.get_camera_tuning_status()
+    except Exception:
+        machine_info["camera_tuning_loaded"] = None
 
     try:
         machine_info["maxfps_setting"] = pi.get_maxfps_setting()
@@ -915,13 +919,6 @@ def user_options(id):
                             "min": 1.0,
                             "max": 16.0,
                             "step": 0.1,
-                            "requires_reboot": False,
-                        },
-                        {
-                            "type": "boolean",
-                            "name": "use_noir_tuning",
-                            "description": "Use NoIR tuning for cameras with IR pass-through filters",
-                            "default": machine_info.get("use_noir_tuning", True),
                             "requires_reboot": False,
                         },
                         {

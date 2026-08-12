@@ -1378,42 +1378,98 @@ def expand_rootfs():
     return result
 
 
-def get_noir_setting(path="/etc/ethoscope/use_noir_tuning"):
+# libcamera ships its sensor tuning files in a pipeline-specific directory:
+# pisp on the Pi 5, vc4 on everything older. Both are searched so one code path
+# covers the whole fleet. Note picamera2's own load_tuning_file() only knows
+# about the vc4 directory, which is why the path is resolved here instead.
+_LIBCAMERA_TUNING_DIRS = (
+    "/usr/share/libcamera/ipa/rpi/pisp",
+    "/usr/share/libcamera/ipa/rpi/vc4",
+    "/usr/local/share/libcamera/ipa/rpi/pisp",
+    "/usr/local/share/libcamera/ipa/rpi/vc4",
+)
+
+
+def get_camera_tuning_file(sensor=None):
     """
-    Reads the NoIR tuning setting for cameras with IR pass-through filters.
+    Resolve the NoIR libcamera tuning file for the attached camera sensor.
+
+    An ethoscope cannot work without an IR pass-through (NoIR) camera, so NoIR
+    tuning is unconditional and is not a user setting. What *does* vary is the
+    sensor: ov5647 (PiNoIR 1), imx219 (PiNoIR 2), imx477 (HQ) and imx708
+    (Camera Module 3) each need their own tuning file, and the file lives in a
+    different directory depending on the Pi generation.
+
+    Args:
+        sensor (str): Sensor name such as "imx219". Detected automatically
+            when omitted.
 
     Returns:
-        bool: True if NoIR tuning should be used, False otherwise
+        str: Absolute path to the NoIR tuning file, or None when the sensor
+            cannot be detected or no matching file is installed. Callers must
+            treat None as a degraded state and say so loudly - silently
+            falling back to the default (colour) tuning changes auto-exposure
+            behaviour with no trace in the data (see issue #222).
+    """
+    if sensor is None:
+        sensor = _get_camera_sensor_info()
+
+    if not sensor:
+        logging.warning("Could not detect the camera sensor; no tuning file resolved")
+        return None
+
+    filename = f"{sensor}_noir.json"
+    for directory in _LIBCAMERA_TUNING_DIRS:
+        candidate = os.path.join(directory, filename)
+        if os.path.isfile(candidate):
+            return candidate
+
+    logging.warning(
+        f"No NoIR tuning file '{filename}' found in any of {_LIBCAMERA_TUNING_DIRS}"
+    )
+    return None
+
+
+# The frame grabber runs in its own process, so what it actually loaded cannot be
+# read back through the object. It records the outcome here, following the same
+# file-on-disk convention already used for the detected camera model.
+CAMERA_TUNING_STATUS_FILE = "/etc/ethoscope/camera-tuning"
+
+
+def set_camera_tuning_status(tuning_file, path=CAMERA_TUNING_STATUS_FILE):
+    """
+    Record which tuning file the camera actually loaded.
+
+    Args:
+        tuning_file (str): Path that was loaded, or None if the camera fell back
+            to libcamera's default (colour) tuning.
+        path (str): Where to record it.
+    """
+    try:
+        ensure_dir_exists(path)
+        with open(path, "w") as f:
+            f.write(tuning_file or "DEFAULT")
+    except Exception as e:
+        logging.error(f"Could not record camera tuning status to {path}: {e}")
+
+
+def get_camera_tuning_status(path=CAMERA_TUNING_STATUS_FILE):
+    """
+    Report the tuning file the camera last loaded.
+
+    Returns:
+        str: The tuning file path, "DEFAULT" when the camera fell back to
+            libcamera's default (colour) tuning - which means auto-exposure
+            behaves differently and the run is not comparable with correctly
+            tuned ones - or None if tracking has not run yet.
     """
     try:
         if os.path.exists(path):
             with open(path) as f:
-                content = f.read().strip().lower()
-                return content in ["true", "1", "yes"]
-        return False
+                return f.read().strip() or None
     except Exception as e:
-        logging.warning(f"Error reading NoIR setting from {path}: {e}")
-        return False
-
-
-def set_noir_setting(use_noir, path="/etc/ethoscope/use_noir_tuning"):
-    """
-    Sets the NoIR tuning preference for cameras with IR pass-through filters.
-
-    Args:
-        use_noir (bool): True to enable NoIR tuning, False to use dynamic adaptation
-        path (str): Path to the configuration file
-    """
-    try:
-        ensure_dir_exists(path)
-
-        with open(path, "w") as f:
-            f.write("true" if use_noir else "false")
-
-        logging.info(f"NoIR tuning setting updated: use_noir={use_noir}")
-    except Exception as e:
-        logging.error(f"Error setting NoIR preference to {path}: {e}")
-        raise
+        logging.warning(f"Could not read camera tuning status from {path}: {e}")
+    return None
 
 
 def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):

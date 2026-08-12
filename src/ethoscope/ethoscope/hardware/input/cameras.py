@@ -677,6 +677,9 @@ class PiFrameGrabber2(PiFrameGrabber):
         """
         # Get gain from system setting
         self._gain = pi.get_gain_setting()
+        # Set in run(), i.e. in the child process: the tuning file actually
+        # loaded, or None if the camera fell back to the default tuning.
+        self._tuning_file = None
         super().__init__(*args, **kwargs)
 
     def _build_camera_controls(self):
@@ -735,34 +738,50 @@ class PiFrameGrabber2(PiFrameGrabber):
         Picamera2.set_logging(logging.ERROR)
 
         try:
-            # Check machine NoIR setting to determine tuning approach
+            # NoIR tuning is unconditional: an ethoscope cannot work without an IR
+            # pass-through camera, so this was never a meaningful user choice. The
+            # tuning *file* does vary by sensor and by Pi generation, which the
+            # resolver handles; it used to be hardcoded to imx219 on the vc4 path,
+            # so every other sensor silently fell back to the default colour tuning
+            # and got different auto-exposure behaviour (issue #222).
             from ethoscope.utils import pi
 
-            use_noir_tuning = pi.get_noir_setting()
+            tuning_path = pi.get_camera_tuning_file()
+            self._tuning_file = tuning_path
 
-            if use_noir_tuning:
-                # Force NoIR tuning file for cameras with IR pass-through filters
-                logging.info(
-                    "Creating Picamera2 instance with forced NoIR tuning for IR pass-through filter"
-                )
+            if tuning_path:
                 try:
+                    # Pass the directory explicitly: picamera2's own search path
+                    # covers only the vc4 directory, so a Pi 5 (pisp) would miss.
                     capture = Picamera2(
                         tuning=Picamera2.load_tuning_file(
-                            "/usr/share/libcamera/ipa/rpi/vc4/imx219_noir.json"
+                            os.path.basename(tuning_path),
+                            dir=os.path.dirname(tuning_path),
                         )
                     )
-                    logging.info("Successfully loaded NoIR tuning file")
+                    logging.info(f"Loaded NoIR tuning file: {tuning_path}")
                 except Exception as e:
-                    logging.warning(
-                        f"Failed to load NoIR tuning file, falling back to automatic detection: {e}"
+                    self._tuning_file = None
+                    logging.error(
+                        f"Failed to load NoIR tuning file {tuning_path}: {e}. "
+                        "Falling back to the default tuning - auto-exposure will "
+                        "behave differently and this run is NOT comparable with "
+                        "correctly tuned ones."
                     )
                     capture = Picamera2()
             else:
-                # Use automatic tuning detection for dynamic day/night adaptation
-                logging.info(
-                    "Creating Picamera2 instance with automatic tuning detection for dynamic light adaptation"
+                logging.error(
+                    "No NoIR tuning file could be resolved for this camera. Falling "
+                    "back to the default tuning - auto-exposure will behave "
+                    "differently and this run is NOT comparable with correctly "
+                    "tuned ones."
                 )
                 capture = Picamera2()
+
+            # Record the outcome where the parent process (and so the node) can
+            # see it: a silent fallback to default tuning is exactly the kind of
+            # per-device difference that made #222 hard to diagnose.
+            pi.set_camera_tuning_status(self._tuning_file)
 
             with capture:
                 logging.info(

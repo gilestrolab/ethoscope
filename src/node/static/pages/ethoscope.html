@@ -13,8 +13,13 @@
             <span ng-if="device.underpowered == true" class="fa fa-bolt fa-3x" title="The PI is underpowered!" style="color: #ff9966;">
             </span>
 
-            <!-- NoIR Camera Icon -->
-            <span ng-if="machine_info.use_noir_tuning" class="fa fa-cloud-moon fa-3x" title="NoIR tuning enabled for IR pass-through filter" style="color: #9966ff;">
+            <!-- Camera tuning. NoIR tuning is always intended; the icon flags the
+                 case where the camera fell back to libcamera's default tuning,
+                 which silently changes auto-exposure behaviour (issue #222). -->
+            <span ng-if="machine_info.camera_tuning_loaded"
+                  class="fa fa-cloud-moon fa-3x"
+                  ng-attr-title="{{machine_info.camera_tuning_loaded === 'DEFAULT' ? 'WARNING: camera fell back to libcamera default tuning instead of the NoIR tuning for this sensor - auto-exposure is not comparable with correctly tuned devices' : 'NoIR tuning loaded: ' + machine_info.camera_tuning_loaded}}"
+                  ng-style="{'color': machine_info.camera_tuning_loaded === 'DEFAULT' ? '#d9534f' : '#9966ff'}">
             </span>
 
             <!-- Dynamic Hard Drive Icon -->
