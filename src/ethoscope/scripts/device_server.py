@@ -316,7 +316,7 @@ def update_machine_info(id):
 
     if "gain_setting" in update_machine_json_data and update_machine_json_data[
         "gain_setting"
-    ] != machine_info.get("gain_setting", 5.0):
+    ] != machine_info.get("gain_setting", pi.DEFAULT_CAMERA_GAIN):
         pi.set_gain_setting(float(update_machine_json_data["gain_setting"]))
         haschanged = True
 
@@ -532,7 +532,7 @@ def get_machine_info(id):
     try:
         machine_info["gain_setting"] = pi.get_gain_setting()
     except Exception:
-        machine_info["gain_setting"] = 5.0
+        machine_info["gain_setting"] = pi.DEFAULT_CAMERA_GAIN
 
     machine_info["SD_CARD_AGE"] = pi.get_SD_CARD_AGE()
     machine_info["partitions"] = pi.get_partition_info()
@@ -922,7 +922,9 @@ def user_options(id):
                             "type": "number",
                             "name": "gain_setting",
                             "description": "Camera gain (lower values reduce noise artifacts for better tracking)",
-                            "default": machine_info.get("gain_setting", 5.0),
+                            "default": machine_info.get(
+                                "gain_setting", pi.DEFAULT_CAMERA_GAIN
+                            ),
                             "min": 1.0,
                             "max": 16.0,
                             "step": 0.1,
@@ -1072,7 +1074,7 @@ if __name__ == "__main__":
         action="store_true",
     )
 
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
     option_dict = vars(options)
 
     PORT = option_dict["port"]

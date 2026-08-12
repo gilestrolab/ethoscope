@@ -166,3 +166,44 @@ def test_noir_setting_is_no_longer_a_user_setting():
     """
     assert not hasattr(pi, "get_noir_setting")
     assert not hasattr(pi, "set_noir_setting")
+
+
+def test_default_gain_is_the_measured_optimum():
+    """Default gain follows the bench measurement, not a guess.
+
+    Noise is linear in gain and independent of frame rate and illumination
+    (issue #222), so gain is the only lever for image noise. The floor is set by
+    detection: gain 1 failed ROI target detection outright, gains 2-3 detected
+    in every condition tested.
+    """
+    assert pi.DEFAULT_CAMERA_GAIN == 3.0
+
+
+def test_missing_gain_file_uses_the_default(tmp_path):
+    assert pi.get_gain_setting(path=str(tmp_path / "absent")) == pi.DEFAULT_CAMERA_GAIN
+
+
+def test_out_of_range_gain_falls_back_to_the_default(tmp_path):
+    bad = tmp_path / "gain_setting"
+    bad.write_text("99")  # outside the 1.0-16.0 the sensor accepts
+
+    assert pi.get_gain_setting(path=str(bad)) == pi.DEFAULT_CAMERA_GAIN
+
+
+def test_valid_gain_file_is_honoured(tmp_path):
+    """A device tuned by hand must keep its value; the default is only a fallback."""
+    f = tmp_path / "gain_setting"
+    f.write_text("7.5")
+
+    assert pi.get_gain_setting(path=str(f)) == 7.5
+
+
+def test_missing_maxfps_file_uses_the_default(tmp_path):
+    assert pi.get_maxfps_setting(path=str(tmp_path / "absent")) == pi.DEFAULT_MAXFPS
+
+
+def test_valid_maxfps_file_is_honoured(tmp_path):
+    f = tmp_path / "maxfps_setting"
+    f.write_text("3")
+
+    assert pi.get_maxfps_setting(path=str(f)) == 3

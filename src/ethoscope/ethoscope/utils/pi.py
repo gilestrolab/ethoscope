@@ -20,6 +20,30 @@ PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 # was never read and detection always fell through to probing the filesystem.
 PICAMERA_VERSION_FILE = "/etc/ethoscope/picamera-version"
 
+# Analogue gain applied when no gain file is present.
+#
+# Measured on a Pi 3 / imx219 bench (issue #222): image noise is linear in gain,
+# frame_noise = 0.523 + 0.0824 x gain (R^2 = 0.965, n = 22), and is independent
+# of frame rate and of illumination - so gain is the only lever for image noise
+# and every step costs about 0.08 grey levels.
+#
+# The floor is set by detection rather than by noise: at gain 1 the image is dim
+# enough that ROI target detection failed outright in one run, and it gave the
+# only unstable noise readings in the matrix. Gains 2-3 detected in every
+# condition tested, so 3 takes the lowest noise that still leaves margin - about
+# 18 % below the 5.0 most cards were shipped with.
+DEFAULT_CAMERA_GAIN = 3.0
+
+# Tracking frame-rate cap applied when no maxfps file is present.
+#
+# It is a CPU throttle, not an exposure control - since the exposure ceiling was
+# decoupled from it, image noise is independent of frame rate (#222). What it
+# does still determine is `dt`, and the movement statistic used for sleep scoring
+# is a per-frame displacement divided by `dt`, so runs at different caps are not
+# directly comparable. 5 matches what deployed cards were shipped with and is at
+# the limit of what a Pi 3 achieves in practice.
+DEFAULT_MAXFPS = 5
+
 
 def ensure_dir_exists(file_path):
     """
@@ -1525,7 +1549,8 @@ def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
         path (str): Path to the configuration file
 
     Returns:
-        int: Maximum FPS value, defaults to 15 if file doesn't exist or invalid
+        int: Maximum FPS value, defaults to DEFAULT_MAXFPS if the file is
+            missing or invalid
     """
     try:
         if os.path.exists(path):
@@ -1537,15 +1562,17 @@ def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
                     return fps_value
                 else:
                     logging.warning(
-                        f"Invalid FPS value {fps_value} in {path}, using default 15"
+                        f"Invalid FPS value {fps_value} in {path}, using default "
+                        f"{DEFAULT_MAXFPS}"
                     )
-                    return 15
-        return 15  # Default value
+                    return DEFAULT_MAXFPS
+        return DEFAULT_MAXFPS
     except (ValueError, OSError) as e:
         logging.warning(
-            f"Error reading max FPS setting from {path}: {e}, using default 15"
+            f"Error reading max FPS setting from {path}: {e}, using default "
+            f"{DEFAULT_MAXFPS}"
         )
-        return 15
+        return DEFAULT_MAXFPS
 
 
 def set_maxfps_setting(max_fps, path="/etc/ethoscope/maxfps_setting"):
@@ -1582,7 +1609,8 @@ def get_gain_setting(path="/etc/ethoscope/gain_setting"):
         path (str): Path to the configuration file
 
     Returns:
-        float: Camera gain value, defaults to 1.0 if file doesn't exist or invalid
+        float: Camera gain value, defaults to DEFAULT_CAMERA_GAIN if the file is
+            missing or invalid.
     """
     try:
         if os.path.exists(path):
@@ -1594,15 +1622,17 @@ def get_gain_setting(path="/etc/ethoscope/gain_setting"):
                     return gain_value
                 else:
                     logging.warning(
-                        f"Invalid gain value {gain_value} in {path}, using default 1.0"
+                        f"Invalid gain value {gain_value} in {path}, using default "
+                        f"{DEFAULT_CAMERA_GAIN}"
                     )
-                    return 1.0
-        return 1.0  # Default value for minimal noise
+                    return DEFAULT_CAMERA_GAIN
+        return DEFAULT_CAMERA_GAIN
     except (ValueError, OSError) as e:
         logging.warning(
-            f"Error reading gain setting from {path}: {e}, using default 1.0"
+            f"Error reading gain setting from {path}: {e}, using default "
+            f"{DEFAULT_CAMERA_GAIN}"
         )
-        return 1.0
+        return DEFAULT_CAMERA_GAIN
 
 
 def set_gain_setting(gain, path="/etc/ethoscope/gain_setting"):
