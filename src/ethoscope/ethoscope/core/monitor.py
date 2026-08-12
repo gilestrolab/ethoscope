@@ -64,6 +64,7 @@ class Monitor:
         # cost nothing on the tracking hot path. See _collect_diagnostics().
         self._diagnostics = {}
         self._last_diagnostics_t = None
+        self._last_diagnostics_frame_idx = 0
 
         if rois is None:
             raise NotImplementedError("rois must exist (cannot be None)")
@@ -319,8 +320,31 @@ class Monitor:
                     self._last_diagnostics_t is None
                     or t - self._last_diagnostics_t >= self._DIAGNOSTICS_INTERVAL
                 ):
+                    # Achieved rate since the previous sample. Recorded next to
+                    # the noise figures because the movement statistic depends
+                    # on dt, so a run cannot be interpreted without it.
+                    fps = None
+                    if (
+                        self._last_diagnostics_t is not None
+                        and t > self._last_diagnostics_t
+                    ):
+                        fps = (i - self._last_diagnostics_frame_idx) / (
+                            (t - self._last_diagnostics_t) / 1000.0
+                        )
+
                     self._last_diagnostics_t = t
+                    self._last_diagnostics_frame_idx = i
                     self._collect_diagnostics(t, frame)
+
+                    # hasattr rather than a bare call: writers that predate the
+                    # diagnostics table (or stand in for one) must not break a
+                    # run just because they cannot record a sample.
+                    if result_writer is not None and hasattr(
+                        result_writer, "write_diagnostics"
+                    ):
+                        result_writer.write_diagnostics(
+                            t_with_offset, self._diagnostics, fps=fps
+                        )
 
                 self._last_t = t
                 time.sleep(0.001)

@@ -509,6 +509,11 @@ class SQLiteResultWriter(BaseResultWriter):
                 "VAR_MAP", "var_name TEXT, sql_type TEXT, functional_type TEXT"
             )
 
+            logging.info("Creating acquisition diagnostics table 'DIAGNOSTICS'")
+            self._create_table(
+                self.DIAGNOSTICS_TABLE_NAME, self.DIAGNOSTICS_FIELDS, engine=None
+            )
+
             if self._shot_saver is not None:
                 logging.info("Creating table for IMG_SNAPSHOTS")
                 # SQLite-compatible version of image snapshots table

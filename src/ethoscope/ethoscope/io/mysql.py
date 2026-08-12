@@ -401,6 +401,8 @@ class MySQLResultWriter(BaseResultWriter):
 
             logging.info("Creating 'METADATA' table")
             self._create_table("METADATA", "field CHAR(100), value TEXT")
+            logging.info("Creating acquisition diagnostics table 'DIAGNOSTICS'")
+            self._create_table(self.DIAGNOSTICS_TABLE_NAME, self.DIAGNOSTICS_FIELDS)
             logging.info("Creating 'START_EVENTS' table")
             self._create_table(
                 "START_EVENTS",

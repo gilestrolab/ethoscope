@@ -871,6 +871,69 @@ class BaseResultWriter:
         except Exception as e:
             logging.error(f"Failed to log I/O diagnostics: {e}")
 
+    # Acquisition-quality samples, one row per interval (about one a minute).
+    # Ordered to match DIAGNOSTICS_INSERT_FIELDS below.
+    DIAGNOSTICS_TABLE_NAME = "DIAGNOSTICS"
+    # No autoincrementing id: the spelling differs between SQLite and MySQL, and
+    # `t` already identifies a sample. One definition then serves both backends.
+    DIAGNOSTICS_FIELDS = (
+        "t INTEGER, "
+        "fps REAL, "
+        "image_noise REAL, "
+        "sharpness REAL, "
+        "jitter REAL, "
+        "n_rois_sampled INTEGER"
+    )
+    DIAGNOSTICS_INSERT_FIELDS = (
+        "t",
+        "fps",
+        "image_noise",
+        "sharpness",
+        "jitter",
+        "n_rois_sampled",
+    )
+
+    def write_diagnostics(self, t, sample, fps=None):
+        """
+        Record one acquisition-quality sample.
+
+        Roughly 1440 rows a day against millions of tracking rows, which buys
+        the ability to ask afterwards whether a run's data is trustworthy:
+        whether the image got noisier, whether focus drifted, and whether the
+        movement signal's noise floor moved with them (issue #222).
+
+        Never raises: diagnostics must not be able to interrupt an experiment.
+
+        Args:
+            t (int): Timestamp of the sample, in milliseconds.
+            sample (dict): Diagnostics as produced by the monitor.
+            fps (float): Achieved frame rate at the time of the sample.
+        """
+        if not sample:
+            return
+
+        try:
+            values = (
+                t,
+                float(fps) if fps is not None else None,
+                sample.get("image_noise"),
+                sample.get("sharpness"),
+                sample.get("jitter"),
+                sample.get("n_rois_sampled"),
+            )
+
+            placeholder = "?" if self._database_type == "SQLite3" else "%s"
+            placeholders = ", ".join([placeholder] * len(values))
+            command = (
+                f"INSERT INTO {self.DIAGNOSTICS_TABLE_NAME} "
+                f"({', '.join(self.DIAGNOSTICS_INSERT_FIELDS)}) "
+                f"VALUES ({placeholders})"
+            )
+            self._write_async_command(command, values)
+
+        except Exception as e:
+            logging.warning(f"Could not record a diagnostics sample: {e}")
+
     def _create_table(self, name, fields, engine="InnoDB"):
         """
         Create a database table with specified fields.

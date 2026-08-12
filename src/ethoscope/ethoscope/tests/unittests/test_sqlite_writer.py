@@ -537,6 +537,81 @@ class TestSQLiteResultWriterCreateAllTables(unittest.TestCase):
         self.assertIn("VAR_MAP", tables)
         self.assertIn("METADATA", tables)
         self.assertIn("START_EVENTS", tables)
+        self.assertIn("DIAGNOSTICS", tables)
+
+    def test_write_diagnostics_records_a_sample(self):
+        """Acquisition quality is persisted so a run can be judged afterwards.
+
+        About 1440 rows a day against millions of tracking rows, which is what
+        makes it possible to ask later whether the image got noisier or focus
+        drifted during an experiment (issue #222).
+        """
+        import time
+
+        writer = self._create_result_writer(erase_old_db=True)
+        time.sleep(0.5)
+
+        writer.write_diagnostics(
+            60000,
+            {
+                "t": 60000,
+                "image_noise": 1.5,
+                "sharpness": 210.0,
+                "jitter": 0.0004,
+                "n_rois_sampled": 20,
+            },
+            fps=4.6,
+        )
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        row = conn.execute(
+            "SELECT t, fps, image_noise, sharpness, jitter, n_rois_sampled "
+            "FROM DIAGNOSTICS"
+        ).fetchone()
+        conn.close()
+
+        self.assertEqual(row[0], 60000)
+        self.assertAlmostEqual(row[1], 4.6, places=3)
+        self.assertAlmostEqual(row[2], 1.5, places=3)
+        self.assertAlmostEqual(row[3], 210.0, places=3)
+        self.assertAlmostEqual(row[4], 0.0004, places=6)
+        self.assertEqual(row[5], 20)
+
+    def test_write_diagnostics_ignores_an_empty_sample(self):
+        """Before the first sample there is nothing to record, and that is fine."""
+        import time
+
+        writer = self._create_result_writer(erase_old_db=True)
+        time.sleep(0.5)
+
+        writer.write_diagnostics(1000, {})
+        writer.write_diagnostics(1000, None)
+        time.sleep(0.3)
+
+        conn = sqlite3.connect(self.db_path)
+        count = conn.execute("SELECT COUNT(*) FROM DIAGNOSTICS").fetchone()[0]
+        conn.close()
+
+        self.assertEqual(count, 0)
+
+    def test_write_diagnostics_tolerates_missing_fields(self):
+        """A partial sample is stored as NULLs rather than being dropped."""
+        import time
+
+        writer = self._create_result_writer(erase_old_db=True)
+        time.sleep(0.5)
+
+        # Background not yet converged: noise unavailable, jitter measured.
+        writer.write_diagnostics(1000, {"jitter": 0.0002, "n_rois_sampled": 3})
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        row = conn.execute("SELECT image_noise, jitter FROM DIAGNOSTICS").fetchone()
+        conn.close()
+
+        self.assertIsNone(row[0])
+        self.assertAlmostEqual(row[1], 0.0002, places=6)
 
     def test_create_all_tables_with_dam(self):
         """Test DAM activity table created when make_dam_like_table=True."""
