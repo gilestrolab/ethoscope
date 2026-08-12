@@ -942,6 +942,27 @@ class TestBackendSelection:
             with patch.object(ld, "_try_make_lgpio_backend", return_value=sentinel):
                 assert ld.LightController._select_backend(17) is sentinel
 
+    def test_lgpio_pwm_refused_on_non_hardware_pwm_pins(self):
+        """CPU-timed PWM on GPIO17 flickers under tracking load - seen on hardware.
+
+        A steady lamp that cannot dim is better for the animals than a
+        dimmable one that flickers, so this must decline rather than degrade.
+        """
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        assert ld._try_make_lgpio_backend(17) is None
+
+    def test_lgpio_pwm_allowed_on_hardware_pwm_pins(self):
+        """GPIO12/13/18/19 drive true hardware PWM, which does not jitter."""
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        fake_module = MagicMock()
+        with patch.dict("sys.modules", {"gpiozero": fake_module}):
+            backend = ld._try_make_lgpio_backend(18)
+
+        assert backend is not None
+        assert backend.name == "lgpio"
+
     def test_falls_back_to_pinctrl_when_no_pwm_backend(self):
         from ethoscope.hardware.interfaces import light_daemon as ld
 

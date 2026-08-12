@@ -18,10 +18,13 @@ The daemon supports three GPIO backends with the same external behaviour:
   ``fade_out_seconds`` ramps to ``max_light`` percent. Requires ``pigpiod``
   to be running (``systemctl enable --now pigpiod``). Only available on
   Bookworm and earlier.
-* ``LgpioBackend`` — PWM via ``gpiozero`` over ``lgpio``, same fade support.
-  This is what modern images use: ``pigpio`` ships no package from Debian
-  Trixie onwards and never supported the Pi 5, so without this backend every
-  recent card silently degraded to binary on/off.
+* ``LgpioBackend`` — PWM via ``gpiozero`` over ``lgpio``, same fade support,
+  **hardware-PWM pins only** (GPIO12/13/18/19). ``pigpio`` ships no package
+  from Debian Trixie onwards and never supported the Pi 5, so this is the only
+  PWM route on modern images. It is restricted to hardware-PWM pins because
+  lgpio times software PWM on the CPU rather than off the DMA engine, and a
+  tracking ethoscope keeps its Pi saturated: on GPIO17 that flickers visibly,
+  which is worse for the animals than not dimming at all.
 * ``PinctrlBackend`` — legacy binary on/off via the ``pinctrl`` CLI. Fade
   requests collapse to instant transitions at the 50 % threshold. Last-resort
   fallback, so older deployments keep working unchanged.
@@ -286,7 +289,26 @@ def _try_make_pigpio_backend(gpio_pin: int) -> _LedBackend | None:
 
 
 def _try_make_lgpio_backend(gpio_pin: int) -> _LedBackend | None:
-    """Return a working LgpioBackend, or None on any failure (logged once)."""
+    """Return a working LgpioBackend, or None if unsuitable (logged once).
+
+    Restricted to hardware-PWM pins on purpose. Unlike pigpio, which clocked
+    software PWM off the DMA engine and so was immune to CPU load, lgpio times
+    its pulses on the CPU: on a tracking ethoscope - which runs its Pi at
+    saturation, and thermally throttled when enclosed - that produces visibly
+    flickering light. Flicker is a salient visual stimulus to the animals, so a
+    steady lamp that cannot dim beats a dimmable one that flickers.
+    """
+    if gpio_pin not in _HW_PWM_GPIOS:
+        logging.warning(
+            "GPIO%s is not hardware-PWM capable and pigpio is unavailable, so "
+            "PWM would be CPU-timed and visibly flicker under tracking load. "
+            "Falling back to steady on/off. For dimming and fades, wire the LED "
+            "to a hardware-PWM GPIO (%s).",
+            gpio_pin,
+            ", ".join(str(p) for p in sorted(_HW_PWM_GPIOS)),
+        )
+        return None
+
     try:
         return LgpioBackend(gpio_pin)
     except ImportError:
