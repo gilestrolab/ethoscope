@@ -1281,9 +1281,12 @@ class ControlThread(Thread):
         ROIBuilderClass = self._option_dict["roi_builder"]["class"]
         roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
 
-        roi_builder = ROIBuilderClass(**roi_builder_kwargs)
-
         try:
+            # Inside the try: constructing the builder is where a bad or missing
+            # template fails, and that escaped as a raw traceback in the device's
+            # error field rather than a sentence the user can act on.
+            roi_builder = ROIBuilderClass(**roi_builder_kwargs)
+
             reference_points, rois = roi_builder.build(cam)
 
             # Handle graceful failure when ROI building returns None values
