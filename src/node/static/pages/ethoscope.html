@@ -109,12 +109,16 @@
                      absorbed into the calibration feature later. No threshold is
                      applied yet - the alert level has to come from observed fleet
                      values rather than an invented cutoff. -->
-                <span ng-if="device.status == 'running' && device.monitor_info.diagnostics.jitter !== undefined && device.monitor_info.diagnostics.jitter !== null">
-                    <span class="fas fa-wave-square" title="Noise floor of the movement signal, as a fraction of ROI width. Lower is better."></span>
-                    Jitter: {{device.monitor_info.diagnostics.jitter | number:5}}
-                    <span title="Image noise, in grey levels. Driven by illumination and gain.">| noise: {{device.monitor_info.diagnostics.image_noise | number:2}}</span>
-                    <span title="Focus proxy: variance of the Laplacian. Higher is sharper.">| focus: {{device.monitor_info.diagnostics.sharpness | number:0}}</span>
-                    <span style="color: #6c757d;">({{device.monitor_info.diagnostics.n_rois_sampled}} ROIs)</span>
+                <!-- Gated on the sample existing, not on any one field: jitter is
+                     null whenever no animal is detected, and gating on it hid the
+                     noise and focus readings that were being measured perfectly
+                     well. Each figure shows only when it has a value. -->
+                <span ng-if="device.status == 'running' && device.monitor_info.diagnostics.t">
+                    <span class="fas fa-wave-square" title="Acquisition quality, sampled once a minute"></span>
+                    <span title="Single-frame noise estimate, in grey levels. Set by analogue gain; independent of frame rate and illumination.">Noise: {{device.monitor_info.diagnostics.frame_noise | number:3}}</span>
+                    <span ng-if="device.monitor_info.diagnostics.sharpness !== null" title="Variance of the Laplacian: high-frequency content. Rises with gain.">| focus: {{device.monitor_info.diagnostics.sharpness | number:0}}</span>
+                    <span ng-if="device.monitor_info.diagnostics.jitter !== null" title="Noise floor of the movement signal, as a fraction of ROI width. Lower is better.">| jitter: {{device.monitor_info.diagnostics.jitter | number:5}} <span style="color: #6c757d;">({{device.monitor_info.diagnostics.n_rois_sampled}} ROIs)</span></span>
+                    <span ng-if="device.monitor_info.diagnostics.cpu_temp !== null" title="Core temperature. Sensor dark current roughly doubles every 6-8 C.">| {{device.monitor_info.diagnostics.cpu_temp | number:1}} &#8451;</span>
                     <br>
                 </span>
                 <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
