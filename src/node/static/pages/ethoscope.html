@@ -104,6 +104,19 @@
                 <br>
                 <span ng-if="device.status == 'running'" class="fas fa-camera"></span> {{device.monitor_info.fps}} FPS
                 <br>
+                <!-- Acquisition quality, sampled once a minute during tracking.
+                     A debugging aid while issue #222 is open; expected to be
+                     absorbed into the calibration feature later. No threshold is
+                     applied yet - the alert level has to come from observed fleet
+                     values rather than an invented cutoff. -->
+                <span ng-if="device.status == 'running' && device.monitor_info.diagnostics.jitter !== undefined && device.monitor_info.diagnostics.jitter !== null">
+                    <span class="fas fa-wave-square" title="Noise floor of the movement signal, as a fraction of ROI width. Lower is better."></span>
+                    Jitter: {{device.monitor_info.diagnostics.jitter | number:5}}
+                    <span title="Image noise, in grey levels. Driven by illumination and gain.">| noise: {{device.monitor_info.diagnostics.image_noise | number:2}}</span>
+                    <span title="Focus proxy: variance of the Laplacian. Higher is sharper.">| focus: {{device.monitor_info.diagnostics.sharpness | number:0}}</span>
+                    <span style="color: #6c757d;">({{device.monitor_info.diagnostics.n_rois_sampled}} ROIs)</span>
+                    <br>
+                </span>
                 <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
                 <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451
             </p>

@@ -348,6 +348,13 @@ class AdaptiveBGModel(BaseTracker):
 
         self._bg_model = BackgroundModel()
         self._max_m_log_lik = 5.5
+
+        # Reference (not a copy) to the most recent pre-processed ROI, kept so
+        # image noise can be measured against the background model on demand.
+        # Sampling it here costs one assignment per frame instead of running an
+        # estimator on the tracking hot path, which maxfps_setting exists to
+        # protect (issue #222).
+        self._last_grey = None
         self._buff_grey = None
         self._buff_object = None
         self._buff_object_old = None
@@ -380,6 +387,35 @@ class AdaptiveBGModel(BaseTracker):
 
         if self.blur_rad % 2 == 0:
             self.blur_rad += 1
+
+    def image_noise(self):
+        """
+        Image noise in this ROI, in grey levels.
+
+        Measured as the median absolute difference between the most recent
+        pre-processed ROI and the background model's running mean. The median is
+        used rather than the mean or the standard deviation because the animal
+        occupies a small fraction of the ROI: a median is unaffected by it, so
+        the number reflects sensor noise rather than the animal's presence.
+
+        This is the *cause* side of the sleep-scoring problem in issue #222 -
+        noisier frames jitter the tracked centroid, and the jitter is scored as
+        movement. It is computed on demand (roughly once a minute) rather than
+        per frame, so it costs nothing on the tracking hot path.
+
+        Returns:
+            float: Median absolute deviation from the background, in grey
+                levels, or None before the background model has converged.
+        """
+        background = self._bg_model.bg_img
+
+        if background is None or self._last_grey is None:
+            return None
+
+        if background.shape != self._last_grey.shape:
+            return None
+
+        return float(np.median(np.abs(self._last_grey.astype(np.float32) - background)))
 
     def _pre_process_input_minimal(self, img, mask, t, darker_fg=True):
         """
@@ -455,6 +491,7 @@ class AdaptiveBGModel(BaseTracker):
         """
 
         pre_processed_image = self._pre_process_input_minimal(img, mask, t)
+        self._last_grey = pre_processed_image
 
         try:
             return self._track(img, pre_processed_image, mask, t)

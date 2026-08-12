@@ -719,6 +719,10 @@ class ControlThread(Thread):
                 # "last_positions":pos,
                 "last_time_stamp": t,
                 "fps": f,
+                # Acquisition quality, refreshed by the monitor on a slow
+                # interval. Rides along with the existing payload so the node
+                # needs no new endpoint to display it (issue #222).
+                "diagnostics": self._monit.diagnostics,
             }
 
         if self._drawer:
