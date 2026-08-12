@@ -11,21 +11,25 @@ GPIO HIGH = MOSFET on = LED on, GPIO LOW = LED off.
 
 Backends
 --------
-The daemon supports two GPIO backends with the same external behaviour:
+The daemon supports three GPIO backends with the same external behaviour:
 
 * ``PigpioBackend`` — DMA-software-PWM via ``pigpio`` on any GPIO, or *true*
   hardware PWM on GPIO12/13/18/19. Provides smooth ``fade_in_seconds`` /
   ``fade_out_seconds`` ramps to ``max_light`` percent. Requires ``pigpiod``
-  to be running (``systemctl enable --now pigpiod`` on Debian/Raspbian).
+  to be running (``systemctl enable --now pigpiod``). Only available on
+  Bookworm and earlier.
+* ``LgpioBackend`` — PWM via ``gpiozero`` over ``lgpio``, same fade support.
+  This is what modern images use: ``pigpio`` ships no package from Debian
+  Trixie onwards and never supported the Pi 5, so without this backend every
+  recent card silently degraded to binary on/off.
 * ``PinctrlBackend`` — legacy binary on/off via the ``pinctrl`` CLI. Fade
-  requests collapse to instant transitions at the 50 % threshold. Used as
-  the fallback when ``pigpio`` isn't installed or ``pigpiod`` isn't running,
-  so older deployments keep working unchanged.
+  requests collapse to instant transitions at the 50 % threshold. Last-resort
+  fallback, so older deployments keep working unchanged.
 
-Backend selection happens at init: pigpio is tried first, with the pinctrl
-backend automatically taking over on any error (import failure, daemon not
-running, connection refused). The choice is logged at startup so it's
-self-evident in the journal which backend is in use.
+Backend selection happens at init, in that order, each falling through to the
+next on any error (import failure, daemon not running, connection refused).
+The choice is logged at startup so it's self-evident in the journal which
+backend is in use.
 """
 
 import datetime
@@ -215,21 +219,87 @@ class PigpioBackend(_LedBackend):
             pass
 
 
+class LgpioBackend(_LedBackend):
+    """PWM via ``gpiozero`` over the ``lgpio`` pin factory.
+
+    The successor to pigpio on modern Raspberry Pi OS: ``pigpio`` ships no
+    package from Debian Trixie onwards, and does not support the Pi 5 at all,
+    so without this backend every recent image silently degraded to binary
+    on/off. Software PWM here runs inside this process, which is fine because
+    the daemon is long-lived, but means the LED reverts when it exits.
+    """
+
+    supports_fade = True
+    name = "lgpio"
+
+    def __init__(self, gpio_pin: int, frequency_hz: int = DEFAULT_PWM_FREQUENCY_HZ):
+        from gpiozero import PWMLED
+
+        self._gpio_pin = int(gpio_pin)
+        self._frequency_hz = int(frequency_hz)
+        self._led = PWMLED(self._gpio_pin, frequency=self._frequency_hz)
+        self._current_pct = None
+
+        logging.info(
+            "LED backend: lgpio PWM on GPIO%s at %s Hz",
+            self._gpio_pin,
+            self._frequency_hz,
+        )
+
+    def set_pct(self, pct: int) -> None:
+        pct = max(0, min(100, int(pct)))
+        if pct == self._current_pct:
+            return
+        # Same gamma correction as the pigpio backend, so a given percentage
+        # looks the same whichever backend a device happens to be using.
+        self._led.value = (pct / 100.0) ** LIGHT_GAMMA
+        self._current_pct = pct
+
+    def close(self) -> None:
+        try:
+            self._led.value = 0
+        except Exception:
+            pass
+        try:
+            self._led.close()
+        except Exception:
+            pass
+
+
 def _try_make_pigpio_backend(gpio_pin: int) -> _LedBackend | None:
     """Return a working PigpioBackend, or None on any failure (logged once)."""
     try:
         return PigpioBackend(gpio_pin)
     except ImportError:
+        logging.info(
+            "pigpio Python module not available — trying the lgpio backend. "
+            "(pigpio has no package on Debian Trixie and later.)"
+        )
+        return None
+    except Exception as e:
+        logging.info(
+            "Could not open pigpio (%s) — trying the lgpio backend. "
+            "Is pigpiod running? systemctl enable --now pigpiod",
+            e,
+        )
+        return None
+
+
+def _try_make_lgpio_backend(gpio_pin: int) -> _LedBackend | None:
+    """Return a working LgpioBackend, or None on any failure (logged once)."""
+    try:
+        return LgpioBackend(gpio_pin)
+    except ImportError:
         logging.warning(
-            "pigpio Python module not available — falling back to pinctrl backend "
-            "(no fade support). Install with: apt-get install python3-pigpio pigpio"
+            "gpiozero/lgpio not available — falling back to pinctrl backend "
+            "(no fade support). Install with: "
+            "apt-get install python3-gpiozero python3-lgpio"
         )
         return None
     except Exception as e:
         logging.warning(
-            "Could not open pigpio (%s) — falling back to pinctrl backend "
-            "(no fade support). Is pigpiod running? "
-            "systemctl enable --now pigpiod",
+            "Could not open lgpio (%s) — falling back to pinctrl backend "
+            "(no fade support)",
             e,
         )
         return None
@@ -282,6 +352,9 @@ class LightController:
     @staticmethod
     def _select_backend(gpio_pin: int) -> _LedBackend:
         backend = _try_make_pigpio_backend(gpio_pin)
+        if backend is not None:
+            return backend
+        backend = _try_make_lgpio_backend(gpio_pin)
         if backend is not None:
             return backend
         return PinctrlBackend(gpio_pin)

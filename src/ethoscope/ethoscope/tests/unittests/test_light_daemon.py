@@ -915,3 +915,54 @@ class TestSetLedBackcompat:
         controller = LightController(gpio_pin=17, socket_path=None, backend=backend)
         controller.set_led(False)
         backend.set_pct.assert_called_with(0)
+
+
+class TestBackendSelection:
+    """Backend order: pigpio, then lgpio, then binary pinctrl.
+
+    pigpio ships no package from Debian Trixie onwards and never supported the
+    Pi 5, so without the lgpio backend every modern card silently lost PWM and
+    fell back to binary on/off - found on a Trixie Pi 3 during bench testing.
+    """
+
+    def test_prefers_pigpio_when_available(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        sentinel = object()
+        with patch.object(ld, "_try_make_pigpio_backend", return_value=sentinel):
+            with patch.object(ld, "_try_make_lgpio_backend") as lgpio:
+                assert ld.LightController._select_backend(17) is sentinel
+                lgpio.assert_not_called()
+
+    def test_falls_back_to_lgpio_when_pigpio_missing(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        sentinel = object()
+        with patch.object(ld, "_try_make_pigpio_backend", return_value=None):
+            with patch.object(ld, "_try_make_lgpio_backend", return_value=sentinel):
+                assert ld.LightController._select_backend(17) is sentinel
+
+    def test_falls_back_to_pinctrl_when_no_pwm_backend(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        with patch.object(ld, "_try_make_pigpio_backend", return_value=None):
+            with patch.object(ld, "_try_make_lgpio_backend", return_value=None):
+                backend = ld.LightController._select_backend(17)
+
+        assert isinstance(backend, PinctrlBackend)
+        assert not backend.supports_fade
+
+    def test_lgpio_backend_applies_the_same_gamma(self):
+        """A given percentage must look the same on either PWM backend."""
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        fake_led = MagicMock()
+        fake_module = MagicMock()
+        fake_module.PWMLED.return_value = fake_led
+
+        with patch.dict("sys.modules", {"gpiozero": fake_module}):
+            backend = ld.LgpioBackend(17)
+            backend.set_pct(50)
+
+        assert backend.supports_fade
+        assert fake_led.value == pytest.approx((50 / 100.0) ** LIGHT_GAMMA)
