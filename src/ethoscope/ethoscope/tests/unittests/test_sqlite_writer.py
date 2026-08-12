@@ -856,3 +856,64 @@ class TestDiagnosticsOnResumedRuns(unittest.TestCase):
         conn.close()
 
         self.assertEqual(count, 1)
+
+
+class TestDiagnosticsTemperature(unittest.TestCase):
+    """Core temperature is stored with each sample.
+
+    Dark current roughly doubles every 6-8 C and its shot noise goes as the
+    square root, so an image_noise reading cannot be interpreted without the
+    temperature it was taken at - a warm room and a cooled incubator are
+    different measurements of the same camera.
+    """
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.db_fd)
+        self.rois = [
+            ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1),
+        ]
+        self.writers = []
+
+    def tearDown(self):
+        for writer in self.writers:
+            try:
+                writer._queue.put("DONE")
+                writer._queue.cancel_join_thread()
+                if writer._async_writer.is_alive():
+                    writer._async_writer.join(timeout=2)
+            except Exception:
+                pass
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def test_cpu_temp_is_recorded(self):
+        import time
+
+        writer = SQLiteResultWriter(
+            db_credentials={"name": self.db_path},
+            rois=self.rois,
+            metadata={"machine_name": "t", "machine_id": "T"},
+            erase_old_db=True,
+        )
+        self.writers.append(writer)
+        time.sleep(0.5)
+
+        writer.write_diagnostics(
+            60000,
+            {
+                "image_noise": 0.5,
+                "sharpness": 20.0,
+                "jitter": 0.002,
+                "n_rois_sampled": 20,
+                "cpu_temp": 57.5,
+            },
+            fps=4.8,
+        )
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        temp = conn.execute("SELECT cpu_temp FROM DIAGNOSTICS").fetchone()[0]
+        conn.close()
+
+        self.assertAlmostEqual(temp, 57.5, places=2)

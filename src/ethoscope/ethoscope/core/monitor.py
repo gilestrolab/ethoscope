@@ -152,6 +152,11 @@ class Monitor:
                 "t": t,
                 # Grey levels: sensor noise, driven by illumination and gain.
                 "image_noise": float(np.median(noises)) if noises else None,
+                # Core temperature, because dark current roughly doubles every
+                # 6-8 C and its shot noise goes as the square root: a noise
+                # reading cannot be interpreted without the temperature it was
+                # taken at, and an enclosure or a warm room changes it.
+                "cpu_temp": self._core_temperature(),
                 # Variance of the Laplacian: high is sharp, low is defocused.
                 "sharpness": self._frame_sharpness(frame),
                 # Fraction of ROI width: the noise floor of the movement signal,
@@ -164,6 +169,22 @@ class Monitor:
             logging.warning(
                 f"Could not collect tracking diagnostics: {traceback.format_exc()}"
             )
+
+    @staticmethod
+    def _core_temperature():
+        """
+        Core temperature in degrees C, or None off a Pi.
+
+        A proxy for sensor temperature rather than a measurement of it - the
+        camera sits on its own board - but it tracks the enclosure and the room,
+        which is what changes between a warm afternoon and a cooled incubator.
+        """
+        try:
+            from ethoscope.utils import pi
+
+            return float(pi.get_core_temperature())
+        except Exception:
+            return None
 
     @staticmethod
     def _frame_sharpness(frame):
