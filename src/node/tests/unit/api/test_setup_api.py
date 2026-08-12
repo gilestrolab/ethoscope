@@ -678,6 +678,46 @@ class TestSetupAPI(unittest.TestCase):
 
     @patch("bottle.request")
     @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_add_incubator_duplicate_name_is_named(
+        self, mock_db_class, mock_request
+    ):
+        """A name clash must say so, not report a generic failure.
+
+        addIncubator() returns -1 both for a duplicate name and for a failed
+        INSERT; the handler must distinguish them so the user knows what to fix.
+        """
+        mock_request.json = {"name": "Incubator 1"}
+
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = -1
+        mock_db.getIncubatorByName.return_value = {"id": 1, "name": "Incubator 1"}
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "error")
+        self.assertIn("already exists", result["message"])
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_setup_add_incubator_db_error_points_at_log(
+        self, mock_db_class, mock_request
+    ):
+        """A failed INSERT (no name clash) must point the user at the log."""
+        mock_request.json = {"name": "miniPercival"}
+
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = -1
+        mock_db.getIncubatorByName.return_value = {}
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "error")
+        self.assertIn("node log", result["message"])
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
     def test_setup_update_incubator_success(self, mock_db_class, mock_request):
         """Test updating incubator successfully."""
         mock_request.json = {

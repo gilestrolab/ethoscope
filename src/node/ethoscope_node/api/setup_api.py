@@ -674,7 +674,22 @@ class SetupAPI(BaseAPI):
                     "incubator_id": result,
                 }
             else:
-                return {"result": "error", "message": "Failed to create incubator"}
+                # Reason: addIncubator() collapses "name taken" and "the INSERT
+                # failed" into a single -1, which reached the user as a bare
+                # "Failed to create incubator" with the actual cause buried in
+                # the node log. Re-query only on the failure path (never on the
+                # happy path) to tell the two apart and say which one it was.
+                if db.getIncubatorByName(incubator_data["name"]):
+                    return {
+                        "result": "error",
+                        "message": f'An incubator named "{incubator_data["name"]}" '
+                        "already exists",
+                    }
+                return {
+                    "result": "error",
+                    "message": "Failed to create incubator: the database rejected "
+                    "the insert. See the node log for the SQLite error.",
+                }
 
         except Exception as e:
             self.logger.error(f"Error creating incubator: {e}")
