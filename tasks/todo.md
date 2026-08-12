@@ -386,8 +386,23 @@ addressing only exposure will not make sleep scores comparable across units.
 - [ ] Repeat the illumination sweep with flies, so jitter reflects animals.
 - [ ] Defocus test at fixed illumination, to see whether sharpness separates
       focus from contrast before it is used for attribution.
-- [ ] `manual_polygons` ROI templates are broken (`template.py`): float32
-      polygons where fillPoly needs int32, and normalised coordinates never
-      scaled by the camera. `default_full_image` is unusable.
-- [ ] ROI-building failures all report "insufficient targets detected" whatever
-      the real cause, which misdirects diagnosis.
+- [x] `manual_polygons` ROI templates repaired (`template.py`): int32 points,
+      and unit-square coordinates scaled to the frame and clipped to the last
+      valid pixel. `default_full_image` builds and tracks on the device.
+- [x] ROI-building failures now report their real cause. Builder construction
+      moved inside the try as well, since a missing template failed one line
+      above it and escaped as a raw traceback.
+- [x] DIAGNOSTICS created unconditionally, so resumed runs record samples.
+- [x] Camera model cache path unified (writer and reader had disagreed, so it
+      was never read).
+
+Remaining known defects, not fixed here:
+- [ ] `_has_moved()` divides by dt before the term cancels (#224 territory).
+- [ ] `ethoscopeFormService.js` seeds arguments with `argDef.default || ''`,
+      mangling boolean False and numeric 0 (#224 territory).
+- [ ] The device unit suite cannot be collected by pytest at all: importing
+      `ethoscope/__init__.py` fails through `control` -> `ethoscope.core.monitor`.
+      Pre-existing; tests had to be run from a copy outside the package tree.
+- [ ] Devices cannot self-update on this network: `origin` is
+      `git://node.local/ethoscope.git`, which does not resolve from a device and
+      whose git daemon port is closed.
