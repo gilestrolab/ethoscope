@@ -70,6 +70,29 @@ def test_reads_the_acquisition_regime_from_the_camera():
     assert metadata["tracker_class"] == "_FakeTracker"
 
 
+def test_reads_the_regime_from_the_frame_grabber():
+    """Pi cameras keep these on the grabber process, not on the camera.
+
+    Regression: reading only the camera object left target_fps and
+    exposure_decoupled empty in the database of a real run - and
+    exposure_decoupled is the very thing issue #222 is about.
+    """
+
+    class _Grabber:
+        _target_fps = 5.0
+        _exposure_decoupled = True
+
+    class _PiCam:
+        width = 1280
+        height = 960
+        _p = _Grabber()
+
+    metadata = ControlThread._acquisition_metadata(_PiCam(), _FakeTracker)
+
+    assert metadata["target_fps"] == "5.0"
+    assert metadata["exposure_decoupled"] == "True"
+
+
 def test_a_failing_probe_does_not_break_the_experiment():
     """A probe that raises degrades to None instead of propagating.
 

@@ -551,18 +551,31 @@ class ControlThread(Thread):
 
             return version("picamera2")
 
+        def _camera_attr(name):
+            """
+            Read an acquisition attribute from the camera or its frame grabber.
+
+            The Pi cameras delegate acquisition to a frame-grabber process held
+            as ``_p``, so target_fps and the exposure regime live one level down;
+            simpler cameras keep them on the camera itself. Both are checked
+            because reading only the camera left these two fields empty in the
+            database on a real device.
+            """
+            for obj in (cam, getattr(cam, "_p", None)):
+                if obj is not None and getattr(obj, name, None) is not None:
+                    return getattr(obj, name)
+            return None
+
         metadata = {
             # Sampling rate: the configured ceiling, and what the camera was
             # actually asked for (they differ for video recording).
             "maxfps_setting": _safe(pi.get_maxfps_setting),
-            "target_fps": _safe(lambda: getattr(cam, "_target_fps", None)),
+            "target_fps": _safe(lambda: _camera_attr("_target_fps")),
             # Exposure regime. With the gain pinned, the FPS ceiling doubles as
             # an exposure ceiling; 'exposure_decoupled' records whether this
             # build lets auto-exposure integrate beyond 1 / target_fps.
             "gain_setting": _safe(pi.get_gain_setting),
-            "exposure_decoupled": _safe(
-                lambda: getattr(cam, "_exposure_decoupled", None)
-            ),
+            "exposure_decoupled": _safe(lambda: _camera_attr("_exposure_decoupled")),
             # Camera tuning: what this sensor needs, and what was really loaded.
             # "DEFAULT" means it fell back to libcamera's colour tuning and this
             # run is not comparable with a correctly tuned one.
