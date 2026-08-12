@@ -228,3 +228,39 @@ warn-only.
 - Packaging the standalone as a Debian/Docker artefact (Phase 3).
 - Migrating already-deployed firmware configs — bump persisted-config schema, accept
   reset-to-defaults on first boot of new FW.
+
+# Fresh-install setup wizard + incubator report (2026-08-12)
+
+Reported by a user on a freshly reinstalled node (Manjaro LiveCD, ethoscope-node
+1.7-7): the wizard's final "Next" did nothing, and adding an incubator failed
+with a generic, doubled error message.
+
+## Fixed (all reproduced locally first)
+- [x] **Wizard dead-end in reconfigure mode.** `init()` set `totalSteps = 8`
+      while the completion screen is step 9, so `nextStep()` was a no-op on the
+      last input step: the POST succeeded, the page never changed, and
+      `/setup/complete` was never reached. Reconfigure mode never actually
+      skipped a step, so the total is now 9 in both modes.
+      (`static/js/controllers/installationWizardController.js`)
+- [x] **`/setup/reset` was a silent no-op on fresh installs.** The no-config-file
+      path shallow-copied `DEFAULT_SETTINGS`, so `_settings["setup"]` *was* the
+      class attribute; `complete_setup()` flipped the class default to
+      `completed: True`, and every later "restore the defaults" restored the
+      polluted values. Now a deep copy. (`utils/configuration.py`)
+- [x] **`add_key()` never persisted.** Mutated `_settings` without `save()`; its
+      round-trip test only passed because of the pollution above.
+- [x] **Dead Back button on the Remote Access step** — `ng-click="goToPreviousStep()"`
+      names a function that does not exist. AngularJS evaluates an undefined
+      handler as a silent no-op: no page change, no console error, no request.
+- [x] **Unactionable incubator error.** `addIncubator()` returns -1 for both
+      "name already taken" and "the INSERT failed"; the handler reported a bare
+      "Failed to create incubator". It now re-queries on the failure path only
+      and names which of the two happened. (`api/setup_api.py`)
+
+## Discovered During Work
+- `migrate_legacy_config_dir()` **moves** (`shutil.move`) everything in
+  `/etc/ethoscope` into the resolved config dir. Starting a dev server with
+  `--configuration <somewhere else>` silently relocates a real node's config.
+  Worth a guard or at least a loud warning.
+- Failure-path messages across `setup_api.py` are uniformly generic
+  ("Failed to create user", ...); the incubator one is fixed, the rest are not.
