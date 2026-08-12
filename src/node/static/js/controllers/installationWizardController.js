@@ -134,14 +134,20 @@
             var hash = $location.hash();
 
             // Check for reconfigure parameter in both search and hash
+            // Reason: totalSteps must count the completion screen (step 9) in
+            // both modes. Reconfigure mode used to claim 8 steps, which made
+            // nextStep() a no-op on the last input step (Notifications): the
+            // POST succeeded but the wizard never advanced to step 9, so
+            // /setup/complete was never called and setup could not be finished.
+            // Reconfigure mode does not actually skip any step either.
+            $scope.totalSteps = 9;
+
             if ((search.reconfigure && search.reconfigure.toLowerCase() === 'true') ||
                 (hash && hash.indexOf('reconfigure=true') !== -1)) {
                 $scope.isReconfigureMode = true;
-                $scope.totalSteps = 8; // Skip basic info step in reconfigure mode
                 $scope.loadExistingConfig();
             } else {
                 $scope.isReconfigureMode = false;
-                $scope.totalSteps = 9;
             }
         };
 
