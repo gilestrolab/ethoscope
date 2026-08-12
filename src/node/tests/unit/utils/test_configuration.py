@@ -570,10 +570,12 @@ class TestEthoscopeConfigurationSections:
         config._settings = {"section": {"old": "value"}}
         config._logger = MagicMock()
 
-        config.add_key("section", {"new": "data"})
+        with patch.object(config, "save") as mock_save:
+            config.add_key("section", {"new": "data"})
 
         assert config._settings["section"]["old"] == "value"
         assert config._settings["section"]["new"] == "data"
+        mock_save.assert_called_once()  # new keys must reach disk
 
     def test_add_key_creates_section_if_missing(self):
         """Test adding keys creates section if it doesn't exist."""
@@ -581,7 +583,8 @@ class TestEthoscopeConfigurationSections:
         config._settings = {}
         config._logger = MagicMock()
 
-        config.add_key("new_section", {"key": "value"})
+        with patch.object(config, "save"):
+            config.add_key("new_section", {"key": "value"})
 
         assert "new_section" in config._settings
         assert config._settings["new_section"]["key"] == "value"
@@ -1196,10 +1199,46 @@ class TestEthoscopeConfigurationSetup:
             with patch.object(config, "save"):
                 config.reset_setup()
 
-            assert (
-                config._settings["setup"]
-                == EthoscopeConfiguration.DEFAULT_SETTINGS["setup"]
-            )
+            # Compare against a literal, not against DEFAULT_SETTINGS: asserting
+            # equality with the class attribute passes even when that attribute
+            # has itself been polluted, which is exactly how the fresh-install
+            # reset bug went unnoticed (see test_fresh_install_does_not_pollute_defaults).
+            assert config._settings["setup"]["completed"] is False
+            assert config._settings["setup"]["steps_completed"] == []
+            assert config._settings["setup"]["setup_started"] is None
+
+    def test_fresh_install_does_not_pollute_class_defaults(self):
+        """A first run with no config file must not mutate DEFAULT_SETTINGS.
+
+        The defaults used to be shallow-copied, so on a brand-new node
+        ``_settings["setup"]`` *was* ``DEFAULT_SETTINGS["setup"]``. Completing
+        the wizard then flipped the class default to completed=True, and every
+        later "restore defaults" restored the polluted values — making
+        reset_setup() a silent no-op.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+            config._config_file = Path(tmpdir) / "ethoscope.conf"
+            config._settings = {}
+            config._logger = MagicMock()
+
+            # Fresh install: no config file on disk -> defaults are used.
+            with patch.object(config, "save"):
+                config.load()
+                config.mark_setup_step_completed("notifications")
+                config.complete_setup()
+
+            defaults = EthoscopeConfiguration.DEFAULT_SETTINGS["setup"]
+            assert defaults["completed"] is False
+            assert defaults["steps_completed"] == []
+            assert defaults["setup_completed"] is None
+
+            # ...and a reset genuinely clears the live settings.
+            with patch.object(config, "save"):
+                config.reset_setup()
+
+            assert config._settings["setup"]["completed"] is False
+            assert config._settings["setup"]["steps_completed"] == []
 
 
 class TestEthoscopeConfigurationTunnel:

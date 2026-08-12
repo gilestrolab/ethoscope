@@ -1,3 +1,4 @@
+import copy
 import datetime
 import json
 import logging
@@ -301,8 +302,6 @@ class EthoscopeConfiguration:
         Returns:
             Merged configuration data
         """
-        import copy
-
         merged = copy.deepcopy(self.DEFAULT_SETTINGS)
 
         def deep_merge(target: dict, source: dict) -> dict:
@@ -387,7 +386,13 @@ class EthoscopeConfiguration:
         # If file doesn't exist, save defaults
         if not self.file_exists:
             self._logger.info("Configuration file not found, creating with defaults")
-            self._settings = self.DEFAULT_SETTINGS.copy()
+            # Reason: must be a deep copy. A shallow copy shares the nested
+            # section dicts with the class attribute, so the first fresh-install
+            # run mutates DEFAULT_SETTINGS itself (e.g. complete_setup() sets
+            # setup.completed = True on the class default). Every later
+            # "restore the defaults" then restores the polluted values —
+            # reset_setup() became a silent no-op on brand-new nodes.
+            self._settings = copy.deepcopy(self.DEFAULT_SETTINGS)
             self.save()
             return self._settings
 
@@ -474,6 +479,10 @@ class EthoscopeConfiguration:
             self.add_section(section)
 
         self._settings[section].update(obj)
+        # Reason: persist like every other mutator (update_custom, add_user...).
+        # Without this the new keys lived only in memory; the round-trip test
+        # passed only because the shallow-copied defaults were being mutated too.
+        self.save()
         self._logger.info(
             f"Updated section '{section}' with new keys: {list(obj.keys())}"
         )
@@ -947,7 +956,7 @@ class EthoscopeConfiguration:
             step: Name of the completed step
         """
         if "setup" not in self._settings:
-            self._settings["setup"] = self.DEFAULT_SETTINGS["setup"].copy()
+            self._settings["setup"] = copy.deepcopy(self.DEFAULT_SETTINGS["setup"])
 
         steps_completed = self._settings["setup"].get("steps_completed", [])
         if step not in steps_completed:
@@ -968,7 +977,7 @@ class EthoscopeConfiguration:
         Mark the entire setup process as completed.
         """
         if "setup" not in self._settings:
-            self._settings["setup"] = self.DEFAULT_SETTINGS["setup"].copy()
+            self._settings["setup"] = copy.deepcopy(self.DEFAULT_SETTINGS["setup"])
 
         self._settings["setup"]["completed"] = True
         self._settings["setup"]["setup_completed"] = datetime.datetime.now().isoformat()
@@ -980,7 +989,7 @@ class EthoscopeConfiguration:
         """
         Reset setup status (for testing or re-setup).
         """
-        self._settings["setup"] = self.DEFAULT_SETTINGS["setup"].copy()
+        self._settings["setup"] = copy.deepcopy(self.DEFAULT_SETTINGS["setup"])
         self.save()
         self._logger.info("Setup status reset")
 
