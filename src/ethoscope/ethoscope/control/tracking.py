@@ -515,6 +515,71 @@ class ControlThread(Thread):
             "SD_CARD_NAME": pi.get_SD_CARD_NAME(),
         }
 
+    @staticmethod
+    def _acquisition_metadata(cam, TrackerClass=None):
+        """
+        Acquisition context for the METADATA table, one queryable field each.
+
+        Everything here is needed to decide whether two experiments are
+        comparable. Sleep scoring depends on the sampling rate and on image
+        noise, both of which depend on the FPS cap, the analogue gain, the
+        camera tuning and the Pi generation - none of which used to be recorded
+        anywhere, so a database could not be audited after the fact (issue #222).
+        ``hardware_info`` carries some of this already, but only as one
+        stringified blob that cannot be queried or compared across runs.
+
+        Every field is collected defensively: diagnostics must never be the
+        reason an experiment fails to start.
+
+        Args:
+            cam: The camera instance in use.
+            TrackerClass: The tracker class selected for this run.
+
+        Returns:
+            dict: Metadata fields, with None where a value is unavailable.
+        """
+
+        def _safe(fn, default=None):
+            try:
+                return fn()
+            except Exception as e:
+                logging.warning(f"Could not collect acquisition metadata: {e}")
+                return default
+
+        def _picamera2_version():
+            from importlib.metadata import version
+
+            return version("picamera2")
+
+        metadata = {
+            # Sampling rate: the configured ceiling, and what the camera was
+            # actually asked for (they differ for video recording).
+            "maxfps_setting": _safe(pi.get_maxfps_setting),
+            "target_fps": _safe(lambda: getattr(cam, "_target_fps", None)),
+            # Exposure regime. With the gain pinned, the FPS ceiling doubles as
+            # an exposure ceiling; 'exposure_decoupled' records whether this
+            # build lets auto-exposure integrate beyond 1 / target_fps.
+            "gain_setting": _safe(pi.get_gain_setting),
+            "exposure_decoupled": _safe(
+                lambda: getattr(cam, "_exposure_decoupled", None)
+            ),
+            # Camera tuning: what this sensor needs, and what was really loaded.
+            # "DEFAULT" means it fell back to libcamera's colour tuning and this
+            # run is not comparable with a correctly tuned one.
+            "camera_tuning_expected": _safe(pi.get_camera_tuning_file),
+            "camera_tuning_loaded": _safe(pi.get_camera_tuning_status),
+            "camera_sensor": _safe(lambda: pi.getPiCameraVersion()),
+            # Platform: determines whether the FPS ceiling actually binds.
+            "pi_version": _safe(pi.pi_version),
+            "picamera2_version": _safe(_picamera2_version),
+            # Which algorithm produced the positions in this database.
+            "tracker_class": (
+                getattr(TrackerClass, "__name__", None) if TrackerClass else None
+            ),
+        }
+
+        return {k: str(v) if v is not None else None for k, v in metadata.items()}
+
     @property
     def info(self):
         self._update_info()
@@ -971,6 +1036,7 @@ class ControlThread(Thread):
             "result_writer_type": result_writer_type,
             "sqlite_source_path": sqlite_source_path,
         }
+        self._metadata.update(self._acquisition_metadata(cam, TrackerClass))
 
         # This is useful to retrieve the latest run's information after a reboot
         # Now stored in cache files instead of separate pickle file

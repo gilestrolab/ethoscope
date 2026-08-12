@@ -264,9 +264,12 @@ DIAGNOSTICS table.
 - [ ] New DIAGNOSTICS table in both the SQLite and MySQL writers:
       `t, fps, exposure_us, gain, brightness, sensor_noise, sharpness, jitter,
       inferred_frac, ambiguous_frac`. ~1440 rows/day against ~21M tracking rows.
-- [ ] Static acquisition context into METADATA at start: `maxfps_setting`, camera
-      model, Pi model, exposure policy, tracker class, device git version. Without
-      this you cannot tell from a database whether two experiments are comparable.
+- [x] Static acquisition context into METADATA at start: `maxfps_setting`,
+      `target_fps`, `gain_setting`, `exposure_decoupled`, `camera_tuning_expected`,
+      `camera_tuning_loaded`, `camera_sensor`, `pi_version`, `picamera2_version`,
+      `tracker_class`. One queryable field each - `hardware_info` already carried
+      some of this, but only as a stringified blob that cannot be compared across
+      runs. Collected defensively: a diagnostic must never stop an experiment.
 
 ## 1c. Surfacing through the node
 - [ ] Include the latest diagnostics sample in the `/data/<id>` payload next to
@@ -316,8 +319,9 @@ gain destabilises the background model. So the real choice is: give AE more fram
 duration (Alice's branch), or let AE use gain within bounds. The step-1
 diagnostics are what tell us which regime a device is actually in.
 
-- [ ] Record in METADATA which regime applied: exposure policy, fixed vs bounded
-      gain, and the actual exposure/gain values seen during the run.
+- [x] Record in METADATA which regime applied: exposure policy and configured
+      gain are now stamped at experiment start. The *observed* exposure/gain per
+      frame still needs the per-minute DIAGNOSTICS table (1b).
 
 ## NoIR tuning: make it constant, and fix the sensor mismatch
 
