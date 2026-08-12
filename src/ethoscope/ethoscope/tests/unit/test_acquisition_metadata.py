@@ -132,3 +132,23 @@ def test_records_the_tuning_actually_loaded():
         metadata = ControlThread._acquisition_metadata(_FakeCam(), _FakeTracker)
 
     assert metadata["camera_tuning_loaded"] == "DEFAULT"
+
+
+def test_camera_version_file_is_read_from_where_it_is_written():
+    """Writer and reader must agree on the cache path.
+
+    They did not: the camera wrote /etc/picamera-version while
+    getPiCameraVersion() read /etc/ethoscope/picamera-version, so the cache was
+    never read and detection always fell through to probing the filesystem.
+    """
+    import inspect
+
+    from ethoscope.hardware.input.cameras import PiFrameGrabber
+    from ethoscope.utils import pi
+
+    default = inspect.signature(PiFrameGrabber._save_camera_info).parameters[
+        "save_path"
+    ]
+
+    assert default.default == pi.PICAMERA_VERSION_FILE
+    assert pi.PICAMERA_VERSION_FILE == "/etc/ethoscope/picamera-version"

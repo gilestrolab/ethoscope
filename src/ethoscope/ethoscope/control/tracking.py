@@ -319,6 +319,9 @@ class ControlThread(Thread):
         self._monit_args = args
         self._monit_kwargs = kwargs
         self._metadata = None
+        # Why the last ROI build failed, so the user is told the real cause
+        # rather than a fixed "insufficient targets" message.
+        self._roi_build_error = None
 
         # for FPS computation
         self._last_info_t_stamp = 0
@@ -1286,6 +1289,10 @@ class ControlThread(Thread):
             # Handle graceful failure when ROI building returns None values
             if reference_points is None or rois is None:
                 logging.warning("ROI building failed: insufficient targets detected.")
+                self._roi_build_error = (
+                    "ROI building failed: insufficient targets detected. Please "
+                    "check your arena has 3 circular targets visible."
+                )
                 # Save debug image to help user understand the issue
                 self._save_roi_debug_image(cam, "Insufficient targets detected")
                 return None, None
@@ -1303,6 +1310,12 @@ class ControlThread(Thread):
 
         except (EthoscopeException, Exception) as e:
             logging.error(f"Target detection failed: {e}")
+            # Reason: keep the actual cause. It used to be logged and then
+            # discarded, and every failure - a broken template, an OpenCV type
+            # error, a missing file - was reported to the user as "insufficient
+            # targets detected", sending them to check the arena and the camera
+            # when the fault was elsewhere.
+            self._roi_build_error = f"ROI building failed: {e}"
             # Save debug image with exception details
             self._save_roi_debug_image(cam, f"Target detection error: {str(e)}")
             return None, None
@@ -1413,8 +1426,9 @@ class ControlThread(Thread):
                     "Tracking setup failed. Please check your arena setup and try again."
                 )
                 self._info["status"] = "stopped"  # Keep device available for restart
-                self._info["error"] = (
-                    "ROI building failed: insufficient targets detected. Please check your arena has 3 circular targets visible."
+                self._info["error"] = self._roi_build_error or (
+                    "ROI building failed: insufficient targets detected. Please "
+                    "check your arena has 3 circular targets visible."
                 )
                 # Don't exit, just stop this tracking attempt - device remains available
                 return  # Exit gracefully without crashing

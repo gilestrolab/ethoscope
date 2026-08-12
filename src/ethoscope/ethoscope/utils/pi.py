@@ -14,6 +14,12 @@ from ethoscope.utils.rpi_bad_power import powerChecker
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
+# Where the detected camera model is cached. Defined here, and imported by the
+# camera code that writes it, because the two used to disagree: the writer used
+# /etc/picamera-version while the reader looked in /etc/ethoscope/, so the cache
+# was never read and detection always fell through to probing the filesystem.
+PICAMERA_VERSION_FILE = "/etc/ethoscope/picamera-version"
+
 
 def ensure_dir_exists(file_path):
     """
@@ -691,7 +697,7 @@ def getPiCameraVersion():
         "imx708": "Camera Module 3",
     }
 
-    picamera_info_file = "/etc/ethoscope/picamera-version"
+    picamera_info_file = PICAMERA_VERSION_FILE
 
     if hasPiCamera():
         try:

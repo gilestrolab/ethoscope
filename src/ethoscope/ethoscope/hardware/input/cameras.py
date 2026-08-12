@@ -475,7 +475,7 @@ class PiFrameGrabber(threading.Thread):
 
         super().__init__()
 
-    def _save_camera_info(self, camera_info, save_path="/etc/picamera-version"):
+    def _save_camera_info(self, camera_info, save_path=pi.PICAMERA_VERSION_FILE):
         """
         PINoIR v1 with picamera
         {'IFD0.Model': 'RP_ov5647', 'IFD0.Make': 'RaspberryPi'}
@@ -495,6 +495,7 @@ class PiFrameGrabber(threading.Thread):
             camera_info["IFD0.Model"] = camera_info["Model"]
 
         logging.info(f"Detected camera {camera_info}")
+        pi.ensure_dir_exists(save_path)
         with open(save_path, "w") as outfile:
             print(camera_info, file=outfile)
 

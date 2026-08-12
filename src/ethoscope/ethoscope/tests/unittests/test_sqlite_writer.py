@@ -803,3 +803,56 @@ class TestSQLiteResultWriterAddAndFlush(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDiagnosticsOnResumedRuns(unittest.TestCase):
+    """DIAGNOSTICS must exist even when an existing database is reused.
+
+    It was created only under erase_old_db, so a resumed or appended run wrote
+    every sample against a missing table: one warning a minute and no data, in
+    exactly the runs someone had to restart.
+    """
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.db_fd)
+        self.db_credentials = {"name": self.db_path}
+        self.rois = [
+            ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1),
+        ]
+        self.metadata = {"machine_name": "test", "machine_id": "T001"}
+        self.result_writers = []
+
+    def tearDown(self):
+        for writer in self.result_writers:
+            try:
+                if hasattr(writer, "_queue") and hasattr(writer, "_async_writer"):
+                    writer._queue.put("DONE")
+                    writer._queue.cancel_join_thread()
+                    if writer._async_writer.is_alive():
+                        writer._async_writer.join(timeout=2)
+            except Exception:
+                pass
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def test_diagnostics_table_created_without_erase(self):
+        import time
+
+        writer = SQLiteResultWriter(
+            db_credentials=self.db_credentials,
+            rois=self.rois,
+            metadata=self.metadata,
+            erase_old_db=False,
+        )
+        self.result_writers.append(writer)
+        time.sleep(0.5)
+
+        writer.write_diagnostics(1000, {"jitter": 0.001, "n_rois_sampled": 1}, fps=4.5)
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        count = conn.execute("SELECT COUNT(*) FROM DIAGNOSTICS").fetchone()[0]
+        conn.close()
+
+        self.assertEqual(count, 1)

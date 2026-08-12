@@ -490,6 +490,16 @@ class SQLiteResultWriter(BaseResultWriter):
 
         Note: SENSORS table is not created as SQLite doesn't support sensors yet
         """
+        # Outside the erase_old_db branch on purpose: a resumed or appended run
+        # keeps its existing database, and every diagnostics sample would then
+        # fail against a missing table - one warning a minute and no data, in
+        # precisely the runs someone had to restart. The statement is
+        # CREATE TABLE IF NOT EXISTS, so it is safe on an existing database.
+        logging.info("Creating acquisition diagnostics table 'DIAGNOSTICS'")
+        self._create_table(
+            self.DIAGNOSTICS_TABLE_NAME, self.DIAGNOSTICS_FIELDS, engine=None
+        )
+
         if self._erase_old_db:
             logging.info("Creating master table 'ROI_MAP'")
             self._create_table(
@@ -507,11 +517,6 @@ class SQLiteResultWriter(BaseResultWriter):
             logging.info("Creating variable map table 'VAR_MAP'")
             self._create_table(
                 "VAR_MAP", "var_name TEXT, sql_type TEXT, functional_type TEXT"
-            )
-
-            logging.info("Creating acquisition diagnostics table 'DIAGNOSTICS'")
-            self._create_table(
-                self.DIAGNOSTICS_TABLE_NAME, self.DIAGNOSTICS_FIELDS, engine=None
             )
 
             if self._shot_saver is not None:
