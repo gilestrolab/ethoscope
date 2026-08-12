@@ -681,7 +681,49 @@ class PiFrameGrabber2(PiFrameGrabber):
         # Set in run(), i.e. in the child process: the tuning file actually
         # loaded, or None if the camera fell back to the default tuning.
         self._tuning_file = None
+        # Throttles the live gain poll in the capture loop.
+        self._last_gain_poll = 0.0
         super().__init__(*args, **kwargs)
+
+    # How often the gain setting file is re-read, in seconds. A stat() at this
+    # rate is free next to frame capture, and a gain change lands within a
+    # second rather than at the next restart.
+    _GAIN_POLL_INTERVAL = 1.0
+
+    def _apply_live_gain(self, capture):
+        """
+        Apply a changed analogue gain without rebuilding the camera.
+
+        Gain used to be read only when the camera was constructed, so changing
+        it meant stopping and restarting tracking - which made sweeping it
+        expensive, and repeated restarts are also what wedged libcamera during
+        bench testing. picamera2 accepts AnalogueGain on a running camera, so
+        the setting file is polled instead and applied in place.
+
+        The file is the same one the node's /update endpoint writes, so no new
+        channel is needed: setting the gain from the UI now takes effect on the
+        running experiment.
+
+        Args:
+            capture: The live Picamera2 instance.
+        """
+        now = time.time()
+        if now - self._last_gain_poll < self._GAIN_POLL_INTERVAL:
+            return
+        self._last_gain_poll = now
+
+        try:
+            gain = pi.get_gain_setting()
+            if gain is None or gain == self._gain:
+                return
+
+            capture.set_controls({"AnalogueGain": float(gain)})
+            logging.info("Analogue gain changed live: %s -> %s", self._gain, gain)
+            self._gain = float(gain)
+
+        except Exception as e:
+            # Never let a settings poll interrupt acquisition.
+            logging.warning(f"Could not apply a live gain change: {e}")
 
     def _build_camera_controls(self):
         """
@@ -908,6 +950,8 @@ class PiFrameGrabber2(PiFrameGrabber):
                     last_emit = time.time()
 
                     while self._stop_queue.empty():
+                        self._apply_live_gain(capture)
+
                         frame = capture.capture_array("main")
 
                         # As for picamera, we take arrays in YUV420 format and then get only the Y channel. The slicing, however, is different.

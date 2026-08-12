@@ -65,3 +65,86 @@ def test_explicit_fps_below_maxfps_is_honoured(patched_camera_env):
     """An explicit FPS below the cap is still used verbatim."""
     cam = V4L2Camera(device=0, target_fps=3, target_resolution=(960, 720))
     assert cam._target_fps == 3.0
+
+
+class TestLiveGain:
+    """Gain must be changeable without rebuilding the camera.
+
+    It used to be read only at construction, so every value cost a stop/start
+    cycle. That made sweeping gain slow, and repeated restarts are what wedged
+    libcamera during bench testing.
+    """
+
+    def _grabber(self, gain=5.0):
+        from unittest.mock import patch
+
+        import queue as _queue
+
+        from ethoscope.hardware.input.cameras import PiFrameGrabber2
+
+        with patch(
+            "ethoscope.hardware.input.cameras.pi.get_gain_setting", return_value=gain
+        ):
+            g = PiFrameGrabber2(
+                5,
+                (1280, 960),
+                _queue.Queue(maxsize=1),
+                _queue.Queue(maxsize=1),
+                exposure_decoupled=True,
+            )
+        return g
+
+    def test_changed_gain_is_applied_to_the_running_camera(self):
+        from unittest.mock import MagicMock, patch
+
+        grabber = self._grabber(gain=5.0)
+        capture = MagicMock()
+
+        with patch(
+            "ethoscope.hardware.input.cameras.pi.get_gain_setting", return_value=8.0
+        ):
+            grabber._apply_live_gain(capture)
+
+        capture.set_controls.assert_called_once_with({"AnalogueGain": 8.0})
+        assert grabber._gain == 8.0
+
+    def test_unchanged_gain_does_not_touch_the_camera(self):
+        from unittest.mock import MagicMock, patch
+
+        grabber = self._grabber(gain=5.0)
+        capture = MagicMock()
+
+        with patch(
+            "ethoscope.hardware.input.cameras.pi.get_gain_setting", return_value=5.0
+        ):
+            grabber._apply_live_gain(capture)
+
+        capture.set_controls.assert_not_called()
+
+    def test_poll_is_throttled(self):
+        from unittest.mock import MagicMock, patch
+
+        grabber = self._grabber(gain=5.0)
+        capture = MagicMock()
+
+        with patch(
+            "ethoscope.hardware.input.cameras.pi.get_gain_setting", return_value=9.0
+        ) as probe:
+            grabber._apply_live_gain(capture)  # first call reads
+            grabber._apply_live_gain(capture)  # immediately after: throttled
+
+        assert probe.call_count == 1
+
+    def test_a_failing_poll_does_not_interrupt_acquisition(self):
+        from unittest.mock import MagicMock, patch
+
+        grabber = self._grabber(gain=5.0)
+        capture = MagicMock()
+
+        with patch(
+            "ethoscope.hardware.input.cameras.pi.get_gain_setting",
+            side_effect=OSError("boom"),
+        ):
+            grabber._apply_live_gain(capture)  # must not raise
+
+        assert grabber._gain == 5.0
