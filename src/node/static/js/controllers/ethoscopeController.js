@@ -1564,6 +1564,36 @@
         $scope.module_testing = false;
         $scope.module_test_result = null;
 
+        /**
+         * Descriptor for the module test button, or null if there is nothing to test.
+         *
+         * Firmware > 1.0 nests the descriptor under interface.test_button, v1.0 puts
+         * it at the top level, and sketches predating the descriptor advertise
+         * neither - the device tries both shapes and fails gracefully either way
+         * (interfaces.py getModuleCapabilities). Gating the button on the modern
+         * shape alone therefore hid the test from everyone else, which is issue #223.
+         */
+        // Reason: a single shared object, not a fresh literal per call. The
+        // template watches getModuleTestButton() through ng-if, and returning a
+        // new object each digest never compares equal to the previous one,
+        // which trips $rootScope:infdig and kills the page.
+        var GENERIC_MODULE_TEST = {
+            title: 'Test module',
+            description: 'Run the module test sequence to check the wiring, motors and tube coupling.'
+        };
+
+        $scope.getModuleTestButton = function() {
+            var info = $scope.module_info || {};
+            var descriptor = (info.interface && info.interface.test_button) || info.test_button;
+            if (descriptor) {
+                return descriptor;
+            }
+            if ($scope.machine_info && $scope.machine_info.Module && $scope.machine_info.Module.Connected) {
+                return GENERIC_MODULE_TEST;
+            }
+            return null;
+        };
+
         $scope.ethoscope.testModule = function() {
             console.log("Testing attached hardware module");
             $scope.module_testing = true;
@@ -1572,7 +1602,11 @@
             $http.post('/device/' + device_id + '/controls/test_module')
                 .then(function(response) {
                     $scope.module_testing = false;
-                    $scope.module_test_result = 'success';
+                    // Trust the device's own verdict; older devices that do not
+                    // report one are treated as success, as before.
+                    var outcome = response.data.module_test;
+                    $scope.module_test_result =
+                        (outcome === undefined || outcome === 'Success') ? 'success' : 'failed';
                     $scope.device.status = response.data.status;
                 })
                 .catch(function(error) {

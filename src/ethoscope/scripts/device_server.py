@@ -388,8 +388,14 @@ def controls(id, action):
 
     elif action == "test_module":
         logging.info("Sending a test command to the connected module.")
-        interfaces.getModuleCapabilities(test=True)
-        return info(id)
+        # Report whether the command actually reached the module. The result was
+        # previously discarded, so the UI showed "success" for any HTTP 200 —
+        # including a serial write that failed or a module advertising no test
+        # command at all, which is the opposite of what a bench test is for.
+        module = interfaces.getModuleCapabilities(test=True)
+        response = info(id)
+        response["module_test"] = module.get("test", "Not attempted")
+        return response
 
     elif action == "firmware_status":
         from ethoscope.hardware.interfaces.firmware import get_firmware_status

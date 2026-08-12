@@ -662,29 +662,6 @@
                         </ul>
                     </div>
 
-                    <!-- Test button -->
-                    <div ng-if="module_info.interface.test_button" style="margin-top: 15px; padding: 10px; background-color: #f0f7ff; border-radius: 4px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong>{{module_info.interface.test_button.title}}</strong>
-                                <p style="margin: 5px 0 0; font-size: 13px; color: #6c757d;">{{module_info.interface.test_button.description}}</p>
-                            </div>
-                            <button class="btn btn-sm btn-info"
-                                    ng-click="ethoscope.testModule()"
-                                    ng-disabled="module_testing">
-                                <i class="fa fa-play" ng-if="!module_testing"></i>
-                                <i class="fa fa-spinner fa-spin" ng-if="module_testing"></i>
-                                {{module_testing ? 'Testing...' : 'Run Test'}}
-                            </button>
-                        </div>
-                        <div ng-if="module_test_result" style="margin-top: 8px; font-size: 13px;"
-                             ng-class="{'text-success': module_test_result === 'success', 'text-danger': module_test_result === 'failed'}">
-                            <i class="fa fa-check-circle" ng-if="module_test_result === 'success'"></i>
-                            <i class="fa fa-exclamation-circle" ng-if="module_test_result === 'failed'"></i>
-                            Test {{module_test_result}}
-                        </div>
-                    </div>
-
                     <!-- Firmware Update Section (only shown when arduino-cli is available on device) -->
                     <div ng-if="firmware_status.arduino_cli_available" style="margin-top: 20px; padding: 12px; border: 1px solid #dee2e6; border-radius: 4px;">
                         <h6 style="font-weight: 600; margin-bottom: 10px;">
@@ -740,8 +717,37 @@
 
                 <!-- Fallback when module info not available -->
                 <div ng-if="!module_info.module">
-                    <p ng-if="machine_info.Module.Connected"><i class="fa fa-spinner fa-spin"></i> Fetching module information...</p>
+                    <p ng-if="machine_info.Module.Connected && !module_info.Error"><i class="fa fa-spinner fa-spin"></i> Fetching module information...</p>
+                    <p ng-if="machine_info.Module.Connected && module_info.Error" style="color: #6c757d;">
+                        {{module_info.Error}} This module does not describe itself, so no details can be shown &mdash; you can still run the test below.
+                    </p>
                     <p ng-if="!machine_info.Module.Connected" class="text-danger">No hardware module detected.</p>
+                </div>
+
+                <!-- Test button. Deliberately outside the identity block above: a module
+                     that does not describe itself over serial still accepts the test
+                     command, and being able to test the coupling on the spot with tubes
+                     and flies loaded matters more than having a descriptor (issue #223). -->
+                <div ng-if="getModuleTestButton()" style="margin-top: 15px; padding: 10px; background-color: #f0f7ff; border-radius: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>{{getModuleTestButton().title}}</strong>
+                            <p style="margin: 5px 0 0; font-size: 13px; color: #6c757d;">{{getModuleTestButton().description}}</p>
+                        </div>
+                        <button class="btn btn-sm btn-info"
+                                ng-click="ethoscope.testModule()"
+                                ng-disabled="module_testing">
+                            <i class="fa fa-play" ng-if="!module_testing"></i>
+                            <i class="fa fa-spinner fa-spin" ng-if="module_testing"></i>
+                            {{module_testing ? 'Testing...' : 'Run Test'}}
+                        </button>
+                    </div>
+                    <div ng-if="module_test_result" style="margin-top: 8px; font-size: 13px;"
+                         ng-class="{'text-success': module_test_result === 'success', 'text-danger': module_test_result === 'failed'}">
+                        <i class="fa fa-check-circle" ng-if="module_test_result === 'success'"></i>
+                        <i class="fa fa-exclamation-circle" ng-if="module_test_result === 'failed'"></i>
+                        Test {{module_test_result}}
+                    </div>
                 </div>
 
             </div>
