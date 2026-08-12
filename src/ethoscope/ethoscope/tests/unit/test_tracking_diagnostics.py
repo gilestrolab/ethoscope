@@ -132,6 +132,28 @@ def test_image_noise_ignores_the_animal():
     assert tracker.image_noise() == pytest.approx(2.0)
 
 
+def test_tracking_unit_exposes_its_tracker():
+    """The diagnostics reach the tracker through TrackingUnit.tracker.
+
+    Regression: the collector was written against Mock(tracker=...), which
+    fabricated the attribute. On real hardware TrackingUnit exposed only `roi`
+    and `stimulator`, so every ROI raised AttributeError and every sample came
+    back empty. Assert against the real class, not a mock of it.
+    """
+    from ethoscope.core.roi import ROI
+    from ethoscope.core.tracking_unit import TrackingUnit
+    from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
+
+    unit = TrackingUnit(
+        AdaptiveBGModel,
+        ROI(polygon=((0, 0), (10, 0), (10, 10), (0, 10)), idx=1, value=1),
+        None,
+    )
+
+    assert isinstance(unit.tracker, AdaptiveBGModel)
+    assert hasattr(unit.tracker, "image_noise")
+
+
 def _monitor_with(trackers):
     """A Monitor with its tracking units replaced, bypassing ROI setup."""
     monitor = Monitor.__new__(Monitor)

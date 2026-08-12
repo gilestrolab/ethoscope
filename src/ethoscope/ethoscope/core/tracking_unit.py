@@ -48,6 +48,14 @@ class TrackingUnit:
         """
         return self._roi
 
+    @property
+    def tracker(self):
+        """
+        :return: A reference to the tracker used by this `TrackingUnit`
+        :rtype: :class:`~ethoscope.trackers.trackers.BaseTracker`
+        """
+        return self._tracker
+
     def get_last_positions(self, absolute=False):
         """
         The last position of the animal monitored by this `TrackingUnit`
