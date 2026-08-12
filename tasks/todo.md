@@ -357,17 +357,17 @@ sharpness ~21, jitter ~0.0022 ROI widths, achieved ~4.8 fps.
       changed ~35 %. Early evidence *against* sensor noise dominating jitter -
       but weak, since with no flies only 4-18 ROIs report and they track dust
       and reflections rather than animals. Needs repeating with flies.
-- [x] Sharpness (variance of Laplacian) is noise-contaminated, not a focus
-      proxy: 20.6 bright -> 38.7 IR-only -> 24.9 LED-on, i.e. it tracks
-      illumination *inversely*. The attribution experiment (regress jitter on
-      noise vs focus) cannot work until this is replaced with a noise-insensitive
-      measure, or focus is compared only at fixed illumination.
-- [x] **Covering the ethoscope throttles the Pi**: 87 C, throttled=0x70006
-      (currently ARM-capped and throttled; under-voltage, capping and throttling
-      all having occurred). Achieved fps fell 4.99 -> 3.64, about 27 %. That
-      changes dt, and so any per-frame velocity statistic - a route to
-      FPS-dependence the exposure work does not touch, triggered by an entirely
-      normal experimental practice.
+- [x] Sharpness groups by illumination *condition*, not by noise: 20.9 room ->
+      38.4 IR-only -> 25.6 LED-on, with corr(noise, sharpness) = +0.10 over 52
+      samples and overlapping noise ranges between conditions. The first reading
+      (noise contamination) was wrong; the camera simply images best under IR,
+      where a NoIR sensor sees crisp silhouettes against the backlight and added
+      visible light washes edges out. It still cannot separate focus from
+      contrast on its own - that needs a defocus test at fixed illumination.
+- NOT APPLICABLE: the Pi thermally throttled (87 C, throttled=0x70006, fps
+      4.99 -> 3.64) under the black cloth used for this bench test. Ethoscopes run
+      in cooled incubators and are never covered, so this was an artefact of
+      testing on a desk, not a field confound.
 - [x] Achieved fps also depends on **scene content**: switching the LED on took
       fps from 4.99 to 4.1, more foreground to segment on a CPU-bound Pi.
 - [x] At maxfps=5 the exposure decoupling is a **no-op**: `_MAX_EXPOSURE_US`
@@ -377,14 +377,15 @@ sharpness ~21, jitter ~0.0022 ROI widths, achieved ~4.8 fps.
       forms the image on a NoIR sensor. Calibration (step 2) should target IR
       brightness and gain, not the daylight LED.
 
-**Implication for #222:** the FPS -> sleep pathway has at least three independent
-contributors - exposure ceiling, CPU/thermal throttling, and scene content. A fix
+**Implication for #222:** the FPS -> sleep pathway has more than one contributor -
+the exposure ceiling and CPU load, which varies with scene content. A fix
 addressing only exposure will not make sleep scores comparable across units.
 
 ## Still open
 - [ ] Decimation study (one recording, scored at several sampling rates).
 - [ ] Repeat the illumination sweep with flies, so jitter reflects animals.
-- [ ] Replace or supplement the sharpness metric with a noise-insensitive one.
+- [ ] Defocus test at fixed illumination, to see whether sharpness separates
+      focus from contrast before it is used for attribution.
 - [ ] `manual_polygons` ROI templates are broken (`template.py`): float32
       polygons where fillPoly needs int32, and normalised coordinates never
       scaled by the camera. `default_full_image` is unusable.
