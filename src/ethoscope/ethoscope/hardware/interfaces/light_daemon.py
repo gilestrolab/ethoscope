@@ -55,6 +55,14 @@ DEFAULT_FADE_IN_SECONDS = 1
 DEFAULT_FADE_OUT_SECONDS = 1
 DEFAULT_PWM_FREQUENCY_HZ = 5000
 
+# Where to reach pigpiod. Deliberately NOT pigpio's default port 8888: on an
+# ethoscope that belongs to ethoscope_update.service, so pigpiod cannot bind it
+# and - worse - a client using the default connects to the update server, is
+# told the connection succeeded, and then sends GPIO commands to an HTTP server.
+# pigpiod must therefore be started with a matching `-p` (see the systemd unit).
+PIGPIO_HOST = os.environ.get("ETHOSCOPE_PIGPIO_HOST", "localhost")
+PIGPIO_PORT = int(os.environ.get("ETHOSCOPE_PIGPIO_PORT", "8889"))
+
 # Gamma correction for the LED PWM duty cycle. Human brightness perception is
 # roughly logarithmic, so a linear duty looks crammed at the bottom and plateaus
 # at the top. ~2.2 matches the sRGB convention and gives a visually even ramp.
@@ -165,15 +173,38 @@ class PigpioBackend(_LedBackend):
     supports_fade = True
     name = "pigpio"
 
-    def __init__(self, gpio_pin: int, frequency_hz: int = DEFAULT_PWM_FREQUENCY_HZ):
+    def __init__(
+        self,
+        gpio_pin: int,
+        frequency_hz: int = DEFAULT_PWM_FREQUENCY_HZ,
+        host: str = PIGPIO_HOST,
+        port: int = PIGPIO_PORT,
+    ):
         # Late import so importing this module on a dev box without pigpio
         # succeeds; falls back to PinctrlBackend at the call site.
         import pigpio  # noqa: F401 (validated by the caller)
 
         self._pigpio = pigpio
-        self._pi = pigpio.pi()
+        self._pi = pigpio.pi(host, port)
         if not self._pi.connected:
-            raise RuntimeError("pigpiod is not running")
+            raise RuntimeError(f"pigpiod is not running on {host}:{port}")
+
+        # A bare TCP connect proves nothing: pigpio's own default port (8888)
+        # is the ethoscope update server's, and connecting to *that* reports
+        # success, after which every GPIO call would be sent to an HTTP server
+        # and silently do nothing. Ask for a version to confirm the peer really
+        # is pigpiod before this backend is accepted.
+        try:
+            version = self._pi.get_pigpio_version()
+        except Exception as e:
+            self._pi.stop()
+            raise RuntimeError(f"{host}:{port} did not answer as pigpiod: {e}") from e
+
+        if not isinstance(version, int) or version <= 0:
+            self._pi.stop()
+            raise RuntimeError(
+                f"{host}:{port} is not pigpiod (bad version response: {version!r})"
+            )
         self._gpio_pin = int(gpio_pin)
         self._frequency_hz = int(frequency_hz)
         self._hardware = self._gpio_pin in _HW_PWM_GPIOS
