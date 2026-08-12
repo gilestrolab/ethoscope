@@ -232,6 +232,13 @@ def update_machine_info(id):
         raise WrongMachineID
 
     data = bottle.request.json
+    # Reason: clear first, as the tracking and recording handlers do. This dict
+    # is module-level, so without it every request also re-evaluates the fields
+    # of every earlier request. Most branches compare against the current state
+    # and so no-op, but "datetime" and "expand_rootfs" do not: once either had
+    # been sent, every later settings change would silently re-apply a stale
+    # system clock or re-run a filesystem expansion.
+    update_machine_json_data.clear()
     update_machine_json_data.update(data["machine_options"]["arguments"])
 
     if (
