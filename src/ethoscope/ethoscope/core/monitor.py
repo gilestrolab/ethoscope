@@ -2,6 +2,7 @@ __author__ = "quentin"
 
 import datetime
 import logging
+import os
 import time
 import traceback
 
@@ -84,8 +85,11 @@ class Monitor:
 
     # How often the diagnostics are refreshed, in milliseconds. Noise and focus
     # drift on the scale of the room, not the frame, so once a minute is ample
-    # and keeps the cost off the tracking loop.
-    _DIAGNOSTICS_INTERVAL = 60 * 1000
+    # for an experiment and keeps the cost off the tracking loop. Calibration and
+    # bench work need answers in seconds, not minutes, hence the override.
+    _DIAGNOSTICS_INTERVAL = int(
+        os.environ.get("ETHOSCOPE_DIAGNOSTICS_INTERVAL_MS", 60 * 1000)
+    )
 
     # Quantile of the per-frame displacement distribution taken as the noise
     # floor. Most animals are quiescent at any moment, so the low tail of the
@@ -152,6 +156,9 @@ class Monitor:
                 "t": t,
                 # Grey levels: sensor noise, driven by illumination and gain.
                 "image_noise": float(np.median(noises)) if noises else None,
+                # Single-frame noise estimate: available immediately, whereas
+                # image_noise waits on the background model to converge.
+                "frame_noise": self._frame_noise(frame),
                 # Core temperature, because dark current roughly doubles every
                 # 6-8 C and its shot noise goes as the square root: a noise
                 # reading cannot be interpreted without the temperature it was
@@ -169,6 +176,46 @@ class Monitor:
             logging.warning(
                 f"Could not collect tracking diagnostics: {traceback.format_exc()}"
             )
+
+    # Immerkaer's 3x3 kernel: a Laplacian-of-Laplacian that responds to noise
+    # while cancelling smooth gradients and straight edges, so a single frame
+    # yields a noise estimate without any temporal reference.
+    _NOISE_KERNEL = np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]], dtype=np.float32)
+
+    @classmethod
+    def _frame_noise(cls, frame):
+        """
+        Sensor noise estimated from a single frame, in grey levels.
+
+        Unlike ``image_noise``, which measures deviation from the background
+        model and is therefore only meaningful once that model has converged,
+        this needs one frame. That makes a reading available seconds after
+        tracking starts rather than minutes, which matters when sweeping a
+        setting - each value otherwise costs a full convergence.
+
+        It is also computable on a stored JPEG, so live readings and archived
+        snapshots can be compared on the same scale (with the caveat that JPEG
+        compression attenuates the estimate).
+
+        Args:
+            frame (numpy.ndarray): The current frame.
+
+        Returns:
+            float: Estimated Gaussian noise sigma, or None if unavailable.
+        """
+        try:
+            if frame is None:
+                return None
+            grey = frame if frame.ndim == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            h, w = grey.shape[:2]
+            if h < 3 or w < 3:
+                return None
+            conv = cv2.filter2D(grey.astype(np.float32), -1, cls._NOISE_KERNEL)
+            return float(
+                np.sqrt(np.pi / 2) * np.abs(conv).sum() / (6.0 * (w - 2) * (h - 2))
+            )
+        except Exception:
+            return None
 
     @staticmethod
     def _core_temperature():

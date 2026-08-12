@@ -883,7 +883,8 @@ class BaseResultWriter:
         "sharpness REAL, "
         "jitter REAL, "
         "n_rois_sampled INTEGER, "
-        "cpu_temp REAL"
+        "cpu_temp REAL, "
+        "frame_noise REAL"
     )
     DIAGNOSTICS_INSERT_FIELDS = (
         "t",
@@ -893,6 +894,7 @@ class BaseResultWriter:
         "jitter",
         "n_rois_sampled",
         "cpu_temp",
+        "frame_noise",
     )
 
     def write_diagnostics(self, t, sample, fps=None):
@@ -923,6 +925,7 @@ class BaseResultWriter:
                 sample.get("jitter"),
                 sample.get("n_rois_sampled"),
                 sample.get("cpu_temp"),
+                sample.get("frame_noise"),
             )
 
             placeholder = "?" if self._database_type == "SQLite3" else "%s"

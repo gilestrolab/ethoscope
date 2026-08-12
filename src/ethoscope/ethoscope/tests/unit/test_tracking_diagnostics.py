@@ -209,3 +209,57 @@ def test_image_noise_is_none_before_the_background_converges():
     tracker._bg_model.bg_img = None
 
     assert tracker.image_noise() is None
+
+
+def test_frame_noise_recovers_known_sigma():
+    """Single-frame noise estimate, so a reading needs one frame not minutes.
+
+    image_noise is measured against the background model and is meaningless
+    until that model converges, which cost minutes per condition when sweeping
+    a camera setting. This needs no temporal reference at all.
+    """
+    rng = np.random.default_rng(0)
+    base = np.full((240, 320), 180, np.uint8)
+    import cv2
+
+    for i in range(6):
+        cv2.rectangle(base, (20, 10 + i * 38), (300, 40 + i * 38), 140, -1)
+
+    for sigma in (1.0, 4.0):
+        noisy = np.clip(base + rng.normal(0, sigma, base.shape), 0, 255).astype(
+            np.uint8
+        )
+        assert Monitor._frame_noise(noisy) == pytest.approx(sigma, rel=0.25)
+
+
+def test_frame_noise_rises_with_noise():
+    """Monotonic in noise, which is what a calibration sweep needs."""
+    rng = np.random.default_rng(1)
+    base = np.full((240, 320), 128, np.uint8)
+
+    quiet = np.clip(base + rng.normal(0, 1, base.shape), 0, 255).astype(np.uint8)
+    loud = np.clip(base + rng.normal(0, 6, base.shape), 0, 255).astype(np.uint8)
+
+    assert Monitor._frame_noise(loud) > Monitor._frame_noise(quiet) * 3
+
+
+def test_frame_noise_tolerates_a_missing_frame():
+    assert Monitor._frame_noise(None) is None
+
+
+def test_diagnostics_interval_is_overridable():
+    """Bench and calibration work needs samples in seconds, not minutes."""
+    import importlib
+    import os
+    from unittest.mock import patch
+
+    with patch.dict(os.environ, {"ETHOSCOPE_DIAGNOSTICS_INTERVAL_MS": "5000"}):
+        import ethoscope.core.monitor as m
+
+        importlib.reload(m)
+        assert m.Monitor._DIAGNOSTICS_INTERVAL == 5000
+
+    import ethoscope.core.monitor as m
+
+    importlib.reload(m)
+    assert m.Monitor._DIAGNOSTICS_INTERVAL == 60000
