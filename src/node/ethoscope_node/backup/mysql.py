@@ -89,7 +89,11 @@ class BaseSQLConnector:
     Base class for SQL operations with improved error handling and resource management.
     """
 
-    _TABLE_WITHOUT_KEY = ["ROI_MAP", "VAR_MAP", "METADATA"]
+    # Tables with no autoincrementing id, counted with COUNT(*) rather than
+    # synced incrementally on MAX(id). DIAGNOSTICS deliberately has no id: the
+    # keyword differs between SQLite and MySQL and `t` already identifies a
+    # sample.
+    _TABLE_WITHOUT_KEY = ["ROI_MAP", "VAR_MAP", "METADATA", "DIAGNOSTICS"]
 
     def __init__(
         self,
