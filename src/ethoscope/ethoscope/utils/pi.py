@@ -1379,30 +1379,69 @@ def expand_rootfs():
 
 
 # libcamera ships its sensor tuning files in a pipeline-specific directory:
-# pisp on the Pi 5, vc4 on everything older. Both are searched so one code path
-# covers the whole fleet. Note picamera2's own load_tuning_file() only knows
-# about the vc4 directory, which is why the path is resolved here instead.
-_LIBCAMERA_TUNING_DIRS = (
-    "/usr/share/libcamera/ipa/rpi/pisp",
-    "/usr/share/libcamera/ipa/rpi/vc4",
-    "/usr/local/share/libcamera/ipa/rpi/pisp",
-    "/usr/local/share/libcamera/ipa/rpi/vc4",
-)
+# "pisp" for the Pi 5's ISP, "vc4" for every earlier model. picamera2's own
+# load_tuning_file() only searches vc4, which is why the path is resolved here.
+#
+# Both directories are installed on a Pi 3, each holding a file of the same name,
+# so "first one that exists" picks the wrong pipeline. The directory must be
+# chosen by Pi generation instead, which is what _tuning_dirs_for_this_pi does.
+_LIBCAMERA_PIPELINE_DIRS = {
+    "pisp": (
+        "/usr/share/libcamera/ipa/rpi/pisp",
+        "/usr/local/share/libcamera/ipa/rpi/pisp",
+    ),
+    "vc4": (
+        "/usr/share/libcamera/ipa/rpi/vc4",
+        "/usr/local/share/libcamera/ipa/rpi/vc4",
+    ),
+}
+
+# The Pi generation from which libcamera uses the pisp pipeline.
+_FIRST_PISP_MODEL = 5
 
 
-def get_camera_tuning_file(sensor=None):
+def _tuning_dirs_for_this_pi(model_number=None):
+    """
+    Tuning directories to search, most appropriate pipeline first.
+
+    Args:
+        model_number (int): Raspberry Pi model number. Detected when omitted.
+
+    Returns:
+        tuple: Directories in search order. The other pipeline is kept as a
+            fallback so an unusual layout still resolves something rather than
+            leaving the camera on default tuning.
+    """
+    if model_number is None:
+        try:
+            model_number = pi_version().get("model_number", 0)
+        except Exception:
+            model_number = 0
+
+    if model_number and model_number >= _FIRST_PISP_MODEL:
+        order = ("pisp", "vc4")
+    else:
+        # Pi 0-4, and the unknown case: vc4 is right for every deployed device.
+        order = ("vc4", "pisp")
+
+    return tuple(d for pipeline in order for d in _LIBCAMERA_PIPELINE_DIRS[pipeline])
+
+
+def get_camera_tuning_file(sensor=None, model_number=None):
     """
     Resolve the NoIR libcamera tuning file for the attached camera sensor.
 
     An ethoscope cannot work without an IR pass-through (NoIR) camera, so NoIR
     tuning is unconditional and is not a user setting. What *does* vary is the
-    sensor: ov5647 (PiNoIR 1), imx219 (PiNoIR 2), imx477 (HQ) and imx708
-    (Camera Module 3) each need their own tuning file, and the file lives in a
-    different directory depending on the Pi generation.
+    sensor - ov5647 (PiNoIR 1), imx219 (PiNoIR 2), imx477 (HQ) and imx708
+    (Camera Module 3) each need their own file - and which pipeline directory
+    that file must come from, which depends on the Pi generation rather than on
+    which copy happens to be installed.
 
     Args:
         sensor (str): Sensor name such as "imx219". Detected automatically
             when omitted.
+        model_number (int): Raspberry Pi model number. Detected when omitted.
 
     Returns:
         str: Absolute path to the NoIR tuning file, or None when the sensor
@@ -1418,15 +1457,15 @@ def get_camera_tuning_file(sensor=None):
         logging.warning("Could not detect the camera sensor; no tuning file resolved")
         return None
 
+    directories = _tuning_dirs_for_this_pi(model_number)
+
     filename = f"{sensor}_noir.json"
-    for directory in _LIBCAMERA_TUNING_DIRS:
+    for directory in directories:
         candidate = os.path.join(directory, filename)
         if os.path.isfile(candidate):
             return candidate
 
-    logging.warning(
-        f"No NoIR tuning file '{filename}' found in any of {_LIBCAMERA_TUNING_DIRS}"
-    )
+    logging.warning(f"No NoIR tuning file '{filename}' found in any of {directories}")
     return None
 
 

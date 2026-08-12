@@ -26,12 +26,16 @@ from ethoscope.utils import pi
 
 @pytest.fixture
 def tuning_dirs(tmp_path):
-    """Two fake libcamera tuning directories: a Pi 5 one and a legacy one."""
+    """Fake libcamera tuning directories: the Pi 5 pipeline and the legacy one."""
     pisp = tmp_path / "pisp"
     vc4 = tmp_path / "vc4"
     pisp.mkdir()
     vc4.mkdir()
-    with patch.object(pi, "_LIBCAMERA_TUNING_DIRS", (str(pisp), str(vc4))):
+    with patch.object(
+        pi,
+        "_LIBCAMERA_PIPELINE_DIRS",
+        {"pisp": (str(pisp),), "vc4": (str(vc4),)},
+    ):
         yield pisp, vc4
 
 
@@ -50,7 +54,56 @@ def test_finds_tuning_in_the_pi5_directory(tuning_dirs):
     (pisp / "imx708_noir.json").write_text("{}")
 
     with patch.object(pi, "_get_camera_sensor_info", return_value="imx708"):
-        assert pi.get_camera_tuning_file() == str(pisp / "imx708_noir.json")
+        assert pi.get_camera_tuning_file(model_number=5) == str(
+            pisp / "imx708_noir.json"
+        )
+
+
+def test_pipeline_is_chosen_by_pi_generation_not_by_what_exists(tuning_dirs):
+    """Both directories ship on a Pi 3, so "first match" picks the wrong one.
+
+    Found on real hardware: a Pi 3 has /usr/share/libcamera/ipa/rpi/pisp *and*
+    .../vc4, each holding imx219_noir.json. Searching pisp first resolved the
+    Pi 5 ISP's tuning on a vc4 device.
+    """
+    pisp, vc4 = tuning_dirs
+    (pisp / "imx219_noir.json").write_text("{}")
+    (vc4 / "imx219_noir.json").write_text("{}")
+
+    with patch.object(pi, "_get_camera_sensor_info", return_value="imx219"):
+        assert pi.get_camera_tuning_file(model_number=3) == str(
+            vc4 / "imx219_noir.json"
+        )
+        assert pi.get_camera_tuning_file(model_number=4) == str(
+            vc4 / "imx219_noir.json"
+        )
+        assert pi.get_camera_tuning_file(model_number=5) == str(
+            pisp / "imx219_noir.json"
+        )
+
+
+def test_unknown_pi_generation_prefers_the_legacy_pipeline(tuning_dirs):
+    """vc4 is right for every currently deployed device, so it is the safe default."""
+    pisp, vc4 = tuning_dirs
+    (pisp / "imx219_noir.json").write_text("{}")
+    (vc4 / "imx219_noir.json").write_text("{}")
+
+    with patch.object(pi, "_get_camera_sensor_info", return_value="imx219"):
+        assert pi.get_camera_tuning_file(model_number=0) == str(
+            vc4 / "imx219_noir.json"
+        )
+
+
+def test_falls_back_to_the_other_pipeline_when_needed(tuning_dirs):
+    """An unusual layout still resolves rather than dropping to default tuning."""
+    pisp, _ = tuning_dirs
+    # Only the pisp copy is installed, but this is a Pi 3.
+    (pisp / "imx219_noir.json").write_text("{}")
+
+    with patch.object(pi, "_get_camera_sensor_info", return_value="imx219"):
+        assert pi.get_camera_tuning_file(model_number=3) == str(
+            pisp / "imx219_noir.json"
+        )
 
 
 def test_explicit_sensor_overrides_detection(tuning_dirs):
