@@ -21,6 +21,26 @@ known-broken or unverified, not forgotten.
 - [ ] `test_light_daemon.py::TestRampWalker::test_ramp_down_visits_intermediate_values`
       fails on this branch; already fixed on dev by `8d4f18e1`, resolves on merge.
 
+## Verification gaps found while merging #222 into dev (2026-08-17)
+
+- [ ] **The pre-commit import check cannot pass off a Pi for
+      `scripts/device_server.py`.** It imports its sibling `ethoclient`, and
+      pre-commit runs hooks in an isolated env that strips `PYTHONPATH`, so the
+      sibling is never importable no matter how the committer sets up their
+      shell. Anyone editing that file off-device must use `--no-verify`, which
+      silently skips *every* other hook too. Either add
+      `src/ethoscope/scripts` to the hook's path or exclude the file from that
+      hook explicitly.
+- [ ] **No JavaScript test harness exists.** `src/node/package.json` declares
+      `"test": "echo \"No tests configured\""`. `ethoscope.image_quality()` now
+      carries the acquisition-quality thresholds and has no committed test; its
+      branches were verified by hand against measured fleet values (0.598, 0.823,
+      0.832 healthy; 0.99 the known-bad reading from #222) but nothing guards
+      them against future edits.
+- [ ] The repo venv had no project dependencies installed, so neither suite
+      could run until `opencv-python`, `psutil` and friends were added by hand.
+      Worth a documented `uv sync` / dev-install path.
+
 ## Device / infrastructure
 
 - [ ] **Devices cannot self-update on this network.** `origin` is
