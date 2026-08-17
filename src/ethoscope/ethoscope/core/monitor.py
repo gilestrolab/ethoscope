@@ -67,6 +67,13 @@ class Monitor:
         self._last_diagnostics_t = None
         self._last_diagnostics_frame_idx = 0
 
+        # Last light level written to LIGHT_EVENTS. A sentinel rather than None,
+        # so the first observation is always recorded - including an observation
+        # of zero, because "the lights were off when this run began" is itself
+        # information. See _sample_light().
+        self._last_light_pct = self._LIGHT_UNSET
+        self._light_client = None
+
         if rois is None:
             raise NotImplementedError("rois must exist (cannot be None)")
 
@@ -100,6 +107,93 @@ class Monitor:
     # Below this many observed positions the quantile is meaningless, so no
     # number is reported rather than a misleading one.
     _MIN_JITTER_SAMPLES = 30
+
+    # Sentinel for "no light level has been observed yet", distinct from a
+    # genuine reading of 0 (lights off) and from None (no daemon reachable).
+    _LIGHT_UNSET = object()
+
+    # Timeout for the light daemon status call, in seconds. Well below the
+    # client default: this runs on the tracking thread, so a hung daemon must
+    # cost a fraction of a frame rather than a full second of tracking.
+    _LIGHT_TIMEOUT = 0.25
+
+    def _sample_light(self):
+        """
+        Ask the light daemon what the panel is currently doing.
+
+        The daemon is a separate process with its own lifetime, so this is the
+        only way the tracker can know: it may be absent (no light hardware),
+        stopped, or mid-fade. Any failure yields None, which is recorded as
+        "unknown" rather than mistaken for darkness.
+
+        Returns:
+            tuple: (light_pct, mode), both None if the daemon cannot be reached.
+                light_pct is the true commanded level 0-100, so a crepuscular
+                fade reads as intermediate values.
+        """
+        try:
+            from ethoscope.hardware.interfaces.light_daemon import (
+                LightDaemonClient,
+                LightDaemonUnavailable,
+            )
+        except Exception:
+            return None, None
+
+        try:
+            if self._light_client is None:
+                self._light_client = LightDaemonClient(timeout=self._LIGHT_TIMEOUT)
+
+            status = self._light_client.status()
+            if not isinstance(status, dict):
+                return None, None
+
+            level = status.get("led")
+            return (
+                float(level) if level is not None else None,
+                status.get("mode"),
+            )
+
+        except LightDaemonUnavailable:
+            # Expected on any ethoscope without a light module. Not worth a log
+            # line once a minute for the lifetime of the experiment.
+            return None, None
+        except Exception as e:
+            logging.warning(f"Could not sample the light daemon: {e}")
+            return None, None
+
+    def _record_light_change(self, t, result_writer):
+        """
+        Write a LIGHT_EVENTS row if the panel level has moved since the last one.
+
+        Edge-triggered so a 12:12 cycle costs a handful of rows a day. The first
+        observation of a run always counts as a change, so the starting state is
+        recorded rather than left to be assumed.
+
+        A null reading - no daemon, or one that could not be reached - is not
+        an event: it would otherwise be indistinguishable from the lights going
+        out, which is the one mistake this table exists to prevent.
+
+        Args:
+            t (int): Timestamp of the observation, in milliseconds.
+            result_writer: The active result writer, or None.
+        """
+        if result_writer is None or not hasattr(result_writer, "write_light_event"):
+            return
+
+        light_pct = self._diagnostics.get("light_pct")
+        if light_pct is None:
+            return
+
+        if (
+            self._last_light_pct is not self._LIGHT_UNSET
+            and light_pct == self._last_light_pct
+        ):
+            return
+
+        self._last_light_pct = light_pct
+        result_writer.write_light_event(
+            t, light_pct, self._diagnostics.get("light_mode")
+        )
 
     @property
     def diagnostics(self):
@@ -171,6 +265,13 @@ class Monitor:
                 "jitter": float(np.median(jitters)) if jitters else None,
                 "n_rois_sampled": len(jitters),
             }
+
+            # Sampled on the same slow interval as everything else here, and on
+            # the same terms: a light daemon that is missing or wedged costs a
+            # null reading, never the experiment.
+            light_pct, light_mode = self._sample_light()
+            self._diagnostics["light_pct"] = light_pct
+            self._diagnostics["light_mode"] = light_mode
 
         except Exception:
             logging.warning(
@@ -413,6 +514,8 @@ class Monitor:
                         result_writer.write_diagnostics(
                             t_with_offset, self._diagnostics, fps=fps
                         )
+
+                    self._record_light_change(t_with_offset, result_writer)
 
                 self._last_t = t
                 time.sleep(0.001)

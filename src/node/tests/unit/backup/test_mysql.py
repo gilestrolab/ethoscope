@@ -147,6 +147,16 @@ class TestBaseSQLConnector:
         assert "VAR_MAP" in BaseSQLConnector._TABLE_WITHOUT_KEY
         assert "METADATA" in BaseSQLConnector._TABLE_WITHOUT_KEY
 
+    def test_device_tables_without_an_id_are_listed(self):
+        """DIAGNOSTICS and LIGHT_EVENTS carry no autoincrement id.
+
+        Leaving one out does not skip it - the sync enumerates whatever tables
+        exist - it makes the sync try to read a MAX(id) column that is not
+        there, so the table silently never backs up.
+        """
+        assert "DIAGNOSTICS" in BaseSQLConnector._TABLE_WITHOUT_KEY
+        assert "LIGHT_EVENTS" in BaseSQLConnector._TABLE_WITHOUT_KEY
+
     @patch("ethoscope_node.backup.mysql.DatabaseConnectionManager")
     def test_get_remote_db_info_fast(self, mock_manager):
         """Test _get_remote_db_info using fast INFORMATION_SCHEMA method."""
