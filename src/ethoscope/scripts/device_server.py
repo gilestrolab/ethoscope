@@ -914,28 +914,24 @@ def user_options(id):
                             "default": machine_info["machine-number"],
                             "requires_reboot": True,
                         },
-                        {
-                            "type": "number",
-                            "name": "maxfps_setting",
-                            "description": "Maximum camera FPS (frames per second)",
-                            "default": machine_info.get("maxfps_setting", 5),
-                            "min": 1,
-                            "max": 30,
-                            "step": 1,
-                            "requires_reboot": False,
-                        },
-                        {
-                            "type": "number",
-                            "name": "gain_setting",
-                            "description": "Camera gain (lower values reduce noise artifacts for better tracking)",
-                            "default": machine_info.get(
-                                "gain_setting", pi.DEFAULT_CAMERA_GAIN
-                            ),
-                            "min": 1.0,
-                            "max": 16.0,
-                            "step": 0.1,
-                            "requires_reboot": False,
-                        },
+                        # maxfps_setting and gain_setting are deliberately not
+                        # offered here. Both silently change what the recording
+                        # measures rather than how it is presented, and neither
+                        # has a value a user should be picking per-run:
+                        #
+                        #   * gain sets the sensor noise floor, and sleep scoring
+                        #     is a max-velocity-per-bin statistic, so raising it
+                        #     converts noise into phantom movement and erases
+                        #     sleep. pi.DEFAULT_CAMERA_GAIN is the measured
+                        #     optimum - the lowest gain that still detects ROIs.
+                        #   * maxfps_setting sets dt, and the movement statistic
+                        #     is a displacement divided by dt, so runs made at
+                        #     different caps are not comparable to each other.
+                        #
+                        # Both remain settable through the update_machine API and
+                        # through /etc/ethoscope/{gain,maxfps}_setting for
+                        # deliberate calibration work; they are simply no longer
+                        # one mis-click away in the UI. See #222.
                         {
                             "type": "boolean",
                             "name": "has_light_hardware",
