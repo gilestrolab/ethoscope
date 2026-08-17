@@ -390,6 +390,10 @@ def _fake_pigpio_module(*, connected: bool = True):
     mod.OUTPUT = 1
     pi_instance = MagicMock(name="pigpio.pi instance")
     pi_instance.connected = connected
+    # PigpioBackend confirms the peer really is pigpiod before accepting it,
+    # because a bare connect to the wrong port succeeds against the ethoscope
+    # update server. A bare MagicMock would fail that check.
+    pi_instance.get_pigpio_version.return_value = 79
     mod.pi = MagicMock(return_value=pi_instance)
     mod._instance = pi_instance  # test access
     return mod
@@ -919,3 +923,134 @@ class TestSetLedBackcompat:
         controller = LightController(gpio_pin=17, socket_path=None, backend=backend)
         controller.set_led(False)
         backend.set_pct.assert_called_with(0)
+
+
+class TestBackendSelection:
+    """Backend order: pigpio, then lgpio, then binary pinctrl.
+
+    pigpio ships no package from Debian Trixie onwards and never supported the
+    Pi 5, so without the lgpio backend every modern card silently lost PWM and
+    fell back to binary on/off - found on a Trixie Pi 3 during bench testing.
+    """
+
+    def test_prefers_pigpio_when_available(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        sentinel = object()
+        with patch.object(ld, "_try_make_pigpio_backend", return_value=sentinel):
+            with patch.object(ld, "_try_make_lgpio_backend") as lgpio:
+                assert ld.LightController._select_backend(17) is sentinel
+                lgpio.assert_not_called()
+
+    def test_falls_back_to_lgpio_when_pigpio_missing(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        sentinel = object()
+        with patch.object(ld, "_try_make_pigpio_backend", return_value=None):
+            with patch.object(ld, "_try_make_lgpio_backend", return_value=sentinel):
+                assert ld.LightController._select_backend(17) is sentinel
+
+    def test_lgpio_pwm_refused_on_non_hardware_pwm_pins(self):
+        """CPU-timed PWM on GPIO17 flickers under tracking load - seen on hardware.
+
+        A steady lamp that cannot dim is better for the animals than a
+        dimmable one that flickers, so this must decline rather than degrade.
+        """
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        assert ld._try_make_lgpio_backend(17) is None
+
+    def test_lgpio_pwm_allowed_on_hardware_pwm_pins(self):
+        """GPIO12/13/18/19 drive true hardware PWM, which does not jitter."""
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        fake_module = MagicMock()
+        with patch.dict("sys.modules", {"gpiozero": fake_module}):
+            backend = ld._try_make_lgpio_backend(18)
+
+        assert backend is not None
+        assert backend.name == "lgpio"
+
+    def test_falls_back_to_pinctrl_when_no_pwm_backend(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        with patch.object(ld, "_try_make_pigpio_backend", return_value=None):
+            with patch.object(ld, "_try_make_lgpio_backend", return_value=None):
+                backend = ld.LightController._select_backend(17)
+
+        assert isinstance(backend, PinctrlBackend)
+        assert not backend.supports_fade
+
+    def test_lgpio_backend_applies_the_same_gamma(self):
+        """A given percentage must look the same on either PWM backend."""
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        fake_led = MagicMock()
+        fake_module = MagicMock()
+        fake_module.PWMLED.return_value = fake_led
+
+        with patch.dict("sys.modules", {"gpiozero": fake_module}):
+            backend = ld.LgpioBackend(17)
+            backend.set_pct(50)
+
+        assert backend.supports_fade
+        assert fake_led.value == pytest.approx((50 / 100.0) ** LIGHT_GAMMA)
+
+
+class TestPigpioPortGuard:
+    """pigpio must not be fooled by the ethoscope update server.
+
+    Port 8888 is pigpio's default *and* ethoscope_update.service's. A client
+    using the default connects to the updater, reports success, and then sends
+    GPIO commands to an HTTP server - light silently dead, with no exception to
+    trigger the fallback chain. Seen on a real device.
+    """
+
+    def test_does_not_use_pigpio_default_port(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        assert ld.PIGPIO_PORT != 8888, "8888 belongs to ethoscope_update.service"
+
+    def test_rejects_a_peer_that_is_not_pigpiod(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        fake_pi = MagicMock()
+        fake_pi.connected = True
+        # An HTTP server answers the connect but not the pigpio protocol.
+        fake_pi.get_pigpio_version.side_effect = OSError("not pigpiod")
+        fake_module = MagicMock()
+        fake_module.pi.return_value = fake_pi
+
+        with patch.dict("sys.modules", {"pigpio": fake_module}):
+            with pytest.raises(RuntimeError, match="did not answer as pigpiod"):
+                ld.PigpioBackend(17)
+
+        fake_pi.stop.assert_called_once()
+
+    def test_rejects_an_implausible_version_response(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        fake_pi = MagicMock()
+        fake_pi.connected = True
+        fake_pi.get_pigpio_version.return_value = None
+        fake_module = MagicMock()
+        fake_module.pi.return_value = fake_pi
+
+        with patch.dict("sys.modules", {"pigpio": fake_module}):
+            with pytest.raises(RuntimeError, match="not pigpiod"):
+                ld.PigpioBackend(17)
+
+    def test_accepts_a_real_pigpiod(self):
+        from ethoscope.hardware.interfaces import light_daemon as ld
+
+        fake_pi = MagicMock()
+        fake_pi.connected = True
+        fake_pi.get_pigpio_version.return_value = 79
+        fake_module = MagicMock()
+        fake_module.pi.return_value = fake_pi
+
+        with patch.dict("sys.modules", {"pigpio": fake_module}):
+            backend = ld.PigpioBackend(17)
+
+        assert backend.name == "pigpio"
+        fake_module.pi.assert_called_once_with(ld.PIGPIO_HOST, ld.PIGPIO_PORT)

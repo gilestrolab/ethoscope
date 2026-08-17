@@ -537,6 +537,81 @@ class TestSQLiteResultWriterCreateAllTables(unittest.TestCase):
         self.assertIn("VAR_MAP", tables)
         self.assertIn("METADATA", tables)
         self.assertIn("START_EVENTS", tables)
+        self.assertIn("DIAGNOSTICS", tables)
+
+    def test_write_diagnostics_records_a_sample(self):
+        """Acquisition quality is persisted so a run can be judged afterwards.
+
+        About 1440 rows a day against millions of tracking rows, which is what
+        makes it possible to ask later whether the image got noisier or focus
+        drifted during an experiment (issue #222).
+        """
+        import time
+
+        writer = self._create_result_writer(erase_old_db=True)
+        time.sleep(0.5)
+
+        writer.write_diagnostics(
+            60000,
+            {
+                "t": 60000,
+                "image_noise": 1.5,
+                "sharpness": 210.0,
+                "jitter": 0.0004,
+                "n_rois_sampled": 20,
+            },
+            fps=4.6,
+        )
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        row = conn.execute(
+            "SELECT t, fps, image_noise, sharpness, jitter, n_rois_sampled "
+            "FROM DIAGNOSTICS"
+        ).fetchone()
+        conn.close()
+
+        self.assertEqual(row[0], 60000)
+        self.assertAlmostEqual(row[1], 4.6, places=3)
+        self.assertAlmostEqual(row[2], 1.5, places=3)
+        self.assertAlmostEqual(row[3], 210.0, places=3)
+        self.assertAlmostEqual(row[4], 0.0004, places=6)
+        self.assertEqual(row[5], 20)
+
+    def test_write_diagnostics_ignores_an_empty_sample(self):
+        """Before the first sample there is nothing to record, and that is fine."""
+        import time
+
+        writer = self._create_result_writer(erase_old_db=True)
+        time.sleep(0.5)
+
+        writer.write_diagnostics(1000, {})
+        writer.write_diagnostics(1000, None)
+        time.sleep(0.3)
+
+        conn = sqlite3.connect(self.db_path)
+        count = conn.execute("SELECT COUNT(*) FROM DIAGNOSTICS").fetchone()[0]
+        conn.close()
+
+        self.assertEqual(count, 0)
+
+    def test_write_diagnostics_tolerates_missing_fields(self):
+        """A partial sample is stored as NULLs rather than being dropped."""
+        import time
+
+        writer = self._create_result_writer(erase_old_db=True)
+        time.sleep(0.5)
+
+        # Background not yet converged: noise unavailable, jitter measured.
+        writer.write_diagnostics(1000, {"jitter": 0.0002, "n_rois_sampled": 3})
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        row = conn.execute("SELECT image_noise, jitter FROM DIAGNOSTICS").fetchone()
+        conn.close()
+
+        self.assertIsNone(row[0])
+        self.assertAlmostEqual(row[1], 0.0002, places=6)
 
     def test_create_all_tables_with_dam(self):
         """Test DAM activity table created when make_dam_like_table=True."""
@@ -728,3 +803,117 @@ class TestSQLiteResultWriterAddAndFlush(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDiagnosticsOnResumedRuns(unittest.TestCase):
+    """DIAGNOSTICS must exist even when an existing database is reused.
+
+    It was created only under erase_old_db, so a resumed or appended run wrote
+    every sample against a missing table: one warning a minute and no data, in
+    exactly the runs someone had to restart.
+    """
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.db_fd)
+        self.db_credentials = {"name": self.db_path}
+        self.rois = [
+            ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1),
+        ]
+        self.metadata = {"machine_name": "test", "machine_id": "T001"}
+        self.result_writers = []
+
+    def tearDown(self):
+        for writer in self.result_writers:
+            try:
+                if hasattr(writer, "_queue") and hasattr(writer, "_async_writer"):
+                    writer._queue.put("DONE")
+                    writer._queue.cancel_join_thread()
+                    if writer._async_writer.is_alive():
+                        writer._async_writer.join(timeout=2)
+            except Exception:
+                pass
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def test_diagnostics_table_created_without_erase(self):
+        import time
+
+        writer = SQLiteResultWriter(
+            db_credentials=self.db_credentials,
+            rois=self.rois,
+            metadata=self.metadata,
+            erase_old_db=False,
+        )
+        self.result_writers.append(writer)
+        time.sleep(0.5)
+
+        writer.write_diagnostics(1000, {"jitter": 0.001, "n_rois_sampled": 1}, fps=4.5)
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        count = conn.execute("SELECT COUNT(*) FROM DIAGNOSTICS").fetchone()[0]
+        conn.close()
+
+        self.assertEqual(count, 1)
+
+
+class TestDiagnosticsTemperature(unittest.TestCase):
+    """Core temperature is stored with each sample.
+
+    Dark current roughly doubles every 6-8 C and its shot noise goes as the
+    square root, so an image_noise reading cannot be interpreted without the
+    temperature it was taken at - a warm room and a cooled incubator are
+    different measurements of the same camera.
+    """
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.db_fd)
+        self.rois = [
+            ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=1, value=1),
+        ]
+        self.writers = []
+
+    def tearDown(self):
+        for writer in self.writers:
+            try:
+                writer._queue.put("DONE")
+                writer._queue.cancel_join_thread()
+                if writer._async_writer.is_alive():
+                    writer._async_writer.join(timeout=2)
+            except Exception:
+                pass
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def test_cpu_temp_is_recorded(self):
+        import time
+
+        writer = SQLiteResultWriter(
+            db_credentials={"name": self.db_path},
+            rois=self.rois,
+            metadata={"machine_name": "t", "machine_id": "T"},
+            erase_old_db=True,
+        )
+        self.writers.append(writer)
+        time.sleep(0.5)
+
+        writer.write_diagnostics(
+            60000,
+            {
+                "image_noise": 0.5,
+                "sharpness": 20.0,
+                "jitter": 0.002,
+                "n_rois_sampled": 20,
+                "cpu_temp": 57.5,
+            },
+            fps=4.8,
+        )
+        time.sleep(0.5)
+
+        conn = sqlite3.connect(self.db_path)
+        temp = conn.execute("SELECT cpu_temp FROM DIAGNOSTICS").fetchone()[0]
+        conn.close()
+
+        self.assertAlmostEqual(temp, 57.5, places=2)

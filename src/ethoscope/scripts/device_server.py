@@ -232,6 +232,13 @@ def update_machine_info(id):
         raise WrongMachineID
 
     data = bottle.request.json
+    # Reason: clear first, as the tracking and recording handlers do. This dict
+    # is module-level, so without it every request also re-evaluates the fields
+    # of every earlier request. Most branches compare against the current state
+    # and so no-op, but "datetime" and "expand_rootfs" do not: once either had
+    # been sent, every later settings change would silently re-apply a stale
+    # system clock or re-run a filesystem expansion.
+    update_machine_json_data.clear()
     update_machine_json_data.update(data["machine_options"]["arguments"])
 
     if (
@@ -295,12 +302,6 @@ def update_machine_info(id):
         pi.loggingStatus(update_machine_json_data["remoteLogging"])
         haschanged = True
 
-    if "use_noir_tuning" in update_machine_json_data and update_machine_json_data[
-        "use_noir_tuning"
-    ] != machine_info.get("use_noir_tuning", True):
-        pi.set_noir_setting(update_machine_json_data["use_noir_tuning"])
-        haschanged = True
-
     if "has_light_hardware" in update_machine_json_data and update_machine_json_data[
         "has_light_hardware"
     ] != machine_info.get("has_light_hardware", False):
@@ -315,7 +316,7 @@ def update_machine_info(id):
 
     if "gain_setting" in update_machine_json_data and update_machine_json_data[
         "gain_setting"
-    ] != machine_info.get("gain_setting", 5.0):
+    ] != machine_info.get("gain_setting", pi.DEFAULT_CAMERA_GAIN):
         pi.set_gain_setting(float(update_machine_json_data["gain_setting"]))
         haschanged = True
 
@@ -514,10 +515,20 @@ def get_machine_info(id):
     except Exception:
         machine_info["remoteLogging"] = False
 
+    # NoIR tuning is unconditional (an ethoscope has no other kind of camera), so
+    # what matters is not whether it is enabled but which file the sensor needs
+    # and which one the camera actually loaded. "DEFAULT" means it fell back to
+    # libcamera's colour tuning and this device's auto-exposure is not comparable
+    # with a correctly tuned one.
     try:
-        machine_info["use_noir_tuning"] = pi.get_noir_setting()
+        machine_info["camera_tuning_expected"] = pi.get_camera_tuning_file()
     except Exception:
-        machine_info["use_noir_tuning"] = True
+        machine_info["camera_tuning_expected"] = None
+
+    try:
+        machine_info["camera_tuning_loaded"] = pi.get_camera_tuning_status()
+    except Exception:
+        machine_info["camera_tuning_loaded"] = None
 
     try:
         machine_info["maxfps_setting"] = pi.get_maxfps_setting()
@@ -527,7 +538,7 @@ def get_machine_info(id):
     try:
         machine_info["gain_setting"] = pi.get_gain_setting()
     except Exception:
-        machine_info["gain_setting"] = 5.0
+        machine_info["gain_setting"] = pi.DEFAULT_CAMERA_GAIN
 
     machine_info["SD_CARD_AGE"] = pi.get_SD_CARD_AGE()
     machine_info["partitions"] = pi.get_partition_info()
@@ -917,17 +928,12 @@ def user_options(id):
                             "type": "number",
                             "name": "gain_setting",
                             "description": "Camera gain (lower values reduce noise artifacts for better tracking)",
-                            "default": machine_info.get("gain_setting", 5.0),
+                            "default": machine_info.get(
+                                "gain_setting", pi.DEFAULT_CAMERA_GAIN
+                            ),
                             "min": 1.0,
                             "max": 16.0,
                             "step": 0.1,
-                            "requires_reboot": False,
-                        },
-                        {
-                            "type": "boolean",
-                            "name": "use_noir_tuning",
-                            "description": "Use NoIR tuning for cameras with IR pass-through filters",
-                            "default": machine_info.get("use_noir_tuning", True),
                             "requires_reboot": False,
                         },
                         {
@@ -1074,7 +1080,7 @@ if __name__ == "__main__":
         action="store_true",
     )
 
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
     option_dict = vars(options)
 
     PORT = option_dict["port"]

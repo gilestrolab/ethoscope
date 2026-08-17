@@ -13,8 +13,13 @@
             <span ng-if="device.underpowered == true" class="fa fa-bolt fa-3x" title="The PI is underpowered!" style="color: #ff9966;">
             </span>
 
-            <!-- NoIR Camera Icon -->
-            <span ng-if="machine_info.use_noir_tuning" class="fa fa-cloud-moon fa-3x" title="NoIR tuning enabled for IR pass-through filter" style="color: #9966ff;">
+            <!-- Camera tuning. NoIR tuning is always intended; the icon flags the
+                 case where the camera fell back to libcamera's default tuning,
+                 which silently changes auto-exposure behaviour (issue #222). -->
+            <span ng-if="machine_info.camera_tuning_loaded"
+                  class="fa fa-cloud-moon fa-3x"
+                  ng-attr-title="{{machine_info.camera_tuning_loaded === 'DEFAULT' ? 'WARNING: camera fell back to libcamera default tuning instead of the NoIR tuning for this sensor - auto-exposure is not comparable with correctly tuned devices' : 'NoIR tuning loaded: ' + machine_info.camera_tuning_loaded}}"
+                  ng-style="{'color': machine_info.camera_tuning_loaded === 'DEFAULT' ? '#d9534f' : '#9966ff'}">
             </span>
 
             <!-- Dynamic Hard Drive Icon -->
@@ -99,6 +104,23 @@
                 <br>
                 <span ng-if="device.status == 'running'" class="fas fa-camera"></span> {{device.monitor_info.fps}} FPS
                 <br>
+                <!-- Acquisition quality, sampled once a minute during tracking.
+                     A debugging aid while issue #222 is open; expected to be
+                     absorbed into the calibration feature later. No threshold is
+                     applied yet - the alert level has to come from observed fleet
+                     values rather than an invented cutoff. -->
+                <!-- Gated on the sample existing, not on any one field: jitter is
+                     null whenever no animal is detected, and gating on it hid the
+                     noise and focus readings that were being measured perfectly
+                     well. Each figure shows only when it has a value. -->
+                <span ng-if="device.status == 'running' && device.monitor_info.diagnostics.t">
+                    <span class="fas fa-wave-square" title="Acquisition quality, sampled once a minute"></span>
+                    <span title="Single-frame noise estimate, in grey levels. Set by analogue gain; independent of frame rate and illumination.">Noise: {{device.monitor_info.diagnostics.frame_noise | number:3}}</span>
+                    <span ng-if="device.monitor_info.diagnostics.sharpness !== null" title="Variance of the Laplacian: high-frequency content. Rises with gain.">| focus: {{device.monitor_info.diagnostics.sharpness | number:0}}</span>
+                    <span ng-if="device.monitor_info.diagnostics.jitter !== null" title="Noise floor of the movement signal, as a fraction of ROI width. Lower is better.">| jitter: {{device.monitor_info.diagnostics.jitter | number:5}} <span style="color: #6c757d;">({{device.monitor_info.diagnostics.n_rois_sampled}} ROIs)</span></span>
+                    <span ng-if="device.monitor_info.diagnostics.cpu_temp !== null" title="Core temperature. Sensor dark current roughly doubles every 6-8 C.">| {{device.monitor_info.diagnostics.cpu_temp | number:1}} &#8451;</span>
+                    <br>
+                </span>
                 <span ng-if="device.CPU_temp > 70" class="fas fa-temperature-high"></span>
                 <span ng-if="device.CPU_temp <= 70" class="fas fa-temperature-low"></span> CPU temperature: {{device.CPU_temp}} &#8451
             </p>

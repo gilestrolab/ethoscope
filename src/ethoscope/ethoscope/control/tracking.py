@@ -319,6 +319,9 @@ class ControlThread(Thread):
         self._monit_args = args
         self._monit_kwargs = kwargs
         self._metadata = None
+        # Why the last ROI build failed, so the user is told the real cause
+        # rather than a fixed "insufficient targets" message.
+        self._roi_build_error = None
 
         # for FPS computation
         self._last_info_t_stamp = 0
@@ -515,6 +518,84 @@ class ControlThread(Thread):
             "SD_CARD_NAME": pi.get_SD_CARD_NAME(),
         }
 
+    @staticmethod
+    def _acquisition_metadata(cam, TrackerClass=None):
+        """
+        Acquisition context for the METADATA table, one queryable field each.
+
+        Everything here is needed to decide whether two experiments are
+        comparable. Sleep scoring depends on the sampling rate and on image
+        noise, both of which depend on the FPS cap, the analogue gain, the
+        camera tuning and the Pi generation - none of which used to be recorded
+        anywhere, so a database could not be audited after the fact (issue #222).
+        ``hardware_info`` carries some of this already, but only as one
+        stringified blob that cannot be queried or compared across runs.
+
+        Every field is collected defensively: diagnostics must never be the
+        reason an experiment fails to start.
+
+        Args:
+            cam: The camera instance in use.
+            TrackerClass: The tracker class selected for this run.
+
+        Returns:
+            dict: Metadata fields, with None where a value is unavailable.
+        """
+
+        def _safe(fn, default=None):
+            try:
+                return fn()
+            except Exception as e:
+                logging.warning(f"Could not collect acquisition metadata: {e}")
+                return default
+
+        def _picamera2_version():
+            from importlib.metadata import version
+
+            return version("picamera2")
+
+        def _camera_attr(name):
+            """
+            Read an acquisition attribute from the camera or its frame grabber.
+
+            The Pi cameras delegate acquisition to a frame-grabber process held
+            as ``_p``, so target_fps and the exposure regime live one level down;
+            simpler cameras keep them on the camera itself. Both are checked
+            because reading only the camera left these two fields empty in the
+            database on a real device.
+            """
+            for obj in (cam, getattr(cam, "_p", None)):
+                if obj is not None and getattr(obj, name, None) is not None:
+                    return getattr(obj, name)
+            return None
+
+        metadata = {
+            # Sampling rate: the configured ceiling, and what the camera was
+            # actually asked for (they differ for video recording).
+            "maxfps_setting": _safe(pi.get_maxfps_setting),
+            "target_fps": _safe(lambda: _camera_attr("_target_fps")),
+            # Exposure regime. With the gain pinned, the FPS ceiling doubles as
+            # an exposure ceiling; 'exposure_decoupled' records whether this
+            # build lets auto-exposure integrate beyond 1 / target_fps.
+            "gain_setting": _safe(pi.get_gain_setting),
+            "exposure_decoupled": _safe(lambda: _camera_attr("_exposure_decoupled")),
+            # Camera tuning: what this sensor needs, and what was really loaded.
+            # "DEFAULT" means it fell back to libcamera's colour tuning and this
+            # run is not comparable with a correctly tuned one.
+            "camera_tuning_expected": _safe(pi.get_camera_tuning_file),
+            "camera_tuning_loaded": _safe(pi.get_camera_tuning_status),
+            "camera_sensor": _safe(lambda: pi.getPiCameraVersion()),
+            # Platform: determines whether the FPS ceiling actually binds.
+            "pi_version": _safe(pi.pi_version),
+            "picamera2_version": _safe(_picamera2_version),
+            # Which algorithm produced the positions in this database.
+            "tracker_class": (
+                getattr(TrackerClass, "__name__", None) if TrackerClass else None
+            ),
+        }
+
+        return {k: str(v) if v is not None else None for k, v in metadata.items()}
+
     @property
     def info(self):
         self._update_info()
@@ -654,6 +735,10 @@ class ControlThread(Thread):
                 # "last_positions":pos,
                 "last_time_stamp": t,
                 "fps": f,
+                # Acquisition quality, refreshed by the monitor on a slow
+                # interval. Rides along with the existing payload so the node
+                # needs no new endpoint to display it (issue #222).
+                "diagnostics": self._monit.diagnostics,
             }
 
         if self._drawer:
@@ -974,6 +1059,7 @@ class ControlThread(Thread):
             "result_writer_type": result_writer_type,
             "sqlite_source_path": sqlite_source_path,
         }
+        self._metadata.update(self._acquisition_metadata(cam, TrackerClass))
 
         # This is useful to retrieve the latest run's information after a reboot
         # Now stored in cache files instead of separate pickle file
@@ -1198,14 +1284,21 @@ class ControlThread(Thread):
         ROIBuilderClass = self._option_dict["roi_builder"]["class"]
         roi_builder_kwargs = self._option_dict["roi_builder"]["kwargs"]
 
-        roi_builder = ROIBuilderClass(**roi_builder_kwargs)
-
         try:
+            # Inside the try: constructing the builder is where a bad or missing
+            # template fails, and that escaped as a raw traceback in the device's
+            # error field rather than a sentence the user can act on.
+            roi_builder = ROIBuilderClass(**roi_builder_kwargs)
+
             reference_points, rois = roi_builder.build(cam)
 
             # Handle graceful failure when ROI building returns None values
             if reference_points is None or rois is None:
                 logging.warning("ROI building failed: insufficient targets detected.")
+                self._roi_build_error = (
+                    "ROI building failed: insufficient targets detected. Please "
+                    "check your arena has 3 circular targets visible."
+                )
                 # Save debug image to help user understand the issue
                 self._save_roi_debug_image(cam, "Insufficient targets detected")
                 return None, None
@@ -1223,6 +1316,12 @@ class ControlThread(Thread):
 
         except (EthoscopeException, Exception) as e:
             logging.error(f"Target detection failed: {e}")
+            # Reason: keep the actual cause. It used to be logged and then
+            # discarded, and every failure - a broken template, an OpenCV type
+            # error, a missing file - was reported to the user as "insufficient
+            # targets detected", sending them to check the arena and the camera
+            # when the fault was elsewhere.
+            self._roi_build_error = f"ROI building failed: {e}"
             # Save debug image with exception details
             self._save_roi_debug_image(cam, f"Target detection error: {str(e)}")
             return None, None
@@ -1333,8 +1432,9 @@ class ControlThread(Thread):
                     "Tracking setup failed. Please check your arena setup and try again."
                 )
                 self._info["status"] = "stopped"  # Keep device available for restart
-                self._info["error"] = (
-                    "ROI building failed: insufficient targets detected. Please check your arena has 3 circular targets visible."
+                self._info["error"] = self._roi_build_error or (
+                    "ROI building failed: insufficient targets detected. Please "
+                    "check your arena has 3 circular targets visible."
                 )
                 # Don't exit, just stop this tracking attempt - device remains available
                 return  # Exit gracefully without crashing

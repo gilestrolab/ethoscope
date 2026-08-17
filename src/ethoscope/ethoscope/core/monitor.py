@@ -2,8 +2,12 @@ __author__ = "quentin"
 
 import datetime
 import logging
+import os
 import time
 import traceback
+
+import cv2
+import numpy as np
 
 from .tracking_unit import TrackingUnit
 
@@ -57,6 +61,12 @@ class Monitor:
         self._is_running = False
         self._reference_points = reference_points
 
+        # Acquisition-quality diagnostics, refreshed on a slow interval so they
+        # cost nothing on the tracking hot path. See _collect_diagnostics().
+        self._diagnostics = {}
+        self._last_diagnostics_t = None
+        self._last_diagnostics_frame_idx = 0
+
         if rois is None:
             raise NotImplementedError("rois must exist (cannot be None)")
 
@@ -72,6 +82,220 @@ class Monitor:
             ]
         else:
             raise ValueError("You should have one interactor per ROI")
+
+    # How often the diagnostics are refreshed, in milliseconds. Noise and focus
+    # drift on the scale of the room, not the frame, so once a minute is ample
+    # for an experiment and keeps the cost off the tracking loop. Calibration and
+    # bench work need answers in seconds, not minutes, hence the override.
+    _DIAGNOSTICS_INTERVAL = int(
+        os.environ.get("ETHOSCOPE_DIAGNOSTICS_INTERVAL_MS", 60 * 1000)
+    )
+
+    # Quantile of the per-frame displacement distribution taken as the noise
+    # floor. Most animals are quiescent at any moment, so the low tail of the
+    # distribution is the tracker's jitter rather than real movement - which
+    # means the floor can be measured without knowing which animals are asleep.
+    _JITTER_QUANTILE = 10
+
+    # Below this many observed positions the quantile is meaningless, so no
+    # number is reported rather than a misleading one.
+    _MIN_JITTER_SAMPLES = 30
+
+    @property
+    def diagnostics(self):
+        """
+        :return: The most recent acquisition-quality measurements: image noise,\
+            focus and tracker jitter. Empty until the first sample is taken.
+        :rtype: dict
+        """
+        return self._diagnostics
+
+    def _collect_diagnostics(self, t, frame):
+        """
+        Sample acquisition quality: how noisy the image is, how sharp it is, and
+        how much the tracked position jitters.
+
+        These are the three quantities behind the sleep-scoring problem in issue
+        #222. Image noise and focus are the candidate *causes* of centroid
+        jitter, and jitter is the *effect* that gets scored as movement, so all
+        three are recorded together: which cause dominates is then a question
+        the data answers rather than one we have to assume.
+
+        Everything is derived from state the tracker already keeps, so nothing
+        is added to the per-frame path. Failures are swallowed: diagnostics must
+        never interrupt an experiment.
+
+        Args:
+            t (int): Current frame timestamp, in milliseconds.
+            frame (numpy.ndarray): The current frame.
+        """
+        try:
+            noises = []
+            jitters = []
+
+            for track_u in self._unit_trackers:
+                # Guarded per ROI: one misbehaving tracker must cost its own
+                # sample, not the whole plate's.
+                try:
+                    tracker = track_u.tracker
+
+                    noise = None
+                    if hasattr(tracker, "image_noise"):
+                        noise = tracker.image_noise()
+                    if noise is not None:
+                        noises.append(noise)
+
+                    jitter = self._roi_jitter(tracker)
+                    if jitter is not None:
+                        jitters.append(jitter)
+
+                except Exception as e:
+                    logging.warning(f"Could not sample diagnostics for an ROI: {e}")
+
+            self._diagnostics = {
+                "t": t,
+                # Grey levels: sensor noise, driven by illumination and gain.
+                "image_noise": float(np.median(noises)) if noises else None,
+                # Single-frame noise estimate: available immediately, whereas
+                # image_noise waits on the background model to converge.
+                "frame_noise": self._frame_noise(frame),
+                # Core temperature, because dark current roughly doubles every
+                # 6-8 C and its shot noise goes as the square root: a noise
+                # reading cannot be interpreted without the temperature it was
+                # taken at, and an enclosure or a warm room changes it.
+                "cpu_temp": self._core_temperature(),
+                # Variance of the Laplacian: high is sharp, low is defocused.
+                "sharpness": self._frame_sharpness(frame),
+                # Fraction of ROI width: the noise floor of the movement signal,
+                # in the same units as the movement threshold itself.
+                "jitter": float(np.median(jitters)) if jitters else None,
+                "n_rois_sampled": len(jitters),
+            }
+
+        except Exception:
+            logging.warning(
+                f"Could not collect tracking diagnostics: {traceback.format_exc()}"
+            )
+
+    # Immerkaer's 3x3 kernel: a Laplacian-of-Laplacian that responds to noise
+    # while cancelling smooth gradients and straight edges, so a single frame
+    # yields a noise estimate without any temporal reference.
+    _NOISE_KERNEL = np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]], dtype=np.float32)
+
+    @classmethod
+    def _frame_noise(cls, frame):
+        """
+        Sensor noise estimated from a single frame, in grey levels.
+
+        Unlike ``image_noise``, which measures deviation from the background
+        model and is therefore only meaningful once that model has converged,
+        this needs one frame. That makes a reading available seconds after
+        tracking starts rather than minutes, which matters when sweeping a
+        setting - each value otherwise costs a full convergence.
+
+        It is also computable on a stored JPEG, so live readings and archived
+        snapshots can be compared on the same scale (with the caveat that JPEG
+        compression attenuates the estimate).
+
+        Args:
+            frame (numpy.ndarray): The current frame.
+
+        Returns:
+            float: Estimated Gaussian noise sigma, or None if unavailable.
+        """
+        try:
+            if frame is None:
+                return None
+            grey = frame if frame.ndim == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            h, w = grey.shape[:2]
+            if h < 3 or w < 3:
+                return None
+            conv = cv2.filter2D(grey.astype(np.float32), -1, cls._NOISE_KERNEL)
+            return float(
+                np.sqrt(np.pi / 2) * np.abs(conv).sum() / (6.0 * (w - 2) * (h - 2))
+            )
+        except Exception:
+            return None
+
+    @staticmethod
+    def _core_temperature():
+        """
+        Core temperature in degrees C, or None off a Pi.
+
+        A proxy for sensor temperature rather than a measurement of it - the
+        camera sits on its own board - but it tracks the enclosure and the room,
+        which is what changes between a warm afternoon and a cooled incubator.
+        """
+        try:
+            from ethoscope.utils import pi
+
+            return float(pi.get_core_temperature())
+        except Exception:
+            return None
+
+    @staticmethod
+    def _frame_sharpness(frame):
+        """
+        Focus proxy: the variance of the Laplacian of the frame.
+
+        Defocus is the second candidate cause of centroid jitter - a blurred
+        blob has poorly defined edges, so its centroid wanders even in a clean
+        image. Computed on the whole frame rather than per ROI because focus is
+        a property of the optics.
+
+        Args:
+            frame (numpy.ndarray): The current frame.
+
+        Returns:
+            float: Variance of the Laplacian, or None if it cannot be computed.
+        """
+        try:
+            if frame is None:
+                return None
+            grey = frame if frame.ndim == 2 else cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            return float(cv2.Laplacian(grey, cv2.CV_64F).var())
+        except Exception:
+            return None
+
+    @classmethod
+    def _roi_jitter(cls, tracker):
+        """
+        Noise floor of the movement signal for one ROI.
+
+        Takes a low quantile of the per-frame displacements the tracker has
+        already recorded, which is the jitter of a quiescent animal. Inferred
+        positions are excluded: inference repeats the previous displacement
+        verbatim, so including them would bias the floor with values that were
+        never measured (the same artefact that produced ghost movement bouts in
+        issue #224).
+
+        Args:
+            tracker: The tracker whose rolling history is sampled.
+
+        Returns:
+            float: Displacement as a fraction of ROI width, or None if the
+                history is too short to estimate one.
+        """
+        try:
+            distances = []
+
+            for points in tracker.positions:
+                if not points:
+                    continue
+                point = points[0]
+                if point.get("is_inferred", False):
+                    continue
+                # Stored as log10(distance) * 1000, distance being a fraction of
+                # the ROI width.
+                distances.append(10.0 ** (point["xy_dist_log10x1000"] / 1000.0))
+
+            if len(distances) < cls._MIN_JITTER_SAMPLES:
+                return None
+
+            return float(np.percentile(distances, cls._JITTER_QUANTILE))
+
+        except Exception:
+            return None
 
     @property
     def last_positions(self):
@@ -159,6 +383,37 @@ class Monitor:
                         self._unit_trackers,
                         self._reference_points,
                     )
+
+                if (
+                    self._last_diagnostics_t is None
+                    or t - self._last_diagnostics_t >= self._DIAGNOSTICS_INTERVAL
+                ):
+                    # Achieved rate since the previous sample. Recorded next to
+                    # the noise figures because the movement statistic depends
+                    # on dt, so a run cannot be interpreted without it.
+                    fps = None
+                    if (
+                        self._last_diagnostics_t is not None
+                        and t > self._last_diagnostics_t
+                    ):
+                        fps = (i - self._last_diagnostics_frame_idx) / (
+                            (t - self._last_diagnostics_t) / 1000.0
+                        )
+
+                    self._last_diagnostics_t = t
+                    self._last_diagnostics_frame_idx = i
+                    self._collect_diagnostics(t, frame)
+
+                    # hasattr rather than a bare call: writers that predate the
+                    # diagnostics table (or stand in for one) must not break a
+                    # run just because they cannot record a sample.
+                    if result_writer is not None and hasattr(
+                        result_writer, "write_diagnostics"
+                    ):
+                        result_writer.write_diagnostics(
+                            t_with_offset, self._diagnostics, fps=fps
+                        )
+
                 self._last_t = t
                 time.sleep(0.001)
 

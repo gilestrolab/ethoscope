@@ -350,18 +350,56 @@ class ROITemplate:
         return reference_points, rois
 
     def _generate_manual_rois(self, camera, roi_def: dict) -> list[ROI]:
-        """Generate ROIs from manual polygon definitions."""
+        """Generate ROIs from manual polygon definitions.
+
+        Coordinates may be given either in pixels or normalised to 0..1; a
+        template whose points all fall within the unit square is treated as
+        normalised and scaled to the camera. That is how the shipped
+        ``default_full_image`` template is written, and without the scaling it
+        produced a one-pixel ROI.
+
+        Points are int32 because that is what ``cv2.fillPoly`` requires
+        downstream; building them as float32 raised
+        ``(-215:Assertion failed) p.checkVector(2, CV_32S) > 0`` and made every
+        manual template unusable.
+        """
         rois = []
         manual_rois = roi_def["manual_rois"]
 
+        width = int(getattr(camera, "width", 0) or 0)
+        height = int(getattr(camera, "height", 0) or 0)
+
         for i, roi_data in enumerate(manual_rois):
-            polygon = np.array(roi_data["polygon"], dtype=np.float32)
+            points = np.array(roi_data["polygon"], dtype=np.float64)
+
+            if self._is_normalised(points):
+                if not (width and height):
+                    raise ROITemplateValidationError(
+                        f"manual_rois[{i}] uses normalised coordinates but the "
+                        "camera reports no dimensions to scale them to"
+                    )
+                points = points * np.array([width, height], dtype=np.float64)
+                # Clip to the last valid pixel: a normalised 1.0 scales to
+                # exactly `width`, which is one past the edge of the frame.
+                points = np.clip(points, 0, [width - 1, height - 1])
+
+            polygon = np.round(points).astype(np.int32)
             value = roi_data.get("value", i)
 
             roi = ROI(polygon, idx=i, value=value)
             rois.append(roi)
 
         return rois
+
+    @staticmethod
+    def _is_normalised(points: np.ndarray) -> bool:
+        """True when every coordinate lies in the unit square.
+
+        A real pixel polygon spans hundreds of pixels, so it cannot be mistaken
+        for a normalised one; the only ambiguous case is a degenerate ROI a
+        pixel or two across, which is not usable either way.
+        """
+        return bool(points.size and points.min() >= 0.0 and points.max() <= 1.0)
 
     def _generate_mask_rois(self, camera, roi_def: dict) -> list[ROI]:
         """Generate ROIs from image mask."""

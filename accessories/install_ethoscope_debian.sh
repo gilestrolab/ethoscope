@@ -253,9 +253,22 @@ step_install_apt_packages() {
         python3-dev \
         libcap-dev \
         pkg-config \
-        pigpio \
-        python3-pigpio \
+        python3-gpiozero \
+        python3-lgpio \
         git wget curl
+
+    # PWM backend for the light daemon. pigpio has no package from Trixie
+    # onwards and never supported the Pi 5, so it is installed only where it
+    # actually exists; elsewhere the daemon uses gpiozero/lgpio, installed
+    # unconditionally above. Without either, light control degrades to binary
+    # on/off with no fades.
+    print_info "Installing PWM backend for light control..."
+    if apt-cache show pigpio >/dev/null 2>&1; then
+        apt-get install -y pigpio python3-pigpio && \
+            print_success "Installed pigpio (PWM backend)"
+    else
+        print_info "pigpio unavailable on this release — using gpiozero/lgpio"
+    fi
 
     # NTP: ntp was removed in Trixie, replaced by ntpsec
     print_info "Installing NTP service..."
@@ -443,14 +456,28 @@ step_enable_system_services() {
         ethoscope_update.service ethoscope_GPIO_listener.service \
         ethoscope_light.service
 
-    # pigpiod drives the PWM-capable light backend. The light daemon falls back
-    # to pinctrl (binary on/off) if pigpiod isn't running, so this is best-effort:
-    # missing on a stripped-down install simply means no smooth fades.
+    # pigpiod drives the PWM light backend where it exists. From Trixie onwards
+    # it is absent and the daemon uses gpiozero/lgpio instead, which needs no
+    # service, so its absence is expected rather than a problem.
     if systemctl list-unit-files 2>/dev/null | grep -q "^pigpiod\.service"; then
+        # pigpiod defaults to port 8888, which on an ethoscope belongs to
+        # ethoscope_update.service. It cannot bind there, and a client using the
+        # default port connects to the *update server*, is told the connection
+        # succeeded, and then sends GPIO commands to an HTTP server - light
+        # silently dead. Pin both sides to 8889 (see PIGPIO_PORT in light_daemon).
+        mkdir -p /etc/systemd/system/pigpiod.service.d
+        cat > /etc/systemd/system/pigpiod.service.d/port.conf <<'PIGPIOD_PORT'
+[Service]
+ExecStart=
+ExecStart=/usr/bin/pigpiod -l -p 8889
+PIGPIOD_PORT
+        systemctl daemon-reload 2>/dev/null || true
         systemctl enable pigpiod.service 2>/dev/null && \
-            print_success "Enabled pigpiod.service (PWM backend for fades)"
+            print_success "Enabled pigpiod.service on port 8889 (PWM backend for fades)"
     else
-        print_warning "pigpiod.service not found — light daemon will use pinctrl (binary on/off)"
+        print_info "pigpiod.service not present — light daemon will use gpiozero/lgpio PWM"
+        print_info "  (GPIO17 boards then get steady on/off only; dimming needs"
+        print_info "   pigpio, or the LED on a hardware-PWM GPIO: 12, 13, 18, 19)"
     fi
 
     # NTP service

@@ -264,3 +264,180 @@ with a generic, doubled error message.
   Worth a guard or at least a loud warning.
 - Failure-path messages across `setup_api.py` are uniformly generic
   ("Failed to create user", ...); the incubator one is fixed, the rest are not.
+# Real-time noise diagnostics on the device (2026-08-12)
+
+Step 1 of the plan for #222: measure noise while tracking, surface it through the
+node, and record enough context to debug an experiment after the fact. Step 2
+(a calibration phase advising on illumination / FPS / gain) builds on the numbers
+this step produces and is deliberately out of scope here.
+
+Design decisions taken: show positional jitter *and* sensor noise side by side
+(jitter is expected to be driven mainly by sensor noise and by focus blur, which
+this step will test rather than assume); per-minute samples go to a new
+DIAGNOSTICS table.
+
+## 1a. Measurement primitives (device)
+- [ ] Implement `BackgroundModel._bg_sd` as an EWMA of `|img - _bg_mean|` — the
+      stub commented out at `adaptive_bg_tracker.py:217`. One array op per frame,
+      alongside the mean update that already runs. This is the sensor-noise term.
+- [ ] Add a focus/sharpness metric (variance of Laplacian) per ROI, sampled once
+      per diagnostics interval rather than per frame. Second candidate cause of
+      positional jitter.
+- [ ] Positional jitter: 10th percentile of per-frame displacement over the
+      existing 250 s rolling buffer, per ROI, then median across ROIs. Most
+      animals are quiescent at any moment, so the low percentile is the noise
+      floor without needing to know which ones are asleep.
+- [ ] Surface the signals already computed and discarded: `prop_fg_pix`,
+      `is_ambiguous` rate (`adaptive_bg_tracker.py:510,524`), `is_inferred` rate.
+- [ ] Read real exposure/gain via `capture_metadata()`. The current
+      "Auto-exposure status" log (`cameras.py:766`) reads `camera_controls`,
+      which returns (min, max, default) limits, not actual values.
+
+## 1b. Aggregation and storage
+- [ ] Diagnostics aggregator in the monitor loop, once per interval (default 60 s),
+      with bounded cost — percentiles over the existing buffer, no new retention.
+- [ ] New DIAGNOSTICS table in both the SQLite and MySQL writers:
+      `t, fps, exposure_us, gain, brightness, sensor_noise, sharpness, jitter,
+      inferred_frac, ambiguous_frac`. ~1440 rows/day against ~21M tracking rows.
+- [x] Static acquisition context into METADATA at start: `maxfps_setting`,
+      `target_fps`, `gain_setting`, `exposure_decoupled`, `camera_tuning_expected`,
+      `camera_tuning_loaded`, `camera_sensor`, `pi_version`, `picamera2_version`,
+      `tracker_class`. One queryable field each - `hardware_info` already carried
+      some of this, but only as a stringified blob that cannot be compared across
+      runs. Collected defensively: a diagnostic must never stop an experiment.
+
+## 1c. Surfacing through the node
+- [ ] Include the latest diagnostics sample in the `/data/<id>` payload next to
+      `monitor_info`, so the node needs no new endpoint.
+- [ ] Indicator in the device status bar beside the hard-drive / response-time
+      icons, with the detail on the device page.
+- [ ] **No hard alert threshold yet.** Display value and trend, collect across the
+      fleet, then set the threshold from the observed distribution. Shipping an
+      invented cutoff is how the activity trigger ended up with a rule sitting
+      above p99.4 of real behaviour (#224).
+
+## 1d. Validation
+- [ ] Unit tests per estimator: synthetic frames with known added noise, synthetic
+      position traces with known jitter, deliberately defocused frames.
+- [ ] Measure the added per-frame cost on a real device; must stay negligible
+      against tracking, which is already the bottleneck.
+- [ ] Archive audit (independent, cheap): median `dt` per experiment across
+      existing databases, recoverable from the `t` column with no code change.
+      Tells us which historical datasets are mutually comparable.
+
+## Attribution experiment (once data exists)
+Regress jitter on sensor noise and on sharpness across the fleet. GG's prediction
+is that sensor noise dominates; measuring both causes alongside the effect is what
+makes that testable rather than assumed.
+
+## Origin of the noise regression: the picamera -> picamera2 migration
+
+Comparing the legacy path (pre-`e2e74f64`) with the current one:
+
+| | legacy picamera | picamera2 today |
+|---|---|---|
+| exposure | `exposure_mode='auto'` (default) | `ExposureTime: 0` (auto) |
+| gain | **auto ISO** | **`AnalogueGain` pinned** |
+| white balance | auto, `awb_auto_is_greyworld` in config.txt | `AwbEnable: False` + NoIR tuning file |
+| frame rate | `capture.framerate` | `FrameRate` control |
+
+The frame-rate/shutter coupling existed under picamera too - `framerate` limited
+shutter speed there as well. What changed is that **pinning AnalogueGain removed
+the AE loop's second degree of freedom**: in dim light the old stack raised gain
+instead of lengthening exposure, so the FPS ceiling never bound in practice. With
+gain fixed, shutter is the only lever and it is capped, so the sensor
+under-exposes and the frames get noisy. That, not the FrameRate control by
+itself, is the regression.
+
+The fixed gain was deliberate ("Fixed gain to avoid tracking artifacts") - auto
+gain destabilises the background model. So the real choice is: give AE more frame
+duration (Alice's branch), or let AE use gain within bounds. The step-1
+diagnostics are what tell us which regime a device is actually in.
+
+- [x] Record in METADATA which regime applied: exposure policy and configured
+      gain are now stamped at experiment start. The *observed* exposure/gain per
+      frame still needs the per-minute DIAGNOSTICS table (1b).
+
+## NoIR tuning: make it constant, and fix the sensor mismatch
+
+Ethoscopes cannot exist without a NoIR camera, so the `use_noir_tuning` flag is a
+setting that should never be False.
+
+- [ ] Remove the flag: `pi.get_noir_setting` / `pi.set_noir_setting`
+      (`pi.py:1381,1399`), its `/etc/ethoscope/use_noir_tuning` file, and the UI
+      control. Always apply NoIR tuning.
+- [ ] **Select the tuning file from the detected sensor.** It is currently
+      hardcoded to `imx219_noir.json` (`cameras.py:694`) while `pi.py:680-689`
+      already recognises `ov5647` (NoIR v1) and `imx219` (NoIR v2); Camera Module
+      3 is `imx708`. On any non-imx219 device the load fails.
+- [ ] **Never fall back silently.** The failure path currently drops to
+      `Picamera2()` with default colour tuning, logged as a warning and recorded
+      nowhere - two nominally identical ethoscopes can run different AE tuning
+      with no trace in the data. Fail loudly, and record the tuning file actually
+      loaded in METADATA.
+
+## Bench session results (2026-08-12, ETHOSCOPE_900, Pi 3 + imx219, no flies)
+
+Step 1 is implemented and verified on hardware: 1a (estimators), 1b (DIAGNOSTICS
+table + acquisition context in METADATA) and 1c (device page readout) are done.
+Alert thresholds remain deliberately unset pending fleet data.
+
+**Reference numbers, empty arena, maxfps=5:** image noise ~0.57 grey levels,
+sharpness ~21, jitter ~0.0022 ROI widths, achieved ~4.8 fps.
+
+**Findings**
+
+- [x] Jitter barely moves with illumination: 0.00222 -> 0.00242 (~9 %) across
+      room light -> IR-only dark -> LED 100 % -> LED 50 %, while image noise
+      changed ~35 %. Early evidence *against* sensor noise dominating jitter -
+      but weak, since with no flies only 4-18 ROIs report and they track dust
+      and reflections rather than animals. Needs repeating with flies.
+- [x] Sharpness groups by illumination *condition*, not by noise: 20.9 room ->
+      38.4 IR-only -> 25.6 LED-on, with corr(noise, sharpness) = +0.10 over 52
+      samples and overlapping noise ranges between conditions. The first reading
+      (noise contamination) was wrong; the camera simply images best under IR,
+      where a NoIR sensor sees crisp silhouettes against the backlight and added
+      visible light washes edges out. It still cannot separate focus from
+      contrast on its own - that needs a defocus test at fixed illumination.
+- NOT APPLICABLE: the Pi thermally throttled (87 C, throttled=0x70006, fps
+      4.99 -> 3.64) under the black cloth used for this bench test. Ethoscopes run
+      in cooled incubators and are never covered, so this was an artefact of
+      testing on a desk, not a field confound.
+- [x] Achieved fps also depends on **scene content**: switching the LED on took
+      fps from 4.99 to 4.1, more foreground to segment on a CPU-bound Pi.
+- [x] At maxfps=5 the exposure decoupling is a **no-op**: `_MAX_EXPOSURE_US`
+      (200 ms) equals the 5 fps frame period, so decoupled and pinned-FrameRate
+      allow the same maximum exposure. The fix only has room to act above 5 fps.
+- [x] The white daylight LED barely changes image statistics; the **IR backlight**
+      forms the image on a NoIR sensor. Calibration (step 2) should target IR
+      brightness and gain, not the daylight LED.
+
+**Implication for #222:** the FPS -> sleep pathway has more than one contributor -
+the exposure ceiling and CPU load, which varies with scene content. A fix
+addressing only exposure will not make sleep scores comparable across units.
+
+## Still open
+- [ ] Decimation study (one recording, scored at several sampling rates).
+- [ ] Repeat the illumination sweep with flies, so jitter reflects animals.
+- [ ] Defocus test at fixed illumination, to see whether sharpness separates
+      focus from contrast before it is used for attribution.
+- [x] `manual_polygons` ROI templates repaired (`template.py`): int32 points,
+      and unit-square coordinates scaled to the frame and clipped to the last
+      valid pixel. `default_full_image` builds and tracks on the device.
+- [x] ROI-building failures now report their real cause. Builder construction
+      moved inside the try as well, since a missing template failed one line
+      above it and escaped as a raw traceback.
+- [x] DIAGNOSTICS created unconditionally, so resumed runs record samples.
+- [x] Camera model cache path unified (writer and reader had disagreed, so it
+      was never read).
+
+Remaining known defects, not fixed here:
+- [ ] `_has_moved()` divides by dt before the term cancels (#224 territory).
+- [ ] `ethoscopeFormService.js` seeds arguments with `argDef.default || ''`,
+      mangling boolean False and numeric 0 (#224 territory).
+- [ ] The device unit suite cannot be collected by pytest at all: importing
+      `ethoscope/__init__.py` fails through `control` -> `ethoscope.core.monitor`.
+      Pre-existing; tests had to be run from a copy outside the package tree.
+- [ ] Devices cannot self-update on this network: `origin` is
+      `git://node.local/ethoscope.git`, which does not resolve from a device and
+      whose git daemon port is closed.

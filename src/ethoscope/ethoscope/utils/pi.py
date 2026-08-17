@@ -14,6 +14,36 @@ from ethoscope.utils.rpi_bad_power import powerChecker
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
+# Where the detected camera model is cached. Defined here, and imported by the
+# camera code that writes it, because the two used to disagree: the writer used
+# /etc/picamera-version while the reader looked in /etc/ethoscope/, so the cache
+# was never read and detection always fell through to probing the filesystem.
+PICAMERA_VERSION_FILE = "/etc/ethoscope/picamera-version"
+
+# Analogue gain applied when no gain file is present.
+#
+# Measured on a Pi 3 / imx219 bench (issue #222): image noise is linear in gain,
+# frame_noise = 0.523 + 0.0824 x gain (R^2 = 0.965, n = 22), and is independent
+# of frame rate and of illumination - so gain is the only lever for image noise
+# and every step costs about 0.08 grey levels.
+#
+# The floor is set by detection rather than by noise: at gain 1 the image is dim
+# enough that ROI target detection failed outright in one run, and it gave the
+# only unstable noise readings in the matrix. Gains 2-3 detected in every
+# condition tested, so 3 takes the lowest noise that still leaves margin - about
+# 18 % below the 5.0 most cards were shipped with.
+DEFAULT_CAMERA_GAIN = 3.0
+
+# Tracking frame-rate cap applied when no maxfps file is present.
+#
+# It is a CPU throttle, not an exposure control - since the exposure ceiling was
+# decoupled from it, image noise is independent of frame rate (#222). What it
+# does still determine is `dt`, and the movement statistic used for sleep scoring
+# is a per-frame displacement divided by `dt`, so runs at different caps are not
+# directly comparable. 5 matches what deployed cards were shipped with and is at
+# the limit of what a Pi 3 achieves in practice.
+DEFAULT_MAXFPS = 5
+
 
 def ensure_dir_exists(file_path):
     """
@@ -691,7 +721,7 @@ def getPiCameraVersion():
         "imx708": "Camera Module 3",
     }
 
-    picamera_info_file = "/etc/ethoscope/picamera-version"
+    picamera_info_file = PICAMERA_VERSION_FILE
 
     if hasPiCamera():
         try:
@@ -1378,42 +1408,137 @@ def expand_rootfs():
     return result
 
 
-def get_noir_setting(path="/etc/ethoscope/use_noir_tuning"):
+# libcamera ships its sensor tuning files in a pipeline-specific directory:
+# "pisp" for the Pi 5's ISP, "vc4" for every earlier model. picamera2's own
+# load_tuning_file() only searches vc4, which is why the path is resolved here.
+#
+# Both directories are installed on a Pi 3, each holding a file of the same name,
+# so "first one that exists" picks the wrong pipeline. The directory must be
+# chosen by Pi generation instead, which is what _tuning_dirs_for_this_pi does.
+_LIBCAMERA_PIPELINE_DIRS = {
+    "pisp": (
+        "/usr/share/libcamera/ipa/rpi/pisp",
+        "/usr/local/share/libcamera/ipa/rpi/pisp",
+    ),
+    "vc4": (
+        "/usr/share/libcamera/ipa/rpi/vc4",
+        "/usr/local/share/libcamera/ipa/rpi/vc4",
+    ),
+}
+
+# The Pi generation from which libcamera uses the pisp pipeline.
+_FIRST_PISP_MODEL = 5
+
+
+def _tuning_dirs_for_this_pi(model_number=None):
     """
-    Reads the NoIR tuning setting for cameras with IR pass-through filters.
+    Tuning directories to search, most appropriate pipeline first.
+
+    Args:
+        model_number (int): Raspberry Pi model number. Detected when omitted.
 
     Returns:
-        bool: True if NoIR tuning should be used, False otherwise
+        tuple: Directories in search order. The other pipeline is kept as a
+            fallback so an unusual layout still resolves something rather than
+            leaving the camera on default tuning.
+    """
+    if model_number is None:
+        try:
+            model_number = pi_version().get("model_number", 0)
+        except Exception:
+            model_number = 0
+
+    if model_number and model_number >= _FIRST_PISP_MODEL:
+        order = ("pisp", "vc4")
+    else:
+        # Pi 0-4, and the unknown case: vc4 is right for every deployed device.
+        order = ("vc4", "pisp")
+
+    return tuple(d for pipeline in order for d in _LIBCAMERA_PIPELINE_DIRS[pipeline])
+
+
+def get_camera_tuning_file(sensor=None, model_number=None):
+    """
+    Resolve the NoIR libcamera tuning file for the attached camera sensor.
+
+    An ethoscope cannot work without an IR pass-through (NoIR) camera, so NoIR
+    tuning is unconditional and is not a user setting. What *does* vary is the
+    sensor - ov5647 (PiNoIR 1), imx219 (PiNoIR 2), imx477 (HQ) and imx708
+    (Camera Module 3) each need their own file - and which pipeline directory
+    that file must come from, which depends on the Pi generation rather than on
+    which copy happens to be installed.
+
+    Args:
+        sensor (str): Sensor name such as "imx219". Detected automatically
+            when omitted.
+        model_number (int): Raspberry Pi model number. Detected when omitted.
+
+    Returns:
+        str: Absolute path to the NoIR tuning file, or None when the sensor
+            cannot be detected or no matching file is installed. Callers must
+            treat None as a degraded state and say so loudly - silently
+            falling back to the default (colour) tuning changes auto-exposure
+            behaviour with no trace in the data (see issue #222).
+    """
+    if sensor is None:
+        sensor = _get_camera_sensor_info()
+
+    if not sensor:
+        logging.warning("Could not detect the camera sensor; no tuning file resolved")
+        return None
+
+    directories = _tuning_dirs_for_this_pi(model_number)
+
+    filename = f"{sensor}_noir.json"
+    for directory in directories:
+        candidate = os.path.join(directory, filename)
+        if os.path.isfile(candidate):
+            return candidate
+
+    logging.warning(f"No NoIR tuning file '{filename}' found in any of {directories}")
+    return None
+
+
+# The frame grabber runs in its own process, so what it actually loaded cannot be
+# read back through the object. It records the outcome here, following the same
+# file-on-disk convention already used for the detected camera model.
+CAMERA_TUNING_STATUS_FILE = "/etc/ethoscope/camera-tuning"
+
+
+def set_camera_tuning_status(tuning_file, path=CAMERA_TUNING_STATUS_FILE):
+    """
+    Record which tuning file the camera actually loaded.
+
+    Args:
+        tuning_file (str): Path that was loaded, or None if the camera fell back
+            to libcamera's default (colour) tuning.
+        path (str): Where to record it.
+    """
+    try:
+        ensure_dir_exists(path)
+        with open(path, "w") as f:
+            f.write(tuning_file or "DEFAULT")
+    except Exception as e:
+        logging.error(f"Could not record camera tuning status to {path}: {e}")
+
+
+def get_camera_tuning_status(path=CAMERA_TUNING_STATUS_FILE):
+    """
+    Report the tuning file the camera last loaded.
+
+    Returns:
+        str: The tuning file path, "DEFAULT" when the camera fell back to
+            libcamera's default (colour) tuning - which means auto-exposure
+            behaves differently and the run is not comparable with correctly
+            tuned ones - or None if tracking has not run yet.
     """
     try:
         if os.path.exists(path):
             with open(path) as f:
-                content = f.read().strip().lower()
-                return content in ["true", "1", "yes"]
-        return False
+                return f.read().strip() or None
     except Exception as e:
-        logging.warning(f"Error reading NoIR setting from {path}: {e}")
-        return False
-
-
-def set_noir_setting(use_noir, path="/etc/ethoscope/use_noir_tuning"):
-    """
-    Sets the NoIR tuning preference for cameras with IR pass-through filters.
-
-    Args:
-        use_noir (bool): True to enable NoIR tuning, False to use dynamic adaptation
-        path (str): Path to the configuration file
-    """
-    try:
-        ensure_dir_exists(path)
-
-        with open(path, "w") as f:
-            f.write("true" if use_noir else "false")
-
-        logging.info(f"NoIR tuning setting updated: use_noir={use_noir}")
-    except Exception as e:
-        logging.error(f"Error setting NoIR preference to {path}: {e}")
-        raise
+        logging.warning(f"Could not read camera tuning status from {path}: {e}")
+    return None
 
 
 def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
@@ -1424,7 +1549,8 @@ def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
         path (str): Path to the configuration file
 
     Returns:
-        int: Maximum FPS value, defaults to 15 if file doesn't exist or invalid
+        int: Maximum FPS value, defaults to DEFAULT_MAXFPS if the file is
+            missing or invalid
     """
     try:
         if os.path.exists(path):
@@ -1436,15 +1562,17 @@ def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
                     return fps_value
                 else:
                     logging.warning(
-                        f"Invalid FPS value {fps_value} in {path}, using default 15"
+                        f"Invalid FPS value {fps_value} in {path}, using default "
+                        f"{DEFAULT_MAXFPS}"
                     )
-                    return 15
-        return 15  # Default value
+                    return DEFAULT_MAXFPS
+        return DEFAULT_MAXFPS
     except (ValueError, OSError) as e:
         logging.warning(
-            f"Error reading max FPS setting from {path}: {e}, using default 15"
+            f"Error reading max FPS setting from {path}: {e}, using default "
+            f"{DEFAULT_MAXFPS}"
         )
-        return 15
+        return DEFAULT_MAXFPS
 
 
 def set_maxfps_setting(max_fps, path="/etc/ethoscope/maxfps_setting"):
@@ -1481,7 +1609,8 @@ def get_gain_setting(path="/etc/ethoscope/gain_setting"):
         path (str): Path to the configuration file
 
     Returns:
-        float: Camera gain value, defaults to 1.0 if file doesn't exist or invalid
+        float: Camera gain value, defaults to DEFAULT_CAMERA_GAIN if the file is
+            missing or invalid.
     """
     try:
         if os.path.exists(path):
@@ -1493,15 +1622,17 @@ def get_gain_setting(path="/etc/ethoscope/gain_setting"):
                     return gain_value
                 else:
                     logging.warning(
-                        f"Invalid gain value {gain_value} in {path}, using default 1.0"
+                        f"Invalid gain value {gain_value} in {path}, using default "
+                        f"{DEFAULT_CAMERA_GAIN}"
                     )
-                    return 1.0
-        return 1.0  # Default value for minimal noise
+                    return DEFAULT_CAMERA_GAIN
+        return DEFAULT_CAMERA_GAIN
     except (ValueError, OSError) as e:
         logging.warning(
-            f"Error reading gain setting from {path}: {e}, using default 1.0"
+            f"Error reading gain setting from {path}: {e}, using default "
+            f"{DEFAULT_CAMERA_GAIN}"
         )
-        return 1.0
+        return DEFAULT_CAMERA_GAIN
 
 
 def set_gain_setting(gain, path="/etc/ethoscope/gain_setting"):
