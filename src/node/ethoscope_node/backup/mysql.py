@@ -90,10 +90,18 @@ class BaseSQLConnector:
     """
 
     # Tables with no autoincrementing id, counted with COUNT(*) rather than
-    # synced incrementally on MAX(id). DIAGNOSTICS deliberately has no id: the
-    # keyword differs between SQLite and MySQL and `t` already identifies a
-    # sample.
-    _TABLE_WITHOUT_KEY = ["ROI_MAP", "VAR_MAP", "METADATA", "DIAGNOSTICS"]
+    # synced incrementally on MAX(id). DIAGNOSTICS and LIGHT_EVENTS deliberately
+    # have no id: the keyword differs between SQLite and MySQL and `t` already
+    # identifies a sample. Omitting one here does not skip it - the sync
+    # enumerates whatever tables exist - it makes the sync try to read a MAX(id)
+    # column that is not there.
+    _TABLE_WITHOUT_KEY = [
+        "ROI_MAP",
+        "VAR_MAP",
+        "METADATA",
+        "DIAGNOSTICS",
+        "LIGHT_EVENTS",
+    ]
 
     def __init__(
         self,

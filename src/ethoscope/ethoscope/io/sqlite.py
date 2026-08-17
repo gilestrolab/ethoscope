@@ -500,6 +500,14 @@ class SQLiteResultWriter(BaseResultWriter):
             self.DIAGNOSTICS_TABLE_NAME, self.DIAGNOSTICS_FIELDS, engine=None
         )
 
+        # Same reasoning, and the same reason it is a table of its own rather
+        # than DIAGNOSTICS columns: on a resumed run this appears cleanly,
+        # where altering an existing table would not.
+        logging.info("Creating light transitions table 'LIGHT_EVENTS'")
+        self._create_table(
+            self.LIGHT_EVENTS_TABLE_NAME, self.LIGHT_EVENTS_FIELDS, engine=None
+        )
+
         if self._erase_old_db:
             logging.info("Creating master table 'ROI_MAP'")
             self._create_table(

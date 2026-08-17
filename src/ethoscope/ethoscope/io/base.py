@@ -897,6 +897,64 @@ class BaseResultWriter:
         "frame_noise",
     )
 
+    # Light transitions, written only when the panel level actually changes.
+    #
+    # The light daemon is a separate process that runs whether or not anything
+    # is tracking, so it cannot write here itself; the tracker samples it and
+    # records the changes. Without this the light regime is recoverable only by
+    # inference - reading it off image brightness or the noise floor - which is
+    # both work and a source of error, and impossible to do at all for a run
+    # held in constant light.
+    #
+    # A separate table rather than extra DIAGNOSTICS columns, deliberately: a
+    # restarted run keeps its existing database, tables are created with
+    # CREATE TABLE IF NOT EXISTS, and there is no schema migration. A new table
+    # appears cleanly on such a database, whereas a new column on an existing
+    # table would make every insert fail for the whole run.
+    LIGHT_EVENTS_TABLE_NAME = "LIGHT_EVENTS"
+    # No autoincrementing id, matching DIAGNOSTICS: the spelling differs between
+    # SQLite and MySQL and `t` already identifies an event.
+    LIGHT_EVENTS_FIELDS = "t INTEGER, light_pct REAL, mode TEXT"
+    LIGHT_EVENTS_INSERT_FIELDS = ("t", "light_pct", "mode")
+
+    def write_light_event(self, t, light_pct, mode=None):
+        """
+        Record one change in the light panel's level.
+
+        Edge-triggered, so a 12:12 cycle costs a handful of rows a day against
+        the 1440 a sampled series would. The first observation of a run is
+        always written, so the state at the start is known rather than assumed.
+
+        Never raises: the light log must not be able to interrupt an experiment.
+
+        Args:
+            t (int): Timestamp of the event, in milliseconds.
+            light_pct (float): Panel level, 0-100. This is the true commanded
+                level, so a crepuscular fade appears as intermediate values.
+            mode (str, optional): 'schedule' when the daemon is following its
+                schedule, 'forced' when overridden from the UI or CLI. Worth
+                recording because a light forced mid-run explains a phase
+                anomaly that would otherwise look biological.
+        """
+        try:
+            values = (
+                t,
+                float(light_pct) if light_pct is not None else None,
+                str(mode) if mode is not None else None,
+            )
+
+            placeholder = "?" if self._database_type == "SQLite3" else "%s"
+            placeholders = ", ".join([placeholder] * len(values))
+            command = (
+                f"INSERT INTO {self.LIGHT_EVENTS_TABLE_NAME} "
+                f"({', '.join(self.LIGHT_EVENTS_INSERT_FIELDS)}) "
+                f"VALUES ({placeholders})"
+            )
+            self._write_async_command(command, values)
+
+        except Exception as e:
+            logging.warning(f"Could not record a light event: {e}")
+
     def write_diagnostics(self, t, sample, fps=None):
         """
         Record one acquisition-quality sample.

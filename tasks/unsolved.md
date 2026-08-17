@@ -66,6 +66,12 @@ known-broken or unverified, not forgotten.
 - [ ] **Sharpness cannot separate focus from contrast.** Both raise
       high-frequency content. Needs a defocus test at fixed illumination before
       the metric is used for attribution.
+- [ ] **Light transitions are now logged, but only for device-driven light.**
+      `LIGHT_EVENTS` records what the light daemon does. When an incubator drives
+      the light - the common arrangement - there is no daemon to ask and the
+      table stays empty, so the cycle still has to be measured from the images
+      (ethoscopy's `estimate_light_cycle()`). A light sensor, or reading the
+      incubator over the network, is what would close this properly.
 - [ ] **Retroactive noise from archived snapshots is unproven.** `IMG_SNAPSHOTS`
       is JPEG quality 50, which attenuates the estimate badly at low sigma in
       synthetic tests, though real archived frames did vary systematically
