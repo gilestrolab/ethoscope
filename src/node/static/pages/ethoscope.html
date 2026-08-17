@@ -105,19 +105,36 @@
                 <span ng-if="device.status == 'running'" class="fas fa-camera"></span> {{device.monitor_info.fps}} FPS
                 <br>
                 <!-- Acquisition quality, sampled once a minute during tracking.
-                     A debugging aid while issue #222 is open; expected to be
-                     absorbed into the calibration feature later. No threshold is
-                     applied yet - the alert level has to come from observed fleet
-                     values rather than an invented cutoff. -->
-                <!-- Gated on the sample existing, not on any one field: jitter is
-                     null whenever no animal is detected, and gating on it hid the
-                     noise and focus readings that were being measured perfectly
-                     well. Each figure shows only when it has a value. -->
+                     Every figure stays on screen - losing the numbers would lose
+                     information, and they are what a user reports when asking
+                     whether a machine is behaving. What changed is that the noise
+                     reading is now *interpreted*: it carries the colour and icon
+                     of its state, and names the state in words once it leaves the
+                     healthy range, so a bad value announces itself instead of
+                     needing a reader who knows what 0.99 means (#222).
+
+                     Thresholds, and the measured fleet values behind them, live
+                     in ethoscope.image_quality().
+
+                     Gated on the sample existing, not on any one field: jitter is
+                     null whenever no animal is detected, and gating on it used to
+                     hide the noise and focus readings that were being measured
+                     perfectly well. Each figure shows only when it has a value.
+
+                     image_quality() is called per binding rather than cached in
+                     ng-init: ng-init runs once when the scope is created, so a
+                     cached value would freeze at the first sample and never
+                     follow the polling. -->
                 <span ng-if="device.status == 'running' && device.monitor_info.diagnostics.t">
                     <span class="fas fa-wave-square" title="Acquisition quality, sampled once a minute"></span>
-                    <span title="Single-frame noise estimate, in grey levels. Set by analogue gain; independent of frame rate and illumination.">Noise: {{device.monitor_info.diagnostics.frame_noise | number:3}}</span>
-                    <span ng-if="device.monitor_info.diagnostics.sharpness !== null" title="Variance of the Laplacian: high-frequency content. Rises with gain.">| focus: {{device.monitor_info.diagnostics.sharpness | number:0}}</span>
-                    <span ng-if="device.monitor_info.diagnostics.jitter !== null" title="Noise floor of the movement signal, as a fraction of ROI width. Lower is better.">| jitter: {{device.monitor_info.diagnostics.jitter | number:5}} <span style="color: #6c757d;">({{device.monitor_info.diagnostics.n_rois_sampled}} ROIs)</span></span>
+                    <span ng-style="{color: ethoscope.image_quality(device.monitor_info.diagnostics).colour}"
+                          title="{{ethoscope.image_quality(device.monitor_info.diagnostics).advice}} Single-frame noise estimate, in grey levels. Set by analogue gain; runs about 1.3x higher in the dark phase than in the light.">
+                        <span ng-class="ethoscope.image_quality(device.monitor_info.diagnostics).icon"></span>
+                        Noise: {{device.monitor_info.diagnostics.frame_noise | number:3}}
+                        <strong ng-if="ethoscope.image_quality(device.monitor_info.diagnostics).level != 'ok'">({{ethoscope.image_quality(device.monitor_info.diagnostics).label}})</strong>
+                    </span>
+                    <span ng-if="device.monitor_info.diagnostics.sharpness !== null" title="Variance of the Laplacian: high-frequency content. Rises with gain. Not yet calibrated - see tasks/unsolved.md.">| focus: {{device.monitor_info.diagnostics.sharpness | number:0}}</span>
+                    <span ng-if="device.monitor_info.diagnostics.jitter !== null" title="Noise floor of the movement signal, as a fraction of ROI width. Lower is better. Not yet calibrated - see tasks/unsolved.md.">| jitter: {{device.monitor_info.diagnostics.jitter | number:5}} <span style="color: #6c757d;">({{device.monitor_info.diagnostics.n_rois_sampled}} ROIs)</span></span>
                     <span ng-if="device.monitor_info.diagnostics.cpu_temp !== null" title="Core temperature. Sensor dark current roughly doubles every 6-8 C.">| {{device.monitor_info.diagnostics.cpu_temp | number:1}} &#8451;</span>
                     <br>
                 </span>

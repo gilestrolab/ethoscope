@@ -893,6 +893,75 @@
             return new Date(unix_timestamp * 1000).toUTCString();
         };
 
+        /*
+         * Classify a frame_noise reading. The number itself stays on screen -
+         * this only says which state it falls in, so the reading can be coloured
+         * and, when it leaves the healthy range, named.
+         *
+         * frame_noise is a single-frame noise estimate in grey levels, and it is
+         * what sleep scoring is sensitive to: movement is scored as a maximum
+         * velocity per 10 s bin, so one noisy frame is enough to mark a sleeping
+         * animal awake (#222).
+         *
+         * Thresholds come from measured fleet values at the default gain, not
+         * from an invented cutoff. Across four days on two machines at
+         * DEFAULT_CAMERA_GAIN, frame_noise held 0.60-0.64 in the light phase and
+         * 0.80-0.83 in the dark, never exceeding 0.83; the maxfps=10 regime that
+         * opened #222 measured 0.99. WARN therefore sits above the worst healthy
+         * reading with margin, and HIGH above the known-bad one.
+         *
+         * The figures are only comparable at a fixed gain, which is why gain is
+         * no longer a UI setting. Note frame_noise is not illumination
+         * independent: it runs about 1.3x higher in the dark phase (0.80-0.82 vs
+         * 0.60-0.64), consistently enough - sd about 0.01 within phase - that a
+         * single cutoff has to clear the dark-phase level or it would fire every
+         * night. That is why WARN is 0.90 and not something closer to the light
+         * phase readings.
+         *
+         * Sharpness and jitter are still displayed but deliberately do not drive
+         * this indicator: neither is calibrated yet (see tasks/unsolved.md), so
+         * scoring them would invent a judgement the measurement cannot support.
+         */
+        var NOISE_WARN = 0.90;
+        var NOISE_HIGH = 1.10;
+
+        $scope.ethoscope.image_quality = function(diagnostics) {
+            if (!diagnostics || diagnostics.frame_noise === null ||
+                diagnostics.frame_noise === undefined) {
+                return null;
+            }
+
+            if (diagnostics.frame_noise > NOISE_HIGH) {
+                return {
+                    level: 'high',
+                    label: 'high',
+                    icon: 'fas fa-exclamation-triangle',
+                    colour: '#a9451f',
+                    advice: 'Sleep will be under-reported. Check camera gain is ' +
+                            'at its default and that nothing is lighting the arena.'
+                };
+            }
+
+            if (diagnostics.frame_noise > NOISE_WARN) {
+                return {
+                    level: 'elevated',
+                    label: 'elevated',
+                    icon: 'fas fa-exclamation-circle',
+                    colour: '#8a5806',
+                    advice: 'Above the normal range for the default gain. ' +
+                            'Worth checking before trusting sleep from this run.'
+                };
+            }
+
+            return {
+                level: 'ok',
+                label: 'normal',
+                icon: 'fas fa-check-circle',
+                colour: '#2c6e4c',
+                advice: 'Noise is within the range measured on healthy machines.'
+            };
+        };
+
         /**
          * Show alert message
          */
