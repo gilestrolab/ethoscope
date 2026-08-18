@@ -233,6 +233,98 @@ reboot_and_resume() {
 }
 
 #===============================================================================
+# PWM LIGHT BACKEND: pigpio from source (Trixie and later)
+#===============================================================================
+#
+# Why this exists — the lesson, crystallised:
+#
+#  * The light daemon dims the LED with PWM. Two backends can do it: pigpio and
+#    lgpio/gpiozero. They are NOT interchangeable on the legacy boards, whose
+#    LED sits on GPIO17 (a non-hardware-PWM pin):
+#      - pigpio clocks PWM off the DMA engine, so it dims *any* GPIO cleanly and
+#        is immune to CPU load. A tracking ethoscope runs its Pi at saturation,
+#        so this matters.
+#      - lgpio times PWM on the CPU, so on a saturated Pi it visibly flickers on
+#        non-hardware-PWM pins. light_daemon.py therefore refuses lgpio on GPIO17
+#        and drops to steady on/off. lgpio only gives clean PWM on the hardware
+#        PWM pins 12/13/18/19.
+#    So on a GPIO17 board, dimming REQUIRES pigpio. gpiozero/lgpio (installed
+#    unconditionally in step 1) is only the fallback for hardware-PWM-pin boards.
+#
+#  * Debian Trixie — and Raspberry Pi OS from Trixie on — ships NO pigpio apt
+#    package (upstream is stepping away from it; it cannot run on the Pi 5). So
+#    the apt check in step 1 fails and we build the last tagged release, v79,
+#    from source. Verified on Pi 3B / Trixie / kernel 6.x / Python 3.13.
+#    Refs: https://forums.raspberrypi.com/viewtopic.php?t=392438
+#          https://github.com/joan2937/pigpio/issues/632
+#
+#  * Gotchas found the hard way, now handled below:
+#      - Python 3.12 removed the stdlib `distutils` that pigpio's setup.py
+#        imports. Without python3-setuptools + python3-full (which restore the
+#        setuptools distutils shim) `make install` dies with
+#        "ModuleNotFoundError: No module named 'distutils'".
+#      - `make install` installs under /usr/local (pigpiod -> /usr/local/bin),
+#        NOT /usr/bin like the old apt package, and ships NO systemd unit. We
+#        write the unit ourselves; step 7 resolves the binary path dynamically
+#        so the apt (/usr/bin) and source (/usr/local/bin) layouts both work.
+#      - pigpiod's default socket port 8888 collides with ethoscope_update on an
+#        ethoscope. Step 7 starts it on 8889 to match PIGPIO_PORT in
+#        light_daemon.py; `-l` keeps the socket on localhost only.
+#
+install_pigpio_from_source() {
+    print_info "Building pigpio v79 from source (no package on this release)..."
+
+    # setuptools/full provide the distutils shim pigpio's setup.py needs on 3.12+
+    apt-get install -y python3-setuptools python3-full
+
+    local src="/tmp/pigpio-79"
+    rm -rf "$src" /tmp/pigpio-v79.tar.gz
+    if ! wget -qO /tmp/pigpio-v79.tar.gz \
+            https://github.com/joan2937/pigpio/archive/refs/tags/v79.tar.gz; then
+        print_warning "Could not download pigpio source — light control stays on/off"
+        return 1
+    fi
+    tar zxf /tmp/pigpio-v79.tar.gz -C /tmp
+
+    if make -C "$src" -j"$(nproc)" && make -C "$src" install; then
+        ldconfig
+        print_success "Built and installed pigpio v79 (pigpiod -> $(command -v pigpiod))"
+    else
+        print_warning "pigpio build failed — light control falls back to lgpio/on-off"
+        return 1
+    fi
+
+    # Guarantee the Python client module even if the Makefile's deprecated
+    # `setup.py install` step was skipped or failed.
+    python3 -c "import pigpio" 2>/dev/null || \
+        pip3 install pigpio --break-system-packages --ignore-installed 2>/dev/null || true
+
+    # make install ships no unit, so provide a base one. Deliberately minimal:
+    # step 7 owns the port/host flags via a drop-in, keeping a single source of
+    # truth for the port across the apt and from-source layouts. pigpiod forks
+    # by default, hence Type=forking.
+    local pigpiod_bin
+    pigpiod_bin="$(command -v pigpiod || echo /usr/local/bin/pigpiod)"
+    cat > /etc/systemd/system/pigpiod.service <<PIGPIOD_UNIT
+[Unit]
+Description=pigpio daemon (built from source; DMA PWM backend for light control)
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=${pigpiod_bin}
+ExecStop=/bin/systemctl kill pigpiod
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+PIGPIOD_UNIT
+    systemctl daemon-reload 2>/dev/null || true
+    print_success "Installed pigpiod.service (port applied by step 7)"
+}
+
+#===============================================================================
 # STEP 1: PACKAGE INSTALLATION
 #===============================================================================
 
@@ -257,17 +349,18 @@ step_install_apt_packages() {
         python3-lgpio \
         git wget curl
 
-    # PWM backend for the light daemon. pigpio has no package from Trixie
-    # onwards and never supported the Pi 5, so it is installed only where it
-    # actually exists; elsewhere the daemon uses gpiozero/lgpio, installed
-    # unconditionally above. Without either, light control degrades to binary
-    # on/off with no fades.
+    # PWM backend for the light daemon. pigpio is the only backend that dims the
+    # LED on GPIO17 without CPU-load flicker (see install_pigpio_from_source
+    # above for the full rationale). Where an apt package still exists (Bookworm
+    # and earlier) use it; from Trixie on there is none, so build v79 from
+    # source. gpiozero/lgpio, installed unconditionally above, is the fallback.
     print_info "Installing PWM backend for light control..."
     if apt-cache show pigpio >/dev/null 2>&1; then
         apt-get install -y pigpio python3-pigpio && \
-            print_success "Installed pigpio (PWM backend)"
+            print_success "Installed pigpio (PWM backend, apt)"
     else
-        print_info "pigpio unavailable on this release — using gpiozero/lgpio"
+        install_pigpio_from_source || \
+            print_warning "pigpio unavailable — light falls back to lgpio/on-off"
     fi
 
     # NTP: ntp was removed in Trixie, replaced by ntpsec
@@ -334,6 +427,13 @@ EOF
     cd /opt/ethoscope/
     git checkout dev
     git remote set-url origin git://node.local/ethoscope.git
+
+    # Secondary remote pointing straight at GitHub. `origin` stays on the local
+    # node mirror (git://node.local) for routine updates, but keeping a `github`
+    # remote lets a device fetch upstream directly when the node is unreachable
+    # or the mirror is stale (e.g. git fetch github && git checkout github/dev).
+    git remote add github "$GITHUB_REPO" 2>/dev/null || \
+        git remote set-url github "$GITHUB_REPO"
 
     # Use --system instead of --global to avoid requiring $HOME
     git config --system --add safe.directory /opt/ethoscope
@@ -465,11 +565,17 @@ step_enable_system_services() {
         # default port connects to the *update server*, is told the connection
         # succeeded, and then sends GPIO commands to an HTTP server - light
         # silently dead. Pin both sides to 8889 (see PIGPIO_PORT in light_daemon).
+        # This drop-in is the single place the port is defined, for both the apt
+        # unit and the from-source one. `-l` keeps the socket on localhost only.
+        # Resolve the binary dynamically: apt installs /usr/bin/pigpiod, a source
+        # build installs /usr/local/bin/pigpiod.
+        local pigpiod_bin
+        pigpiod_bin="$(command -v pigpiod || echo /usr/bin/pigpiod)"
         mkdir -p /etc/systemd/system/pigpiod.service.d
-        cat > /etc/systemd/system/pigpiod.service.d/port.conf <<'PIGPIOD_PORT'
+        cat > /etc/systemd/system/pigpiod.service.d/port.conf <<PIGPIOD_PORT
 [Service]
 ExecStart=
-ExecStart=/usr/bin/pigpiod -l -p 8889
+ExecStart=${pigpiod_bin} -l -p 8889
 PIGPIOD_PORT
         systemctl daemon-reload 2>/dev/null || true
         systemctl enable pigpiod.service 2>/dev/null && \
