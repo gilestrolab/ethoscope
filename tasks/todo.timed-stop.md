@@ -389,6 +389,33 @@ There is no namespace that both survives and fires, so the fixed `'up'` stands. 
 correct wherever the field sits in the lower part of a form, which is where an
 "and when should this stop" question belongs.
 
+### Stage 8 — one row or the other, never both  ✅ done 2026-08-18
+
+Giorgio: the window should show *either* the duration row *or* the stop-date row, not
+both. Right — they are two ways of saying the same thing, and offering both invited an
+answer to each, resolved by a "the date wins" rule buried in the overview text.
+
+- [x] A `mode` dropdown - "Do not stop automatically" (default) / "Run for a fixed time" /
+      "Stop at a date and time" - with `depends_on` on the other two arguments, so exactly
+      one row is ever on screen.
+- [x] A chosen mode is honoured **exactly**: `TimedStop` blanks the other field rather than
+      letting a stale form value or a saved configuration carrying both take effect.
+- [x] Choosing a mode and leaving its field empty is now an **error**, not a silent
+      no-stop. The failure this whole feature exists to prevent is an experiment that was
+      meant to stop and did not, so a half-filled answer must not start.
+- [x] No mode at all still works, for saved configurations and for API calls giving just
+      one field (`set_autostop {"days": 2}`), keeping the old precedence.
+
+**This is the control the plan originally wanted.** Stage 1 dropped it because the
+recording modal could not render a `dropdown` at all, and settled for two always-visible
+text fields. Extracting the shared partial in Stage 3 is what made it available, and the
+`depends_on` conditional visibility it needs was already in the form service.
+
+Verified on ETHOSCOPE_900: the dropdown shows all three choices, switching it swaps which
+row is on screen (and shows neither on "Do not stop automatically"), and a recording
+started with `mode: duration, run_for {minutes: 2}` armed and fired, leaving
+`stop_reason: autostop`.
+
 ### Remaining
 - [ ] Restore ETHOSCOPE_900 to `fix/222-decouple-exposure-from-maxfps` (`a2c27452`) and drop
       the `test-timed-stop` branch, once the bench work is finished.

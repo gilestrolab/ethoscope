@@ -98,6 +98,42 @@ class TestTimedStopDuration:
             TimedStop(**bad)
 
 
+class TestTimedStopMode:
+    """The form sends a mode, and a mode makes the two ways of saying when exclusive."""
+
+    def test_never_is_the_default_and_stops_nothing(self):
+        assert TimedStop(mode="never").resolve(T0) is None
+
+    def test_never_ignores_a_field_left_filled_in(self):
+        # Switching the dropdown back does not clear the boxes, so the stale value must
+        # not quietly take effect.
+        stop = TimedStop(mode="never", run_for={"days": 5}, stop_at=str(T0 + 99))
+        assert stop.resolve(T0) is None
+        assert stop.autostop is False
+
+    def test_duration_mode_ignores_the_date(self):
+        stop = TimedStop(mode="duration", run_for={"days": 2}, stop_at=str(T0 + 99))
+        assert stop.resolve(T0) == T0 + 2 * 86400
+
+    def test_datetime_mode_ignores_the_duration(self):
+        stop = TimedStop(mode="datetime", run_for={"days": 5}, stop_at=str(T0 + 500))
+        assert stop.resolve(T0) == T0 + 500
+
+    def test_choosing_a_duration_and_leaving_it_empty_is_refused(self):
+        # The failure this whole feature exists to prevent is an experiment that was
+        # meant to stop and did not, so a half-filled answer is an error, not a shrug.
+        with pytest.raises(TimedStopError):
+            TimedStop(mode="duration")
+
+    def test_choosing_a_date_and_leaving_it_empty_is_refused(self):
+        with pytest.raises(TimedStopError):
+            TimedStop(mode="datetime")
+
+    def test_an_unknown_mode_is_refused(self):
+        with pytest.raises(TimedStopError):
+            TimedStop(mode="whenever")
+
+
 class TestTimedStopLegacyDuration:
     """Configurations saved before the duration became three numeric fields."""
 
@@ -134,7 +170,9 @@ class TestTimedStopAbsolute:
         # This is what the web interface sends: only the browser knows the timezone.
         assert TimedStop(stop_at=str(T0 + 500)).resolve(T0) == T0 + 500
 
-    def test_absolute_beats_duration(self):
+    def test_absolute_beats_duration_when_no_mode_was_chosen(self):
+        # Only reachable from a saved configuration or an API call; the form always
+        # sends a mode, and a mode makes the two exclusive.
         stop = TimedStop(days=10, stop_at=str(T0 + 60))
         assert stop.resolve(T0) == T0 + 60
 
@@ -166,9 +204,17 @@ class TestOptionExposure:
         offered = cls.user_options()["time_control"]
 
         assert [o["name"] for o in offered] == ["TimedStop"]
-        assert [a["name"] for a in offered[0]["arguments"]] == ["run_for", "stop_at"]
-        # Both modals render both of these, through the shared partial.
-        assert [a["type"] for a in offered[0]["arguments"]] == ["duration", "datetime"]
+        args = offered[0]["arguments"]
+        assert [a["name"] for a in args] == ["mode", "run_for", "stop_at"]
+        # Both modals render all three, through the shared partial. dropdown in
+        # particular is one the recording modal used to drop silently.
+        assert [a["type"] for a in args] == ["dropdown", "duration", "datetime"]
+
+        # Each way of saying when is shown only when it is the one chosen.
+        by_name = {a["name"]: a for a in args}
+        assert by_name["run_for"]["depends_on"] == {"mode": ["duration"]}
+        assert by_name["stop_at"]["depends_on"] == {"mode": ["datetime"]}
+        assert "depends_on" not in by_name["mode"]
 
     @pytest.mark.parametrize(
         "payload,expected",

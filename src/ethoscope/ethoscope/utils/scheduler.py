@@ -445,30 +445,46 @@ class TimedStop(DescribedObject):
 
     _description = {
         "overview": "Stop the experiment automatically, so it does not have to be "
-        "stopped by hand. Either say how long to run for, or pick a date and time to "
-        "stop at. Leave it all at zero and blank to keep running until stopped "
-        "manually. If both are given, the stop date wins.",
+        "stopped by hand.",
         "arguments": [
             {
-                # A duration is one value with three parts, so it is one argument with
-                # three boxes on a row rather than three stacked fields each carrying a
-                # sentence of its own.
+                # The two ways of saying when are mutually exclusive, so the form asks
+                # which one first and shows only that. Answering both was possible
+                # before, and the rule for resolving it - the date wins - was written
+                # down in the overview where nobody had to read it.
+                "type": "dropdown",
+                "name": "mode",
+                "description": "Automatic stop",
+                "options": [
+                    {"value": "never", "text": "Do not stop automatically"},
+                    {"value": "duration", "text": "Run for a fixed time"},
+                    {"value": "datetime", "text": "Stop at a date and time"},
+                ],
+                "default": "never",
+            },
+            {
                 "type": "duration",
                 "name": "run_for",
                 "description": "Run for",
                 "default": {"days": 0, "hours": 0, "minutes": 0},
+                "depends_on": {"mode": ["duration"]},
             },
             {
                 "type": "datetime",
                 "name": "stop_at",
-                "description": "Or stop at a date and time",
+                "description": "Stop at",
                 "default": "",
+                "depends_on": {"mode": ["datetime"]},
             },
         ],
     }
 
+    #: Accepted values of ``mode``.
+    MODES = ("never", "duration", "datetime")
+
     def __init__(
         self,
+        mode=None,
         run_for=None,
         days=0,
         hours=0,
@@ -479,6 +495,11 @@ class TimedStop(DescribedObject):
     ):
         """
         Args:
+            mode (str): Which of the two ways of saying when to use - ``"never"``,
+                ``"duration"`` or ``"datetime"``. This is what the form sends. When it
+                is absent, as it is for a saved configuration or an API call giving
+                just the one field, whichever field was filled in is used, and an
+                absolute time wins over a duration.
             run_for (dict): ``{"days": d, "hours": h, "minutes": m}``, as the web form
                 sends it. Any key present overrides the matching argument below.
             days (int): Whole days to run for. The flat form, which reads better when
@@ -486,15 +507,20 @@ class TimedStop(DescribedObject):
             hours (int): Hours to run for, on top of the days.
             minutes (int): Minutes to run for, on top of the days and hours.
             stop_at (str|float): An absolute stop time, either a unix timestamp or a
-                ``YYYY-MM-DD HH:MM`` string read in the device's local time. Empty
-                means no automatic stop. Takes precedence over the duration.
+                ``YYYY-MM-DD HH:MM`` string read in the device's local time.
             duration (str): Deprecated ``DD:HH:MM`` string. Kept so experiment
                 configurations saved by earlier versions still start.
             timer (str): Deprecated alias for ``duration``, under its even earlier name.
 
         Raises:
-            TimedStopError: If any field is present but malformed.
+            TimedStopError: If any field is malformed, or if a mode was chosen and the
+                field it asks for was left empty.
         """
+        if mode is not None and mode not in self.MODES:
+            raise TimedStopError(f"{mode!r} is not one of {', '.join(self.MODES)}")
+
+        self.mode = mode
+
         legacy = timer if timer is not None else duration
         if legacy is not None:
             # An old saved configuration. The packed DD:HH:MM string is ambiguous when
@@ -517,9 +543,28 @@ class TimedStop(DescribedObject):
         self.stop_at = stop_at
         self._absolute = self._parse_stop_at(stop_at)
 
+        # A chosen mode is honoured exactly, so the field belonging to the other one
+        # cannot quietly take effect - not from a stale form value, and not from a
+        # saved configuration carrying both.
+        if mode == "never":
+            self._countdown, self._absolute = 0, None
+        elif mode == "duration":
+            self._absolute = None
+            if self._countdown <= 0:
+                raise TimedStopError(
+                    "Say how long to run for, or set the automatic stop to "
+                    "'Do not stop automatically'"
+                )
+        elif mode == "datetime":
+            self._countdown = 0
+            if self._absolute is None:
+                raise TimedStopError(
+                    "Choose a stop date and time, or set the automatic stop to "
+                    "'Do not stop automatically'"
+                )
+
         # Reason: an experiment that is not meant to stop by itself is the common
-        # case, so it must be reachable by leaving the form alone. Everything at its
-        # default means exactly that, rather than an error.
+        # case, so it must be reachable by leaving the form alone.
         self.autostop = self._absolute is not None or self._countdown > 0
 
     @staticmethod
