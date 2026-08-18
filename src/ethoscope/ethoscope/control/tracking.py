@@ -56,6 +56,12 @@ from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.utils import pi
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.description import DescribedObject
+from ethoscope.utils.scheduler import (  # noqa: F401
+    TimedStop,
+    TimedStopError,
+    format_countdown,
+    timedStop,  # resolved by name from configurations saved by earlier versions
+)
 
 
 class ExperimentalInformation(DescribedObject):
@@ -207,6 +213,21 @@ class ControlThread(Thread):
     _auto_SQL_backup_at_stop = False
     LIGHT_SCHEDULE_FILE = "/run/ethoscope/light_schedule.json"
 
+    # How often the autostop supervisor compares the clock against its target.
+    # It polls rather than sleeping out a countdown so that a clock correction -
+    # which the node pushes to devices routinely - moves the stop with the clock
+    # instead of leaving it where the arithmetic put it at start. Twenty seconds
+    # is invisible against experiments measured in days and costs nothing.
+    _AUTOSTOP_POLL_SECONDS = 20
+
+    # Class-level defaults so stop() is safe on any instance, including one whose
+    # __init__ raised part way through - __del__ calls stop() on it regardless.
+    # _init_autostop_state() shadows all four with per-instance values.
+    _autostop_at = None
+    _autostop_cancel = None
+    _autostop_thread = None
+    _autostop_fired = False
+
     _option_dict = OrderedDict(
         [
             (
@@ -276,6 +297,12 @@ class ControlThread(Thread):
                         SQLiteResultWriter,
                         MySQLResultWriter,
                     ],
+                },
+            ),
+            (
+                "time_control",
+                {
+                    "possible_classes": [TimedStop],
                 },
             ),
         ]
@@ -391,6 +418,8 @@ class ControlThread(Thread):
             "name": name,
             "version": version,
             "used_space": pi.get_partition_info(ethoscope_dir)["Use%"].replace("%", ""),
+            "autostop": False,
+            "autostop_at": None,
         }
         self._monit = None
         self._drawer = None  # Initialize drawer to None until monitor starts
@@ -487,10 +516,129 @@ class ControlThread(Thread):
                         f"Failed to get backup filename from metadata cache during initialization: {e}"
                     )
 
+        self._init_autostop_state()
         self._parse_user_options(data)
 
         logging.info("Starting a new monitor control thread")
         super().__init__()
+
+    def _init_autostop_state(self):
+        """
+        Set up the bookkeeping for the automatic stop.
+
+        Called from the constructor of every control thread. It is separate from
+        __init__ because ControlThreadVideoRecording builds its own _info and calls
+        Thread.__init__ directly, so there is no single constructor to hang this on.
+        """
+        self._autostop_at = None
+        self._autostop_cancel = None
+        self._autostop_thread = None
+        self._autostop_fired = False
+
+    def _arm_autostop(self, start_time=None):
+        """
+        Schedule the automatic stop the user asked for, if any.
+
+        Args:
+            start_time (float): Unix timestamp the experiment is starting from. A
+                duration is counted from here. Defaults to now.
+
+        Raises:
+            TimedStopError: If the requested stop is malformed or already past. This
+                is deliberately fatal: it happens at the very start of the run, and a
+                user who asked for an automatic stop and did not get one would only
+                find out days later.
+        """
+        if start_time is None:
+            start_time = time.time()
+
+        TimedStopClass = self._option_dict["time_control"]["class"]
+        kwargs = self._option_dict["time_control"]["kwargs"]
+        timed_stop = TimedStopClass(**kwargs)
+
+        self._set_autostop(timed_stop.resolve(start_time), reference=start_time)
+
+    def _set_autostop(self, stop_at, reference=None):
+        """
+        Point the automatic stop at a given time, replacing any existing one.
+
+        Args:
+            stop_at (float|None): Unix timestamp to stop at, or None to cancel.
+            reference (float): Unix timestamp the reported run length is measured
+                from. Defaults to now, which is what a stop re-armed mid-experiment
+                wants; arming at the start passes the start time, so a 24 h run reads
+                as one day rather than as the 23:59 that measuring from a moment later
+                and truncating would give.
+        """
+        self._cancel_autostop()
+
+        self._info["autostop_at"] = stop_at
+        if stop_at is None:
+            self._info["autostop"] = False
+            return
+
+        self._autostop_at = stop_at
+        # The interface has always been given a DD:HH:MM run length rather than a
+        # timestamp, so keep feeding it one; autostop_at is what anything new
+        # should read.
+        if reference is None:
+            reference = time.time()
+        self._info["autostop"] = format_countdown(stop_at - reference)
+
+        self._autostop_cancel = threading.Event()
+        self._autostop_thread = threading.Thread(
+            target=self._autostop_supervisor,
+            args=(self._autostop_cancel,),
+            daemon=True,
+            name="autostop_supervisor",
+        )
+        self._autostop_thread.start()
+        logging.info(
+            "Experiment will stop automatically at "
+            f"{datetime.datetime.fromtimestamp(stop_at).isoformat(timespec='seconds')}"
+        )
+
+    def _cancel_autostop(self):
+        """
+        Cancel any scheduled automatic stop.
+
+        Safe to call when nothing is scheduled, and safe to call from the supervisor
+        itself - the thread is never joined, so a supervisor that cancels itself on
+        the way out does not deadlock.
+        """
+        if self._autostop_cancel is not None:
+            self._autostop_cancel.set()
+
+        self._autostop_at = None
+        self._autostop_cancel = None
+        self._autostop_thread = None
+        self._info["autostop_at"] = None
+
+    def _autostop_supervisor(self, cancel):
+        """
+        Wait for the scheduled stop time, then stop the experiment.
+
+        Args:
+            cancel (threading.Event): Set when this supervisor has been superseded or
+                cancelled. Passed in rather than read off the instance so that a
+                supervisor replaced mid-run cannot act on its successor's state.
+        """
+        while True:
+            target = self._autostop_at
+            if target is None or cancel.is_set():
+                return
+
+            remaining = target - time.time()
+            if remaining <= 0:
+                logging.info("Automatic stop time reached, stopping the experiment")
+                self._autostop_fired = True
+                self.stop()
+                return
+
+            # Sleep the poll interval, or the remainder if that is shorter, so the
+            # stop lands on the second rather than up to a poll interval late.
+            if cancel.wait(min(self._AUTOSTOP_POLL_SECONDS, remaining)):
+                return
 
     def _create_backup_filename(self):
         current_time = self.info["time"]
@@ -1423,6 +1571,20 @@ class ControlThread(Thread):
             self._last_info_t_stamp = 0
             self._last_info_frame_idx = 0
 
+            # Armed before any of the expensive setup, so a malformed stop time is
+            # reported straight away rather than after the ROIs have been built, and
+            # so a stop scheduled during a long initialisation is still honoured.
+            try:
+                self._arm_autostop()
+            except TimedStopError as e:
+                # A stop time the user typed wrong, or one that has already passed.
+                # Report it plainly and leave the device free to be started again,
+                # rather than burying a readable message in a traceback.
+                logging.error(f"Refusing to start: {e}")
+                self._info["status"] = "stopped"
+                self._info["error"] = str(e)
+                return
+
             # Always create a new tracking instance (pickle resume logic removed)
             tracking_setup = self._set_tracking_from_scratch()
 
@@ -1470,8 +1632,6 @@ class ControlThread(Thread):
                     time_offset=time_offset,
                 )
 
-            # self.stop()
-
         except EthoscopeException as e:
             if e.img is not None:
                 cv2.imwrite(self._info["dbg_img"], e.img)
@@ -1514,6 +1674,10 @@ class ControlThread(Thread):
                 self.stop(traceback.format_exc())
 
         finally:
+            # Covers every way out of run(), including the graceful return taken when
+            # ROI building fails, which never reaches stop().
+            self._cancel_autostop()
+
             try:
                 if cam is not None:
                     cam._close()
@@ -1703,6 +1867,8 @@ class ControlThread(Thread):
             self._info["status"] = "stopping"
             self._info["time"] = time.time()
 
+            self._cancel_autostop()
+
             # Clear light schedule so the daemon turns off the LED
             self._clear_light_schedule()
 
@@ -1735,7 +1901,12 @@ class ControlThread(Thread):
                 try:
                     # Determine if this was a graceful stop or an error
                     is_graceful = error is None
-                    stop_reason = "error" if error else "user_stop"
+                    if error:
+                        stop_reason = "error"
+                    elif self._autostop_fired:
+                        stop_reason = "autostop"
+                    else:
+                        stop_reason = "user_stop"
 
                     self._metadata_cache.finalize_cache(
                         self._tracking_start_time,

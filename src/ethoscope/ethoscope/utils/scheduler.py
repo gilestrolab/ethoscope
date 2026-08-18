@@ -5,12 +5,18 @@ import os
 import re
 import time
 
+from ethoscope.utils.description import DescribedObject
+
 
 class DateRangeError(Exception):
     pass
 
 
 class DailyScheduleError(Exception):
+    pass
+
+
+class TimedStopError(Exception):
     pass
 
 
@@ -399,3 +405,231 @@ class DailyScheduler:
         info["next_period_end"] = datetime.datetime.fromtimestamp(next_end).isoformat()
 
         return info
+
+
+def format_countdown(seconds):
+    """
+    Render a number of seconds as the ``DD:HH:MM`` string the web interface shows.
+
+    Sub-minute remainders are truncated rather than rounded: the string is a
+    "time left" readout, and rounding up would let it claim a minute that has
+    already gone.
+
+    Args:
+        seconds (float): A duration in seconds. Negative values clamp to zero.
+
+    Returns:
+        str: The duration as ``DD:HH:MM``.
+    """
+    seconds = max(0, int(seconds))
+    days, rest = divmod(seconds, 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes = rest // 60
+    return f"{days:02d}:{hours:02d}:{minutes:02d}"
+
+
+class TimedStop(DescribedObject):
+    """
+    When an experiment should stop by itself.
+
+    Accepts either a duration to run for or an absolute date and time to stop at,
+    and resolves whichever was given into a single absolute unix timestamp. That
+    timestamp is the only thing the control threads act on, which is what lets a
+    scheduled stop survive the clock corrections the node pushes to devices: the
+    supervisor compares the wall clock against a target rather than sleeping out
+    a countdown fixed at the moment the experiment started.
+
+    Used by both tracking and video recording (see
+    :class:`~ethoscope.control.tracking.ControlThread`).
+    """
+
+    _description = {
+        "overview": "Stop the experiment automatically, so it does not have to be "
+        "stopped by hand. Either give a duration to run for, or a date and time to "
+        "stop at. Leave both blank to keep running until stopped manually. If both "
+        "are given, the stop date wins.",
+        "arguments": [
+            {
+                "type": "str",
+                "name": "duration",
+                "description": "Run for Days(DD):Hours(HH):Minutes(MM), or 00:00:00 to run until stopped by hand",
+                "default": "00:00:00",
+            },
+            {
+                "type": "str",
+                "name": "stop_at",
+                "description": "Or stop at this date and time (YYYY-MM-DD HH:MM:SS), leave blank to ignore",
+                "default": "",
+            },
+        ],
+    }
+
+    def __init__(self, duration="00:00:00", stop_at="", timer=None):
+        """
+        Args:
+            duration (str): How long to run for, as ``DD:HH:MM``. ``"00:00:00"``
+                means no automatic stop.
+            stop_at (str|float): An absolute stop time, either a unix timestamp or a
+                ``YYYY-MM-DD HH:MM[:SS]`` string read in the device's local time.
+                Empty means no automatic stop. Takes precedence over ``duration``.
+            timer (str): Deprecated alias for ``duration``. Kept so experiment
+                configurations saved by earlier versions, which named this field
+                ``timer``, still start.
+
+        Raises:
+            TimedStopError: If either field is present but malformed.
+        """
+        if timer is not None:
+            duration = timer
+
+        self.duration = duration
+        self.stop_at = stop_at
+
+        self._countdown = self._parse_duration(duration)
+        self._absolute = self._parse_stop_at(stop_at)
+
+        # Reason: an experiment that is not meant to stop by itself is the common
+        # case, so it must be reachable by leaving the form alone. Both fields at
+        # their defaults means exactly that, rather than an error.
+        self.autostop = self._absolute is not None or self._countdown > 0
+
+    @staticmethod
+    def _parse_duration(duration):
+        """
+        Parse a ``DD:HH:MM`` duration into seconds.
+
+        Args:
+            duration (str): The duration string, e.g. ``"02:12:30"``.
+
+        Returns:
+            int: Total number of seconds. Zero means "no automatic stop".
+
+        Raises:
+            TimedStopError: If the string is not three integers separated by colons,
+                or if hours or minutes are out of range.
+        """
+        if duration is None or str(duration).strip() == "":
+            return 0
+
+        parts = str(duration).strip().split(":")
+        if len(parts) != 3:
+            raise TimedStopError(
+                f"Could not read the duration {duration!r}. Use DD:HH:MM (days, hours, minutes)"
+            )
+
+        try:
+            days, hours, minutes = (int(p) for p in parts)
+        except ValueError as e:
+            raise TimedStopError(
+                f"Could not read the duration {duration!r}. Use DD:HH:MM (days, hours, minutes)"
+            ) from e
+
+        if days < 0 or hours < 0 or minutes < 0:
+            raise TimedStopError(f"The duration {duration!r} cannot be negative")
+        if not 0 <= hours < 24:
+            raise TimedStopError("Hours must be between 0 and 23")
+        if not 0 <= minutes < 60:
+            raise TimedStopError("Minutes must be between 0 and 59")
+
+        return days * 86400 + hours * 3600 + minutes * 60
+
+    @staticmethod
+    def _parse_stop_at(stop_at):
+        """
+        Parse an absolute stop time into a unix timestamp.
+
+        Both a numeric timestamp and a date string are accepted. The web interface
+        sends a timestamp, because only the browser knows the user's timezone; the
+        string form is what a human types, and is read in the device's local time.
+
+        Args:
+            stop_at (str|float): The stop time, or an empty value for "not set".
+
+        Returns:
+            float|None: The stop time as a unix timestamp, or None if not set.
+
+        Raises:
+            TimedStopError: If the value is neither a timestamp nor a recognised date.
+        """
+        if stop_at is None:
+            return None
+
+        stop_at = str(stop_at).strip()
+        if stop_at == "":
+            return None
+
+        try:
+            timestamp = float(stop_at)
+        except ValueError:
+            pass
+        else:
+            # Reason: a bare number small enough to be a duration in seconds is far
+            # more likely to be a mis-filled field than a stop time in 1970, and
+            # silently stopping the experiment immediately is the worst outcome.
+            if timestamp < 1e9:
+                raise TimedStopError(
+                    f"{stop_at!r} does not look like a date or a unix timestamp"
+                )
+            return timestamp
+
+        for pattern in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S"):
+            try:
+                parsed = datetime.datetime.strptime(stop_at, pattern)
+            except ValueError:
+                continue
+            return time.mktime(parsed.timetuple())
+
+        raise TimedStopError(
+            f"Could not read the stop time {stop_at!r}. Use YYYY-MM-DD HH:MM:SS"
+        )
+
+    def resolve(self, start_time):
+        """
+        The absolute time at which the experiment should stop.
+
+        Args:
+            start_time (float): Unix timestamp the experiment is starting from. Only
+                used for a duration; an absolute stop time ignores it.
+
+        Returns:
+            float|None: The unix timestamp to stop at, or None for no automatic stop.
+
+        Raises:
+            TimedStopError: If an absolute stop time has already passed. Refusing is
+                the only safe reading: the alternative is an experiment that stops
+                the moment it starts, several days after someone set it up.
+        """
+        if self._absolute is not None:
+            if self._absolute <= start_time:
+                raise TimedStopError(
+                    f"The stop time {self.stop_at!r} is in the past, so the experiment "
+                    "would stop as soon as it started"
+                )
+            return self._absolute
+
+        if self._countdown > 0:
+            return start_time + self._countdown
+
+        return None
+
+    def describe(self, start_time):
+        """
+        The scheduled stop as the ``DD:HH:MM`` run length the web interface displays.
+
+        Args:
+            start_time (float): Unix timestamp the experiment is starting from.
+
+        Returns:
+            str|bool: The run length as ``DD:HH:MM``, or False when there is no
+                automatic stop, matching what the interface expects to be given.
+        """
+        stop_at = self.resolve(start_time)
+        if stop_at is None:
+            return False
+        return format_countdown(stop_at - start_time)
+
+
+# Experiment configurations saved before this class was shared between tracking and
+# recording name it "timedStop", and the control threads resolve option classes by
+# name, so the old spelling has to keep resolving.
+timedStop = TimedStop

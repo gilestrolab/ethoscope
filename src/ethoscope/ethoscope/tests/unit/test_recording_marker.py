@@ -76,6 +76,7 @@ class TestStopWritesMarker:
         assert data["resolution"] == "1920x1088"
         assert data["machine_id"] == "MACHINE123"
         assert data["error"] is None
+        assert data["stop_reason"] == "user_stop"
 
     def test_error_stop_writes_error_marker(self, tmp_path):
         session_dir = str(tmp_path / "session")
@@ -88,6 +89,22 @@ class TestStopWritesMarker:
             data = json.load(fh)
         assert data["status"] == "error"
         assert data["error"] == "boom traceback"
+        assert data["stop_reason"] == "error"
+
+    def test_autostop_marker_records_why_it_stopped(self, tmp_path):
+        # A recording that ran its scheduled length is a clean completion, but the
+        # marker has to say it ended on the timer rather than by hand.
+        session_dir = str(tmp_path / "session")
+        os.makedirs(session_dir)
+        thread = self._make_thread(session_dir)
+        thread._autostop_fired = True
+
+        thread.stop()
+
+        with open(os.path.join(session_dir, RECORDING_MARKER_FILENAME)) as fh:
+            data = json.load(fh)
+        assert data["status"] == "completed"
+        assert data["stop_reason"] == "autostop"
 
     def test_no_session_dir_writes_no_marker(self, tmp_path):
         # Simulates streaming / early failure: prefix points at a dir that was never created.

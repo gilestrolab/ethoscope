@@ -19,6 +19,11 @@ from ethoscope.control.tracking import ControlThread, ExperimentalInformation
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, V4L2Camera
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.description import DescribedObject
+from ethoscope.utils.scheduler import (  # noqa: F401
+    TimedStop,
+    TimedStopError,
+    timedStop,  # resolved by name from configurations saved by earlier versions
+)
 
 STREAMING_PORT = 8887
 
@@ -549,62 +554,6 @@ class Streamer(GeneralVideoRecorder):
         )
 
 
-class timedStop(DescribedObject):
-    _description = {
-        "overview": "Automatically stops the experiment at the given time.",
-        "arguments": [
-            {
-                "type": "str",
-                "name": "timer",
-                "description": "Countdown timer to automatically stop the experiment. Days(DD):Hours(HH):Minutes(MM). ",
-                "default": "00:00:00",
-            },
-        ],
-    }
-
-    def __init__(self, timer="00:00:00"):
-        self.timer = timer
-        self.countdown = self._convert_to_seconds(timer)
-        self.autostop = self.countdown > 0
-
-    def _convert_to_seconds(self, time_str):
-        """
-        Converts a time string from "DD:HH:MM" format into total seconds.
-
-        Args:
-        time_str (str): The time string in "DD:HH:MM" format.
-
-        Returns:
-        int: Total number of seconds.
-
-        Raises:
-        ValueError: If the format is incorrect or values are out of expected range.
-        """
-        # Split the string by ':' and check if it has exactly three parts
-        parts = time_str.split(":")
-        if len(parts) != 3:
-            raise ValueError("Time format must be DD:HH:MM")
-
-        try:
-            # Parse days, hours, and minutes from the parts
-            days, hours, minutes = int(parts[0]), int(parts[1]), int(parts[2])
-
-            # Sanity checks for hours and minutes range
-            if not (0 <= hours < 24):
-                raise ValueError("Hours must be between 0 and 23")
-            if not (0 <= minutes < 60):
-                raise ValueError("Minutes must be between 0 and 59")
-
-            # Convert all to seconds
-            total_seconds = days * 86400 + hours * 3600 + minutes * 60
-            return total_seconds
-
-        except ValueError as e:
-            raise ValueError(
-                "Error in countdown format. Use DD:HH:MM (days, hours, minutes)"
-            ) from e
-
-
 class ControlThreadVideoRecording(ControlThread):
 
     _evanescent = False
@@ -630,7 +579,7 @@ class ControlThreadVideoRecording(ControlThread):
             (
                 "time_control",
                 {
-                    "possible_classes": [timedStop],
+                    "possible_classes": [TimedStop],
                 },
             ),
             (
@@ -692,8 +641,10 @@ class ControlThreadVideoRecording(ControlThread):
             "version": version,
             "experimental_info": {},
             "autostop": False,
+            "autostop_at": None,
         }
 
+        self._init_autostop_state()
         self._parse_user_options(data)
         super(ControlThread, self).__init__()
 
@@ -733,6 +684,19 @@ class ControlThreadVideoRecording(ControlThread):
             exp_info_kwargs = self._option_dict["experimental_info"]["kwargs"]
             self._info["experimental_info"] = ExpInfoClass(**exp_info_kwargs).info_dic
             self._info["time"] = time.time()
+
+            # Armed before the camera is opened, so a malformed stop time is reported
+            # without first spinning up a recording that is about to be torn down.
+            try:
+                self._arm_autostop(self._info["time"])
+            except TimedStopError as e:
+                # A stop time the user typed wrong, or one that has already passed.
+                # Report it plainly and leave the device free to be started again,
+                # rather than burying a readable message in a traceback.
+                logging.error(f"Refusing to start: {e}")
+                self._info["status"] = "stopped"
+                self._info["error"] = str(e)
+                return
 
             # Write light schedule config for the light daemon service
             self._write_light_schedule()
@@ -801,15 +765,6 @@ class ControlThreadVideoRecording(ControlThread):
 
             self._recorder.start_recording()
 
-            # Setting up a timer to stop the recording
-            self._timer = self._option_dict["time_control"]["class"](
-                **self._option_dict["time_control"]["kwargs"]
-            )
-            if self._timer.autostop:
-                timer = threading.Timer(self._timer.countdown, self.stop)
-                timer.start()
-                self._info["autostop"] = self._timer.timer
-
         except Exception:
             self.stop(traceback.format_exc())
 
@@ -822,6 +777,8 @@ class ControlThreadVideoRecording(ControlThread):
         """ """
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
+
+        self._cancel_autostop()
 
         # Clear light schedule so the daemon turns off the LED
         self._clear_light_schedule()
@@ -850,6 +807,11 @@ class ControlThreadVideoRecording(ControlThread):
                     session_dir,
                     {
                         "status": "error" if error is not None else "completed",
+                        "stop_reason": (
+                            "error"
+                            if error is not None
+                            else ("autostop" if self._autostop_fired else "user_stop")
+                        ),
                         "start_time": getattr(self, "_recording_start_time", None),
                         "stop_time": self._info["time"],
                         "fps": getattr(self, "_recording_fps", None),
