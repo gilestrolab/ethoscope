@@ -535,13 +535,16 @@ class ControlThread(Thread):
         self._autostop_thread = None
         self._autostop_fired = False
 
-    def _arm_autostop(self, start_time=None):
+    def _arm_autostop(self, start_time=None, kwargs=None):
         """
         Schedule the automatic stop the user asked for, if any.
 
         Args:
             start_time (float): Unix timestamp the experiment is starting from. A
                 duration is counted from here. Defaults to now.
+            kwargs (dict): TimedStop arguments to use instead of the ones the
+                experiment was started with. Used to change the stop of a run that
+                is already under way.
 
         Raises:
             TimedStopError: If the requested stop is malformed or already past. This
@@ -553,10 +556,40 @@ class ControlThread(Thread):
             start_time = time.time()
 
         TimedStopClass = self._option_dict["time_control"]["class"]
-        kwargs = self._option_dict["time_control"]["kwargs"]
+        if kwargs is None:
+            kwargs = self._option_dict["time_control"]["kwargs"]
         timed_stop = TimedStopClass(**kwargs)
 
         self._set_autostop(timed_stop.resolve(start_time), reference=start_time)
+
+    def set_autostop(self, data=None):
+        """
+        Change or cancel the automatic stop of an experiment already under way.
+
+        This is the point of the feature for anyone who is already running: extending
+        a run otherwise means stopping and restarting it, which is exactly what an
+        automatic stop is there to avoid.
+
+        Args:
+            data (dict): TimedStop arguments. ``stop_at`` is an absolute time and
+                means what it says. A ``duration`` is counted from **now**, not from
+                when the experiment started, so "01:00:00" reads as "run for one more
+                day". Empty, or a zero duration with no ``stop_at``, cancels the stop.
+
+        Returns:
+            dict: The resulting ``autostop`` run length and ``autostop_at`` timestamp.
+
+        Raises:
+            TimedStopError: If the requested stop is malformed or already past. The
+                experiment is left running on its existing schedule.
+        """
+        now = time.time()
+        self._arm_autostop(start_time=now, kwargs=dict(data or {}))
+
+        return {
+            "autostop": self._info["autostop"],
+            "autostop_at": self._info["autostop_at"],
+        }
 
     def _set_autostop(self, stop_at, reference=None):
         """

@@ -387,6 +387,22 @@ def controls(id, action):
             return {"error": result, "status": "stopped", "id": _MACHINE_ID}
         return info(id)
 
+    elif action == "set_autostop":
+        # Reschedule or cancel the automatic stop of a run already under way, without
+        # restarting it. Body is optional: {"duration": "DD:HH:MM"} counted from now,
+        # {"stop_at": <timestamp or date>}, or nothing at all to cancel.
+        data = bottle.request.json or {}
+        result = send_command(action, data)
+        if isinstance(result, str):
+            # Either a refusal, or a stop time that could not be read. Both are the
+            # user's to fix, so report them rather than the generic 500.
+            message = result.removeprefix("ERROR: ")
+            logging.error(f"set_autostop failed: {message}")
+            response = info(id)
+            response["error"] = message
+            return response
+        return info(id)
+
     elif action == "test_module":
         logging.info("Sending a test command to the connected module.")
         # Report whether the command actually reached the module. The result was

@@ -54,6 +54,9 @@ class Ethoscope(BaseDevice):
         "start": ["stopped"],
         "start_record": ["stopped"],
         "stop": ["streaming", "running", "recording"],
+        # Reschedules or cancels the automatic stop of a run already under way, so it
+        # is only meaningful while one is.
+        "set_autostop": ["streaming", "running", "recording"],
         "poweroff": ["stopped"],
         "reboot": ["stopped"],
         "restart": ["stopped"],

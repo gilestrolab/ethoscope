@@ -43,6 +43,7 @@ from optparse import OptionParser
 from ethoscope.control.record import ControlThreadVideoRecording
 from ethoscope.control.tracking import ControlThread
 from ethoscope.utils import pi
+from ethoscope.utils.scheduler import TimedStopError
 
 
 class commandingThread(threading.Thread):
@@ -151,7 +152,12 @@ class commandingThread(threading.Thread):
             return "This action requires JSON data"
 
         if action == "help":
-            return "Commands that do not require JSON info: help, info, status, stop, stream, remove, restart.\nCommands that do require JSON info: start, start_record."
+            return (
+                "Commands that do not require JSON info: help, info, status, stop, stream, remove, restart.\n"
+                "Commands that do require JSON info: start, start_record.\n"
+                "set_autostop takes optional JSON info: a duration or a stop_at to "
+                "reschedule the automatic stop, or nothing at all to cancel it."
+            )
 
         elif action == "info":
             return self.control.info
@@ -210,6 +216,27 @@ class commandingThread(threading.Thread):
             logging.info("Monitor joined")
             logging.info("Monitor stopped")
             return "Stopping ethoscope activity"
+
+        elif action == "set_autostop":
+            if self.control.info["status"] not in [
+                "running",
+                "recording",
+                "streaming",
+            ]:
+                return (
+                    "ERROR: There is no experiment running, so there is nothing to "
+                    "stop automatically."
+                )
+
+            try:
+                result = self.control.set_autostop(data)
+            except TimedStopError as e:
+                # What the user typed, read back to them. Falling through to the
+                # generic handler would bury it in a traceback.
+                return f"ERROR: {e}"
+
+            logging.info(f"Automatic stop changed to {result}")
+            return result
 
         elif action == "remove" and self.control.info["status"] not in [
             "running",
@@ -288,7 +315,7 @@ if __name__ == "__main__":
         action="store_true",
     )
 
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
     option_dict = vars(options)
 
     if option_dict["debug"]:

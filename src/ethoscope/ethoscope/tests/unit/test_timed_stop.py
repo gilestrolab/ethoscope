@@ -256,3 +256,150 @@ class TestAutostopHarness:
         ct._cancel_autostop()
 
         assert ct._autostop_at is None
+
+
+class TestSetAutostop:
+    """Changing the stop of an experiment that is already under way."""
+
+    def test_a_duration_is_counted_from_now_not_from_the_start(self, fast_poll):
+        ct = FakeControlThread(duration="01:00:00")
+        ct._arm_autostop(time.time() - 3600)  # started an hour ago
+
+        result = ct.set_autostop({"duration": "02:00:00"})
+
+        # Two days from now, not two days from when the experiment began.
+        assert result["autostop_at"] == pytest.approx(time.time() + 2 * 86400, abs=5)
+        assert result["autostop"] == "02:00:00"
+
+    def test_an_absolute_stop_time_is_honoured(self, fast_poll):
+        ct = FakeControlThread()
+        target = time.time() + 7200
+
+        result = ct.set_autostop({"stop_at": str(target)})
+
+        assert result["autostop_at"] == target
+        assert ct._info["autostop_at"] == target
+
+    def test_empty_data_cancels_the_stop(self, fast_poll):
+        ct = FakeControlThread(duration="01:00:00")
+        ct._arm_autostop(time.time())
+        assert ct._autostop_thread is not None
+
+        result = ct.set_autostop({})
+
+        assert result["autostop_at"] is None
+        assert result["autostop"] is False
+        assert ct._autostop_thread is None
+
+    def test_it_does_not_stop_the_experiment(self, fast_poll):
+        ct = FakeControlThread()
+        ct.set_autostop({"duration": "00:01:00"})
+
+        assert ct.stop_calls == 0
+        assert not ct.stopped.is_set()
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            {"duration": "not a duration"},
+            {"stop_at": "yesterday"},
+            {"stop_at": "2000-01-01 00:00:00"},
+        ],
+    )
+    def test_a_bad_request_leaves_the_existing_schedule_alone(self, bad, fast_poll):
+        # The experiment is running. A typo in a reschedule must not silently drop the
+        # stop the user already has, and must not stop the run either.
+        ct = FakeControlThread(duration="01:00:00")
+        ct._arm_autostop(time.time())
+        original = ct._info["autostop_at"]
+        supervisor = ct._autostop_thread
+
+        with pytest.raises(TimedStopError):
+            ct.set_autostop(bad)
+
+        assert ct._info["autostop_at"] == original
+        assert ct._autostop_thread is supervisor
+        assert supervisor.is_alive()
+        assert ct.stop_calls == 0
+
+    def test_the_rescheduled_stop_actually_fires(self, fast_poll):
+        ct = FakeControlThread(duration="09:00:00")
+        ct._arm_autostop(time.time())
+
+        ct.set_autostop({"stop_at": str(time.time() + 0.05)})
+
+        assert ct.stopped.wait(5), "the rescheduled stop never fired"
+        assert ct.stop_calls == 1
+
+
+class FakeControl:
+    """The parts of a control thread the listener's dispatch touches."""
+
+    def __init__(self, status="running", raises=None):
+        self.info = {"status": status}
+        self.calls = []
+        self._raises = raises
+
+    def set_autostop(self, data=None):
+        self.calls.append(data)
+        if self._raises is not None:
+            raise self._raises
+        return {"autostop": "01:00:00", "autostop_at": 1234.0}
+
+
+@pytest.fixture
+def listener():
+    """A commandingThread with no socket bound, so only its dispatch is exercised."""
+    import sys
+
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../scripts"))
+    from device_listener import commandingThread
+
+    def _build(control):
+        thread = commandingThread.__new__(commandingThread)
+        thread.control = control
+        return thread
+
+    return _build
+
+
+class TestSetAutostopDispatch:
+    @pytest.mark.parametrize("status", ["running", "recording", "streaming"])
+    def test_it_reaches_the_control_thread_while_active(self, listener, status):
+        control = FakeControl(status=status)
+        thread = listener(control)
+
+        result = thread.action("set_autostop", {"duration": "01:00:00"})
+
+        assert control.calls == [{"duration": "01:00:00"}]
+        assert result["autostop_at"] == 1234.0
+
+    @pytest.mark.parametrize("status", ["stopped", "initialising"])
+    def test_it_is_refused_when_nothing_is_running(self, listener, status):
+        control = FakeControl(status=status)
+        thread = listener(control)
+
+        result = thread.action("set_autostop", {"duration": "01:00:00"})
+
+        assert isinstance(result, str) and result.startswith("ERROR:")
+        assert control.calls == [], "the request reached a device with no experiment"
+
+    def test_an_unreadable_stop_time_is_reported_not_raised(self, listener):
+        # handle_client would otherwise turn this into a traceback, and the user would
+        # be told nothing about the field they got wrong.
+        control = FakeControl(raises=TimedStopError("Use YYYY-MM-DD HH:MM:SS"))
+        thread = listener(control)
+
+        result = thread.action("set_autostop", {"stop_at": "tomorrow"})
+
+        assert result == "ERROR: Use YYYY-MM-DD HH:MM:SS"
+
+    def test_no_body_means_cancel(self, listener):
+        control = FakeControl()
+        thread = listener(control)
+
+        thread.action("set_autostop", None)
+
+        # Not rejected by the "this action requires JSON data" guard, which applies
+        # only to start and start_record.
+        assert control.calls == [None]

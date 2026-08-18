@@ -197,6 +197,45 @@ class TestEthoscope:
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @pytest.mark.parametrize("status", ["running", "recording", "streaming"])
+    def test_set_autostop_is_allowed_while_a_run_is_active(
+        self, mock_config_class, mock_db_class, status
+    ):
+        """Rescheduling the automatic stop needs a run to reschedule."""
+        device = Ethoscope("192.168.1.100")
+        device._device_status = DeviceStatus(status)
+
+        with patch.object(device, "_update_info"):
+            device._check_instruction_status("set_autostop")
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_set_autostop_is_refused_on_a_stopped_device(
+        self, mock_config_class, mock_db_class
+    ):
+        device = Ethoscope("192.168.1.100")
+        device._device_status = DeviceStatus("stopped")
+
+        with patch.object(device, "_update_info"):
+            with pytest.raises(DeviceError):
+                device._check_instruction_status("set_autostop")
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    def test_set_autostop_is_not_a_stop_intervention(
+        self, mock_config_class, mock_db_class
+    ):
+        """
+        It reschedules a stop, it does not perform one.
+
+        Recording it as an intervention would make the scanner attribute a later
+        run termination to the user and suppress the alert for it.
+        """
+        device = Ethoscope("192.168.1.100")
+        assert "set_autostop" not in device._STOP_INTERVENTION_INSTRUCTIONS
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
     def test_check_instruction_status_unknown(self, mock_config_class, mock_db_class):
         """Test instruction validation with unknown instruction."""
         device = Ethoscope("192.168.1.100")

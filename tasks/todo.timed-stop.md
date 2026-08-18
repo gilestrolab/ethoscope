@@ -134,11 +134,16 @@ One timestamp is all the UI needs to render both an absolute date and a live cou
 ### 2.4 Changing or cancelling a running experiment
 
 New listener action `set_autostop` (`src/ethoscope/scripts/device_listener.py:145`) plus the
-matching branch in `controls()` (`src/ethoscope/scripts/device_server.py:340`). The node's
-proxy route is generic (`/device/<id>/controls/<instruction>`,
-`src/node/ethoscope_node/api/device_api.py:62`), so **no node API change is needed**. It
-re-arms the supervisor with a new target, or clears it. This is the part that actually solves
-the reporter's problem for a run already under way.
+matching branch in `controls()` (`src/ethoscope/scripts/device_server.py:340`). It re-arms the
+supervisor with a new target, or clears it. This is the part that actually solves the
+reporter's problem for a run already under way.
+
+**Correction (found in Stage 2):** this section originally claimed no node change was needed,
+because the proxy route `/device/<id>/controls/<instruction>`
+(`src/node/ethoscope_node/api/device_api.py:62`) is generic. It is, but
+`Ethoscope.send_instruction` validates the instruction against an `ALLOWED_INSTRUCTIONS`
+whitelist first (`src/node/ethoscope_node/scanner/ethoscope_scanner.py:52`) and raises
+`ValueError: Unknown instruction` for anything not in it. The whitelist needs the new entry.
 
 ## 3. Frontend
 
@@ -216,10 +221,27 @@ with a near-identical argument-normalisation loop that handles different cases. 
   for a "time left" readout but made a 24 h run report as `00:23:59` when measured from a
   moment after the start. Caught by a test.
 
-### Stage 2 — device API
-- [ ] `set_autostop` action in `device_listener.py` and `device_server.py`, returning the new
-      `autostop_at`.
-- [ ] Test that it re-arms and clears without restarting the experiment.
+### Stage 2 — device API  ✅ done 2026-08-18
+- [x] `ControlThread.set_autostop(data)`, sharing `_arm_autostop` via a `kwargs` override.
+      A `duration` is counted from **now** ("run for one more day"); `stop_at` is absolute;
+      empty cancels.
+- [x] `set_autostop` action in `device_listener.py`, guarded on an active run and
+      converting `TimedStopError` into a readable `ERROR:` string rather than a traceback.
+- [x] `set_autostop` branch in `device_server.py`, returning the device info with the new
+      `autostop_at` (plus an `error` field when the request was refused).
+- [x] `set_autostop` added to the node's `ALLOWED_INSTRUCTIONS` — see the correction in §2.4.
+      Deliberately **not** added to `_STOP_INTERVENTION_INSTRUCTIONS`: it reschedules a stop,
+      it does not perform one, and recording it as an intervention would make the scanner
+      suppress the alert for a later run termination.
+- [x] 19 more tests in `test_timed_stop.py` (the method and the listener dispatch) and 3 in
+      the node's `test_ethoscope_scanner.py`.
+- [x] Verified end to end over the real socket protocol against a live listener: schedule,
+      reschedule, cancel, fire, and refusal once stopped.
+
+**Key property, tested:** a malformed or already-past request leaves the existing schedule
+running untouched. `TimedStop` construction and `resolve()` both raise before `_set_autostop`
+is reached, so a typo while extending a run cannot silently drop the stop the user already
+has — nor stop the run.
 
 ### Stage 3 — frontend
 - [ ] Extract `static/pages/partials/option-argument.html`; use it in all three modals.
