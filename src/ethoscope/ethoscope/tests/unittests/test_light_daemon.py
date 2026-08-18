@@ -26,7 +26,20 @@ from ethoscope.hardware.interfaces.light_daemon import (
     LightDaemonUnavailable,
     PigpioBackend,
     PinctrlBackend,
+    smoothstep,
 )
+
+
+class TestSmoothstep:
+    def test_endpoints_and_midpoint(self):
+        assert smoothstep(0.0) == 0.0
+        assert smoothstep(1.0) == 1.0
+        assert smoothstep(0.5) == pytest.approx(0.5)
+
+    def test_monotonic_and_bounded(self):
+        vals = [smoothstep(i / 20) for i in range(21)]
+        assert vals == sorted(vals)
+        assert all(0.0 <= v <= 1.0 for v in vals)
 
 
 def _expected_hw_duty(pct: int) -> int:

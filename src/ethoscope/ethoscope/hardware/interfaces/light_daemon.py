@@ -84,6 +84,17 @@ _LISTENER_ACCEPT_TIMEOUT = 0.5
 _MAX_CMD_BYTES = 128
 
 
+def smoothstep(t: float) -> float:
+    """Perlin smoothstep ``S(t) = 3t² − 2t³`` on ``t`` in ``[0, 1]``.
+
+    Zero derivative at both endpoints, so a brightness ramp mapped through it
+    eases gently in and out (dawn-/dusk-like) and moves fastest in the middle.
+    Shared by the daemon's ``ramp_to`` and the CLI's client-side fade so both
+    draw the identical curve.
+    """
+    return (3 * t * t) - (2 * t * t * t)
+
+
 class LightDaemonUnavailable(RuntimeError):
     """Raised by LightDaemonClient when the daemon socket cannot be reached."""
 
@@ -460,7 +471,7 @@ class LightController:
             if not self._running:
                 break
             t = i / steps
-            smooth = (3 * t * t) - (2 * t * t * t)  # 0 → 0, 1 → 1, S-shaped
+            smooth = smoothstep(t)  # 0 → 0, 1 → 1, S-shaped
             pct = int(round(start_pct + (target_pct - start_pct) * smooth))
             # Clamp inside the [start, target] envelope (rounding can overshoot by 1).
             if target_pct > start_pct:
