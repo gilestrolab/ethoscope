@@ -21,7 +21,7 @@
 -->
 <div ng-if="isSectionStart(arg, $index, argSiblings, argModel)" class="config-section-heading">{{arg.section}}</div>
 
-<label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+<label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select' && arg.type != 'duration'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
 
 <!-- Select type (for ComposedStimulator trigger/action dropdowns) -->
 <div ng-if="arg.type == 'select'" style="margin-bottom: 10px;">
@@ -92,6 +92,27 @@
     </label>
 </div>
 
+<!-- A duration is one value with three parts, so it gets one label and three boxes
+     on a row. Rendering it as three separate number arguments stacked them vertically,
+     each carrying a sentence of a label, which read as three unrelated questions. -->
+<div ng-if="arg.type == 'duration'" class="form-group duration-group">
+    <label>{{arg.description}}</label>
+    <div class="duration-fields">
+        <span class="duration-field">
+            <input id="input-{{arg.name}}" type="number" name="{{arg.name}}_days" min="0" max="365" step="1" ng-model="argModel[arg.name].days">
+            <small>days</small>
+        </span>
+        <span class="duration-field">
+            <input type="number" name="{{arg.name}}_hours" min="0" max="23" step="1" ng-model="argModel[arg.name].hours">
+            <small>hours</small>
+        </span>
+        <span class="duration-field">
+            <input type="number" name="{{arg.name}}_minutes" min="0" max="59" step="1" ng-model="argModel[arg.name].minutes">
+            <small>minutes</small>
+        </span>
+    </div>
+</div>
+
 <div ng-if="arg.type == 'date_range'" class="form-group">
     <label for="input-drp-{{arg.name}}">{{arg.description}}</label>
     <div class="input-group" style="margin-top: 5px;">
@@ -108,7 +129,7 @@
 </div>
 
 <div ng-if="arg.type == 'datetime'" class="input-group">
-    <input date-range-picker class="form-control date-picker" name="{{arg.name}}" id="input-{{arg.name}}" type="text" ng-model="argModel[arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
+    <input date-range-picker class="form-control date-picker" name="{{arg.name}}" id="input-{{arg.name}}" type="text" ng-model="argModel[arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm' }}">
     <div class="input-group-append">
         <span class="input-group-text"><i class="fa fa-calendar"></i></span>
     </div>

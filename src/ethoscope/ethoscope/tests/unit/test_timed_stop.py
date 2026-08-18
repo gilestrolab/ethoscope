@@ -63,6 +63,15 @@ class TestTimedStopDuration:
         assert stop.autostop is True
         assert stop.resolve(T0) == T0 + 5 * 86400 + 6 * 3600 + 30 * 60
 
+    def test_the_form_sends_the_parts_as_one_value(self):
+        # The duration widget binds one object with three named parts.
+        stop = TimedStop(run_for={"days": 5, "hours": 6, "minutes": 30})
+        assert stop.resolve(T0) == T0 + 5 * 86400 + 6 * 3600 + 30 * 60
+
+    def test_a_partial_run_for_falls_back_to_the_flat_arguments(self):
+        stop = TimedStop(run_for={"hours": 2}, days=1)
+        assert stop.resolve(T0) == T0 + 86400 + 2 * 3600
+
     def test_minutes_alone_work(self):
         # Short video recordings are a real case; this is how a two-minute one is said.
         assert TimedStop(minutes=2).resolve(T0) == T0 + 120
@@ -157,19 +166,14 @@ class TestOptionExposure:
         offered = cls.user_options()["time_control"]
 
         assert [o["name"] for o in offered] == ["TimedStop"]
-        assert [a["name"] for a in offered[0]["arguments"]] == [
-            "days",
-            "hours",
-            "minutes",
-            "stop_at",
-        ]
-        # Both modals render every one of these types, so neither form breaks.
-        assert {a["type"] for a in offered[0]["arguments"]} == {"number", "str"}
+        assert [a["name"] for a in offered[0]["arguments"]] == ["run_for", "stop_at"]
+        # Both modals render both of these, through the shared partial.
+        assert [a["type"] for a in offered[0]["arguments"]] == ["duration", "datetime"]
 
     @pytest.mark.parametrize(
         "payload,expected",
         [
-            ({"name": "TimedStop", "arguments": {"days": 1}}, 86400),
+            ({"name": "TimedStop", "arguments": {"run_for": {"days": 1}}}, 86400),
             # Saved by earlier versions, which named both the class and the field
             # differently. These configurations must still start.
             ({"name": "timedStop", "arguments": {"timer": "00:06:00"}}, 21600),

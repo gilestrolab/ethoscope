@@ -7,6 +7,26 @@
         return {
 
             /**
+             * Seed a datetime argument for the single date picker.
+             *
+             * The picker's $parsers writes a moment into the model and its $formatters
+             * reads one back, so anything else in there is unreadable. Datetime
+             * defaults used to be seeded as a [label, value] array, which the
+             * formatter then handed to moment() as if it were a list of date parts -
+             * which is why no backend argument had ever been able to use this type.
+             *
+             * @param {*} value - The argument's declared default
+             * @returns {Object|null} A moment, or null for "nothing set"
+             */
+            momentOrNull: function(value) {
+                if (value === null || value === undefined || value === '') return null;
+                if (typeof moment === 'undefined') return null;
+
+                var m = moment.isMoment(value) ? value : moment(value);
+                return m.isValid() ? m : null;
+            },
+
+            /**
              * Convert widget values into what the device expects on the wire.
              *
              * The form widgets each hand back their own shape: the date range picker
@@ -53,6 +73,19 @@
 
                 // Date range picker: an object carrying its own formatted string.
                 if (value.hasOwnProperty('formatted')) return value.formatted;
+
+                // A single date picker the user cleared. Its parser writes this shape
+                // rather than null, and the device would read the object as a date.
+                if (value.hasOwnProperty('startDate') && value.startDate === null &&
+                    value.endDate === null) {
+                    return '';
+                }
+
+                // A duration: one value with named parts, passed through as it stands.
+                if (value.hasOwnProperty('days') || value.hasOwnProperty('hours') ||
+                    value.hasOwnProperty('minutes')) {
+                    return value;
+                }
 
                 // Single date picker: the directive's parser writes a moment.
                 if (typeof moment !== 'undefined' && moment.isMoment(value)) {
@@ -124,6 +157,19 @@
                                 endDate: endDate,
                                 formatted: formatted
                             };
+                        } else if (arg.type === 'duration') {
+                            // A fresh object per option: assigning arg.default would
+                            // have every device share one, so typing into a duration
+                            // in one form would change it in the others.
+                            $scope.selected_options[optionType][key].arguments[arg.name] =
+                                angular.extend({days: 0, hours: 0, minutes: 0}, arg.default);
+                        } else if (arg.type === 'datetime') {
+                            // The picker's parser writes a moment, so it has to be
+                            // seeded with one - or with null for "not set". Seeding the
+                            // raw default meant the formatter was handed a string it
+                            // could not read. See below.
+                            $scope.selected_options[optionType][key].arguments[arg.name] =
+                                this.momentOrNull(arg.default);
                         } else {
                             // Standard default value assignment
                             $scope.selected_options[optionType][key].arguments[arg.name] = arg.default;
@@ -142,6 +188,9 @@
             updateUserOptions: function(optionType, name, selectedOptionName, $scope) {
                 var data = $scope.user_options[optionType];
                 if (!data || !data[name]) return;
+
+                // `this` is not the service inside the callback below.
+                var self = this;
 
                 // Use $timeout to ensure proper timing and digest cycle
                 setTimeout(function() {
@@ -173,33 +222,14 @@
                                 var argument = args[j];
 
                                 if (argument.type === 'datetime') {
-                                    // Handle datetime arguments with moment.js formatting
-                                    if (typeof moment !== 'undefined') {
-                                        // Ensure moment.js locale is configured
-                                        this.ensureMomentLocale();
-
-                                        // Validate the default value before using it
-                                        var defaultValue = argument.default;
-                                        var momentObj = moment(defaultValue);
-
-                                        if (momentObj.isValid()) {
-                                            $scope.selected_options[optionType][name].arguments[argument.name] = [
-                                                momentObj.format('LLLL'),
-                                                defaultValue
-                                            ];
-                                        } else {
-                                            // Use current time if default is invalid
-                                            var fallbackMoment = moment();
-                                            $scope.selected_options[optionType][name].arguments[argument.name] = [
-                                                fallbackMoment.format('LLLL'),
-                                                fallbackMoment.unix()
-                                            ];
-                                            console.warn('Invalid datetime default value for ' + argument.name + ':', defaultValue, 'Using current time instead.');
-                                        }
-                                    } else {
-                                        // Fallback if moment isn't available
-                                        $scope.selected_options[optionType][name].arguments[argument.name] = argument.default;
-                                    }
+                                    // See momentOrNull: the picker round-trips moments.
+                                    $scope.selected_options[optionType][name].arguments[argument.name] =
+                                        self.momentOrNull(argument.default);
+                                } else if (argument.type === 'duration') {
+                                    // A fresh object per option, so two forms cannot
+                                    // end up sharing one duration.
+                                    $scope.selected_options[optionType][name].arguments[argument.name] =
+                                        angular.extend({days: 0, hours: 0, minutes: 0}, argument.default);
                                 } else {
                                     // Set default for other argument types
                                     $scope.selected_options[optionType][name].arguments[argument.name] = argument.default;

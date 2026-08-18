@@ -2413,3 +2413,37 @@ body {
     width: 14px;
     text-align: center;
 }
+
+/* ---------------------------------------------------------------------------
+   Duration argument (option-argument.html, type "duration")
+
+   One value with three parts, so the boxes sit on a row under a single label
+   rather than stacking as three separate questions. The !important flags match
+   the surrounding modal rules, which set them on the same properties: without
+   them `.modal label { display: block }` puts each unit on its own line and
+   `.modal input[type=number] { max-width: 250px }` leaves three very wide boxes.
+   --------------------------------------------------------------------------- */
+.duration-fields {
+    display: flex !important;
+    align-items: flex-end !important;
+    gap: 14px !important;
+    margin-top: 2px !important;
+}
+
+.duration-field {
+    display: inline-flex !important;
+    align-items: baseline !important;
+    gap: 5px !important;
+}
+
+.modal .duration-field input[type="number"] {
+    width: 68px !important;
+    max-width: 68px !important;
+    margin-bottom: 0 !important;
+}
+
+.duration-field small {
+    color: #6c757d !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+}

@@ -445,52 +445,44 @@ class TimedStop(DescribedObject):
 
     _description = {
         "overview": "Stop the experiment automatically, so it does not have to be "
-        "stopped by hand. Either say how long to run for, or give a date and time to "
+        "stopped by hand. Either say how long to run for, or pick a date and time to "
         "stop at. Leave it all at zero and blank to keep running until stopped "
         "manually. If both are given, the stop date wins.",
         "arguments": [
             {
-                "type": "number",
-                "name": "days",
-                "description": "Run for: days",
-                "default": 0,
-                "min": 0,
-                "max": 365,
-                "step": 1,
+                # A duration is one value with three parts, so it is one argument with
+                # three boxes on a row rather than three stacked fields each carrying a
+                # sentence of its own.
+                "type": "duration",
+                "name": "run_for",
+                "description": "Run for",
+                "default": {"days": 0, "hours": 0, "minutes": 0},
             },
             {
-                "type": "number",
-                "name": "hours",
-                "description": "Run for: hours",
-                "default": 0,
-                "min": 0,
-                "max": 23,
-                "step": 1,
-            },
-            {
-                "type": "number",
-                "name": "minutes",
-                "description": "Run for: minutes",
-                "default": 0,
-                "min": 0,
-                "max": 59,
-                "step": 1,
-            },
-            {
-                "type": "str",
+                "type": "datetime",
                 "name": "stop_at",
-                "description": "Or stop at this date and time (YYYY-MM-DD HH:MM), leave blank to ignore",
+                "description": "Or stop at a date and time",
                 "default": "",
             },
         ],
     }
 
     def __init__(
-        self, days=0, hours=0, minutes=0, stop_at="", duration=None, timer=None
+        self,
+        run_for=None,
+        days=0,
+        hours=0,
+        minutes=0,
+        stop_at="",
+        duration=None,
+        timer=None,
     ):
         """
         Args:
-            days (int): Whole days to run for.
+            run_for (dict): ``{"days": d, "hours": h, "minutes": m}``, as the web form
+                sends it. Any key present overrides the matching argument below.
+            days (int): Whole days to run for. The flat form, which reads better when
+                driving the API directly - ``{"days": 2}``.
             hours (int): Hours to run for, on top of the days.
             minutes (int): Minutes to run for, on top of the days and hours.
             stop_at (str|float): An absolute stop time, either a unix timestamp or a
@@ -511,6 +503,11 @@ class TimedStop(DescribedObject):
             self._countdown = self._parse_duration(legacy)
             self.days, self.hours, self.minutes = 0, 0, 0
         else:
+            if isinstance(run_for, dict):
+                days = run_for.get("days", days)
+                hours = run_for.get("hours", hours)
+                minutes = run_for.get("minutes", minutes)
+
             self.days = self._whole_number(days, "days")
             self.hours = self._whole_number(hours, "hours")
             self.minutes = self._whole_number(minutes, "minutes")

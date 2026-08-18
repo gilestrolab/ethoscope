@@ -325,6 +325,34 @@ duration format "always bothered me" (his own original design).
 **This is what Stage 3's partial extraction bought.** The revision needed `number` fields in
 the recording modal, which is exactly the class of argument that modal used to drop silently.
 
+### Stage 6 — graphical review  ✅ done 2026-08-18
+Giorgio, on the screenshot of Stage 5: three number boxes stacked vertically, each with a
+sentence of a label, read as three unrelated questions; and the stop time deserved the
+calendar widget used elsewhere.
+
+- [x] **A duration is one argument, not three.** New `duration` argument type, rendered by
+      the shared partial as one label and three boxes on a row with small unit captions.
+      `TimedStop` takes `run_for={"days":…, "hours":…, "minutes":…}`; the flat `days`/
+      `hours`/`minutes` kwargs stay, because they read better when driving the API by hand
+      (`{"days": 2}`), and `run_for` simply overrides them.
+- [x] **`stop_at` is now type `datetime`** — the same calendar-and-clock picker used
+      elsewhere. This is the first working use of that type in the codebase.
+- [x] CSS for the duration row in `main.css`, with `!important` to match the surrounding
+      modal rules: `.modal label { display: block }` is what stacked the units, and
+      `.modal input[type=number] { max-width: 250px }` is what made the boxes enormous.
+
+**The `datetime` type is fixed, not worked around.** Stage 3 diagnosed it and left it alone:
+the picker's `$parsers` writes a **moment**, while both seeding paths wrote a
+`[label, value]` **array**, which the `$formatters` then handed to `moment()` as a list of
+date parts. Both seeders now call a new `momentOrNull()`, and `normaliseArgumentValue`
+turns the moment back into a unix timestamp on submit. Two further bugs surfaced while
+fixing it:
+- `updateUserOptions` seeds arguments inside a `setTimeout`, where `this` is not the
+  service. The pre-existing `this.ensureMomentLocale()` call there had never run. Captured
+  as `self`.
+- A picker the user *clears* writes `{startDate: null, endDate: null}` rather than null,
+  which would have reached the device as a date. Normalised to an empty string.
+
 ### Remaining
 - [ ] Restore ETHOSCOPE_900 to `fix/222-decouple-exposure-from-maxfps` (`a2c27452`) and drop
       the `test-timed-stop` branch, once the bench work is finished.
