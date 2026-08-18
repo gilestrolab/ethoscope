@@ -129,7 +129,11 @@
 </div>
 
 <div ng-if="arg.type == 'datetime'" class="input-group">
-    <input date-range-picker class="form-control date-picker" name="{{arg.name}}" id="input-{{arg.name}}" type="text" ng-model="argModel[arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm' }}">
+    <!-- drops: 'up' is quoted deliberately. It was written as a bare `up`, which in an
+         Angular expression is an undefined variable, so the picker had been silently
+         falling back to dropping downwards - off the bottom of the window, since this
+         is the last field of a long modal and the calendar is 314px tall. -->
+    <input date-range-picker class="form-control date-picker" name="{{arg.name}}" id="input-{{arg.name}}" type="text" ng-model="argModel[arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour: true, timePickerIncrement: 30, autoApply: true, drops: 'up', locale: { format: 'YYYY-MM-DD HH:mm' }}">
     <div class="input-group-append">
         <span class="input-group-text"><i class="fa fa-calendar"></i></span>
     </div>

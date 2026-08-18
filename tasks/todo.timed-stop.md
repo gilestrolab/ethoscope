@@ -353,6 +353,42 @@ fixing it:
 - A picker the user *clears* writes `{startDate: null, endDate: null}` rather than null,
   which would have reached the device as a date. Normalised to an empty string.
 
+### Stage 7 — the calendar opened off the bottom of the window  ✅ done 2026-08-18
+
+Two independent bugs, both older than this work and both first exposed by being the first
+argument to use the `datetime` type:
+
+- **`drops: up` was never in effect.** The inline picker options in the old template said
+  `drops: up`, but `up` there is a bare identifier in an Angular expression - it evaluates
+  to `undefined`, so daterangepicker fell back to its `'down'` default. The calendar is
+  314px tall with the time picker on, the field is the last one in a long modal, and there
+  were 172px below it: measured 150px hanging off the bottom of the window. Quoted to
+  `drops: 'up'`, which is what the original author meant.
+- **`_clear()` threw on every render.** `angular-daterangepicker.js` attaches the picker in
+  a `$timeout`, but ngModel calls `$render` on the first digest, and `$render` calls
+  `_clear()` whenever the model has no `.startDate` - which is *always* for a
+  singleDatePicker, whose model is a moment. So `_picker.setStartDate()` ran with `_picker`
+  still null. `_setDatePoint`, immediately above it, guards for exactly this reason; this
+  one was missed. The thrown exception aborted the rest of the link chain for that element.
+
+**An adaptive version was tried and abandoned.** A `pickerFit` directive choosing the drop
+direction per open would be better than a fixed `'up'`, but it cannot be made to work
+against this vendor pair, and the reasons are worth recording so nobody spends the
+afternoon again:
+- `angular.element` here is **jqLite**, not jQuery — `angular.min.js` loads before
+  `jquery.min.js` in `index.html`. jqLite has no notion of event namespaces, so a handler
+  bound through the Angular element wrapper never hears `show.daterangepicker`.
+- Binding through jQuery *in the picker's own namespace* works exactly once: the picker's
+  `remove()` does `element.off('.daterangepicker')`, and the Angular wrapper re-initialises
+  the picker after the directive has linked, sweeping the handler away.
+- Binding through jQuery *without* a namespace survives, but never fires: jQuery 1.11 does
+  not deliver a namespaced trigger to un-namespaced handlers. Verified by binding all three
+  spellings at once and watching which fired — only the `.daterangepicker` one did.
+
+There is no namespace that both survives and fires, so the fixed `'up'` stands. It is
+correct wherever the field sits in the lower part of a form, which is where an
+"and when should this stop" question belongs.
+
 ### Remaining
 - [ ] Restore ETHOSCOPE_900 to `fix/222-decouple-exposure-from-maxfps` (`a2c27452`) and drop
       the `test-timed-stop` branch, once the bench work is finished.

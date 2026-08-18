@@ -40,6 +40,12 @@
         opts = _mergeOpts({}, dateRangePickerConfig, customOpts);
         _picker = null;
         _clear = function() {
+          // The picker is attached in a $timeout, but ngModel calls $render on the
+          // first digest, and $render clears whenever the model has no .startDate --
+          // which is always for a singleDatePicker, whose model is a moment. So this
+          // ran with _picker still null and threw. _setDatePoint above guards for the
+          // same reason; this one was missed.
+          if (!_picker) return;
           _picker.setStartDate();
           return _picker.setEndDate();
         };
