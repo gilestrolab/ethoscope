@@ -2415,6 +2415,39 @@ body {
 }
 
 /* ---------------------------------------------------------------------------
+   Inline arguments (option-argument.html, "inline" on the argument)
+
+   Consecutive arguments that answer one question share a row instead of each
+   taking a block of their own. The surrounding modal rules assume one control
+   per line -- li is a block, labels are display:block -- so each of those has to
+   be undone explicitly here.
+   --------------------------------------------------------------------------- */
+.modal .option-list li.arg-inline {
+    display: inline-block !important;
+    vertical-align: bottom !important;
+    padding: 2px 0 !important;
+    margin: 0 18px 0 0 !important;
+}
+
+.modal .option-list li.arg-inline:hover {
+    background-color: transparent !important;
+}
+
+.modal .option-list li.arg-inline label {
+    display: inline-block !important;
+    margin: 0 6px 0 0 !important;
+}
+
+.modal .option-list li.arg-inline select {
+    margin-bottom: 0 !important;
+}
+
+.arg-icon {
+    color: #6c757d !important;
+    margin-right: 6px !important;
+}
+
+/* ---------------------------------------------------------------------------
    Duration argument (option-argument.html, type "duration")
 
    One value with three parts, so the boxes sit on a row under a single label

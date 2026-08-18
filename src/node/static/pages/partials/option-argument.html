@@ -21,7 +21,19 @@
 -->
 <div ng-if="isSectionStart(arg, $index, argSiblings, argModel)" class="config-section-heading">{{arg.section}}</div>
 
-<label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select' && arg.type != 'duration'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+<!-- An optional icon standing in for a label, so a self-describing control can lose
+     its heading without losing what it is.
+
+     Deliberately an <i>, not a <span>. labels-in-boxes.js binds a delegated handler to
+     every input and select in the document and hides `input.prev('span')` whenever the
+     control has a value - it is a place-the-label-inside-the-box plugin - so a bare span
+     sitting just before a control disappears the moment anyone touches it. -->
+<i ng-if="arg.icon" class="fa {{arg.icon}} arg-icon" title="{{arg.description}}"></i>
+
+<!-- No description means no label. A control whose own text says what it is - a
+     dropdown reading "Run for a fixed time", boxes captioned days/hours/minutes - does
+     not need a heading repeating it, and the heading is what forced a second row. -->
+<label ng-if="arg.description && !arg.icon && arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select' && arg.type != 'duration'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
 
 <!-- Select type (for ComposedStimulator trigger/action dropdowns) -->
 <div ng-if="arg.type == 'select'" style="margin-bottom: 10px;">
@@ -96,7 +108,7 @@
      on a row. Rendering it as three separate number arguments stacked them vertically,
      each carrying a sentence of a label, which read as three unrelated questions. -->
 <div ng-if="arg.type == 'duration'" class="form-group duration-group">
-    <label>{{arg.description}}</label>
+    <label ng-if="arg.description">{{arg.description}}</label>
     <div class="duration-fields">
         <span class="duration-field">
             <input id="input-{{arg.name}}" type="number" name="{{arg.name}}_days" min="0" max="365" step="1" ng-model="argModel[arg.name].days">

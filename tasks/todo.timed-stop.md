@@ -416,6 +416,28 @@ row is on screen (and shows neither on "Do not stop automatically"), and a recor
 started with `mode: duration, run_for {minutes: 2}` armed and fired, leaving
 `stop_reason: autostop`.
 
+### Stage 9 — one row, not four  ✅ done 2026-08-18
+
+Giorgio: "make that a bit smaller ... they don't need to take two rows, do they?" They did
+not: a heading above the dropdown and another above the boxes were the only reason.
+
+- [x] Two generic additions to the shared partial, not a special case for this control:
+      an argument may carry an **`icon`**, and an argument with **no description renders no
+      label** — a dropdown reading "Run for a fixed time" and boxes captioned
+      days/hours/minutes already say what they are.
+- [x] An **`inline`** flag on an argument puts its `<li>` on the current row. The
+      surrounding modal CSS assumes one control per line (`li` is a block, labels are
+      `display: block`), so each of those is undone explicitly for inline arguments.
+- [x] `TimedStop`'s three arguments are inline, with an hourglass on the mode.
+      The whole control is now **~44px tall in every mode**, down from about 150.
+
+**The icon has to be an `<i>`, not a `<span>`.** `labels-in-boxes.js` — a
+place-the-label-inside-the-box plugin — binds delegated handlers to every input and select
+in the document and hides `input.prev('span')` whenever the control has a value. A bare
+span sitting just before a control therefore vanishes the moment anyone touches it, which
+is exactly what happened: the icon rendered, then disappeared on the first change event,
+with `visibility: hidden` set inline by a plugin nobody was thinking about.
+
 ### Remaining
 - [ ] Restore ETHOSCOPE_900 to `fix/222-decouple-exposure-from-maxfps` (`a2c27452`) and drop
       the `test-timed-stop` branch, once the bench work is finished.

@@ -1120,6 +1120,7 @@
                                     </div>
                                     <ul ng-if="selected_options.tracking[name]['name']==opt.name">
                                         <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.tracking[name]['arguments'])"
+                                            ng-class="{'arg-inline': arg.inline}"
                                             ng-init="argModel = selected_options.tracking[name]['arguments']; argSiblings = opt.arguments; argForm = 'trackingoptionsform'">
                                             <div ng-include="'/static/pages/partials/option-argument.html'"></div>
                                         </li>
@@ -1246,6 +1247,7 @@
                                 </div>
                                 <ul ng-if="selected_options.recording[name]['name']==opt.name">
                                         <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.recording[name]['arguments'])"
+                                            ng-class="{'arg-inline': arg.inline}"
                                             ng-init="argModel = selected_options.recording[name]['arguments']; argSiblings = opt.arguments; argForm = 'recordingoptionsform'">
                                             <div ng-include="'/static/pages/partials/option-argument.html'"></div>
                                         </li>

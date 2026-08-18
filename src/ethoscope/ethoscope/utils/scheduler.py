@@ -455,6 +455,12 @@ class TimedStop(DescribedObject):
                 "type": "dropdown",
                 "name": "mode",
                 "description": "Automatic stop",
+                # The three arguments answer one question, so they share a row. The
+                # dropdown and the boxes say what they are on their own - "Run for a
+                # fixed time", then days/hours/minutes - so the headings above them were
+                # only costing a second row, and the icon carries the meaning instead.
+                "icon": "fa-hourglass-half",
+                "inline": True,
                 "options": [
                     {"value": "never", "text": "Do not stop automatically"},
                     {"value": "duration", "text": "Run for a fixed time"},
@@ -465,14 +471,16 @@ class TimedStop(DescribedObject):
             {
                 "type": "duration",
                 "name": "run_for",
-                "description": "Run for",
+                "description": "",
+                "inline": True,
                 "default": {"days": 0, "hours": 0, "minutes": 0},
                 "depends_on": {"mode": ["duration"]},
             },
             {
                 "type": "datetime",
                 "name": "stop_at",
-                "description": "Stop at",
+                "description": "",
+                "inline": True,
                 "default": "",
                 "depends_on": {"mode": ["datetime"]},
             },
