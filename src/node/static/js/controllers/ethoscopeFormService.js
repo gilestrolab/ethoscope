@@ -7,6 +7,67 @@
         return {
 
             /**
+             * Convert widget values into what the device expects on the wire.
+             *
+             * The form widgets each hand back their own shape: the date range picker
+             * writes an object carrying a `formatted` string, the single date picker
+             * writes a moment, and datetime defaults are seeded as a
+             * [label, value] pair. The device wants a string or a unix timestamp.
+             *
+             * This used to be done twice, differently: start_tracking unwrapped only
+             * `formatted` objects and start_recording unwrapped only [Date, value]
+             * arrays, so the same argument reached the device in a different shape
+             * depending on which form it was submitted from.
+             *
+             * Mutates in place and also returns. Accepts either the selected options
+             * keyed by option group, or the stimulator sequence array - both are a
+             * collection of objects carrying an `arguments` map.
+             *
+             * @param {Object|Array} option - Option groups, or the stimulator sequence
+             * @returns {Object|Array} The same collection, with values normalised
+             */
+            normaliseArguments: function(option) {
+                var self = this;
+                if (!option) return option;
+
+                Object.keys(option).forEach(function(group) {
+                    var args = option[group] && option[group].arguments;
+                    if (!args) return;
+
+                    Object.keys(args).forEach(function(name) {
+                        args[name] = self.normaliseArgumentValue(args[name]);
+                    });
+                });
+
+                return option;
+            },
+
+            /**
+             * Normalise one widget value. See normaliseArguments.
+             *
+             * @param {*} value - Whatever the widget bound to the argument
+             * @returns {*} A string, a unix timestamp, or the value unchanged
+             */
+            normaliseArgumentValue: function(value) {
+                if (!value || typeof value !== 'object') return value;
+
+                // Date range picker: an object carrying its own formatted string.
+                if (value.hasOwnProperty('formatted')) return value.formatted;
+
+                // Single date picker: the directive's parser writes a moment.
+                if (typeof moment !== 'undefined' && moment.isMoment(value)) {
+                    return value.isValid() ? value.unix() : '';
+                }
+
+                if (value instanceof Date) return Math.floor(value.getTime() / 1000);
+
+                // A [label, value] pair, as datetime defaults are seeded.
+                if (Array.isArray(value) && value.length === 2) return value[1];
+
+                return value;
+            },
+
+            /**
              * Initialize form options with default values
              * @param {string} optionType - Type of options (tracking, recording, update_machine)
              * @param {Object} data - Raw options data from server

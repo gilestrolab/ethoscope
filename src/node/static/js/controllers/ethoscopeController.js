@@ -498,6 +498,23 @@
             return ethoscopeFormService.isArgumentVisible(arg, currentArgValues);
         };
 
+        /**
+         * Whether a required argument has been left empty after being touched.
+         *
+         * The shared option-argument partial is used by two forms with different
+         * names, and an ng-include child scope cannot index the scope by a value,
+         * so it passes the form's name here instead.
+         *
+         * @param {string} formName - Name of the enclosing form
+         * @param {string} argName - Name of the argument's field
+         * @returns {boolean} True when the field should show its "required" message
+         */
+        $scope.argIsMissing = function(formName, argName) {
+            var form = $scope[formName];
+            var field = form && form[argName];
+            return !!(field && field.$invalid && field.$touched);
+        };
+
         $scope.isSectionStart = function(arg, index, args, currentArgValues) {
             return ethoscopeFormService.isSectionStart(arg, index, args, currentArgValues);
         };
@@ -878,6 +895,31 @@
         };
 
         /**
+         * Time left until a scheduled stop, as a readable string.
+         *
+         * The mirror of elapsedtime: that one counts up from a start, this counts
+         * down to a stop. Returns null when nothing is scheduled, so the template
+         * can leave the whole line out rather than print a zero.
+         */
+        $scope.ethoscope.remainingtime = function(t) {
+            if (!t) return null;
+
+            var remaining = Math.floor(t - Date.now() / 1000);
+            if (remaining <= 0) return "any moment now";
+
+            var days = Math.floor(remaining / 86400);
+            var hours = Math.floor((remaining - (days * 86400)) / 3600);
+            var minutes = Math.floor((remaining - (days * 86400) - (hours * 3600)) / 60);
+
+            var result = "";
+            if (days > 0) result += days + " days, ";
+            if (hours > 0 || days > 0) result += hours + "h, ";
+            result += minutes + "min";
+
+            return result;
+        };
+
+        /**
          * Create readable URL from full path
          */
         $scope.ethoscope.readable_url = function(url) {
@@ -988,17 +1030,9 @@
             $("#startModal").modal('hide');
             manageSpinner('start');
 
-            // Process arguments - extract formatted values from date range pickers
-            for (var opt in option) {
-                for (var arg in option[opt].arguments) {
-                    // Extract formatted field from date range picker objects
-                    if (option[opt].arguments[arg] &&
-                        typeof option[opt].arguments[arg] === 'object' &&
-                        option[opt].arguments[arg].hasOwnProperty('formatted')) {
-                        option[opt].arguments[arg] = option[opt].arguments[arg].formatted;
-                    }
-                }
-            }
+            // Turn widget values into what the device expects. Shared with
+            // start_recording, which used to normalise a different subset.
+            ethoscopeFormService.normaliseArguments(option);
 
             // Add sensor IP and light schedule based on selected incubator name.
             // Clock drift is handled by the auto-correct loop in
@@ -1043,20 +1077,9 @@
 
             // Include stimulator sequence in the data sent to backend
             if ($scope.stimulatorSequence && $scope.stimulatorSequence.length > 0) {
-                // Process stimulator sequence date range pickers
-                for (var i = 0; i < $scope.stimulatorSequence.length; i++) {
-                    var stimulator = $scope.stimulatorSequence[i];
-                    if (stimulator.arguments) {
-                        for (var argName in stimulator.arguments) {
-                            // Extract formatted field from date range picker objects
-                            if (stimulator.arguments[argName] &&
-                                typeof stimulator.arguments[argName] === 'object' &&
-                                stimulator.arguments[argName].hasOwnProperty('formatted')) {
-                                stimulator.arguments[argName] = stimulator.arguments[argName].formatted;
-                            }
-                        }
-                    }
-                }
+                // Same normalisation as the option groups above: the stimulators
+                // are configured with the same widgets.
+                ethoscopeFormService.normaliseArguments($scope.stimulatorSequence);
 
                 // If only one stimulator, use it directly without MultiStimulator wrapper
                 if ($scope.stimulatorSequence.length === 1) {
@@ -1348,16 +1371,9 @@
             $("#recordModal").modal('hide');
             manageSpinner('start');
 
-            // Process datetime arguments - extract timestamp from Date objects
-            for (var opt in option) {
-                for (var arg in option[opt].arguments) {
-                    if (option[opt].arguments[arg] &&
-                        Array.isArray(option[opt].arguments[arg]) &&
-                        option[opt].arguments[arg][0] instanceof Date) {
-                        option[opt].arguments[arg] = option[opt].arguments[arg][1]; // Use timestamp
-                    }
-                }
-            }
+            // Turn widget values into what the device expects. Shared with
+            // start_tracking, which used to normalise a different subset.
+            ethoscopeFormService.normaliseArguments(option);
 
             // Add sensor IP and light schedule based on selected incubator name
             if (option.experimental_info && option.experimental_info.arguments && option.experimental_info.arguments.location) {
@@ -1382,7 +1398,6 @@
             $http.post('/device/' + device_id + '/controls/start_record', option)
                 .then(function(response) {
                     $scope.device.status = response.data.status;
-                    $scope.device.countdown = response.data.autostop;
                     refreshDeviceStatus();
                 })
                 .catch(function(error) {
@@ -1403,6 +1418,77 @@
                 .catch(function(error) {
                     console.error('Failed to stop:', error);
                 });
+        };
+
+        // ===========================
+        // AUTOMATIC STOP
+        // ===========================
+
+        // Bound to the fields of the automatic-stop modal.
+        $scope.autostop_form = {stop_at: '', error: null};
+
+        /**
+         * Open the automatic-stop modal, seeded with the stop currently scheduled.
+         */
+        $scope.ethoscope.open_autostop = function() {
+            $scope.autostop_form.error = null;
+            $scope.autostop_form.stop_at = $scope.device.autostop_at
+                ? moment.unix($scope.device.autostop_at).format('YYYY-MM-DD HH:mm:ss')
+                : moment().add(1, 'days').format('YYYY-MM-DD HH:mm:ss');
+            $("#autostopModal").modal('show');
+        };
+
+        /**
+         * Reschedule or cancel the automatic stop of the running experiment.
+         *
+         * Always sends an absolute stop_at, so what the user saw on screen is what
+         * the device is asked for. The device also accepts a duration, but that is
+         * counted from when it arrives, which would drift by the round trip.
+         *
+         * @param {number|null} timestamp - Unix seconds to stop at, or null to cancel
+         */
+        $scope.ethoscope.set_autostop = function(timestamp) {
+            var payload = timestamp ? {stop_at: String(timestamp)} : {};
+
+            $http.post('/device/' + device_id + '/controls/set_autostop', payload)
+                .then(function(response) {
+                    // The device reports the refusal in the body rather than as an
+                    // HTTP error, so a rejected stop time lands here, not in catch.
+                    if (response.data && response.data.error) {
+                        $scope.autostop_form.error = response.data.error;
+                        return;
+                    }
+                    $("#autostopModal").modal('hide');
+                    refreshDeviceStatus();
+                })
+                .catch(function(error) {
+                    console.error('Failed to change the automatic stop:', error);
+                    $scope.autostop_form.error =
+                        'Could not reach the ethoscope to change its automatic stop.';
+                });
+        };
+
+        /**
+         * Push the scheduled stop back, or schedule one that far from now.
+         *
+         * @param {number} hours - How much further to run
+         */
+        $scope.ethoscope.extend_autostop = function(hours) {
+            var from = $scope.device.autostop_at || Date.now() / 1000;
+            $scope.ethoscope.set_autostop(Math.round(from + hours * 3600));
+        };
+
+        /**
+         * Apply the date and time typed into the modal.
+         */
+        $scope.ethoscope.apply_autostop = function() {
+            var parsed = moment($scope.autostop_form.stop_at, 'YYYY-MM-DD HH:mm:ss', true);
+            if (!parsed.isValid()) {
+                $scope.autostop_form.error =
+                    'Could not read that date. Use YYYY-MM-DD HH:MM:SS.';
+                return;
+            }
+            $scope.ethoscope.set_autostop(parsed.unix());
         };
 
         // ===========================

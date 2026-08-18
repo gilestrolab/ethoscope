@@ -243,11 +243,46 @@ running untouched. `TimedStop` construction and `resolve()` both raise before `_
 is reached, so a typo while extending a run cannot silently drop the stop the user already
 has — nor stop the run.
 
-### Stage 3 — frontend
-- [ ] Extract `static/pages/partials/option-argument.html`; use it in all three modals.
-- [ ] Extract `normaliseArguments()` into `ethoscopeFormService`; call from both start paths.
-- [ ] `remainingtime()` helper; autostop display for `running` and `recording`;
-      extend/cancel control.
+### Stage 3 — frontend  ✅ done 2026-08-18
+- [x] `static/pages/partials/option-argument.html`, included by the tracking and
+      recording modals with `ng-init="argModel = …; argSiblings = …; argForm = '…'"`.
+      Recording gains `select`, `dropdown`, `boolean` and `str`-with-options, which it
+      silently dropped before.
+- [x] `normaliseArguments()` / `normaliseArgumentValue()` in `ethoscopeFormService`,
+      called from `start_tracking`, `start_recording` **and** the stimulator sequence,
+      which had a third copy of the same loop. Handles `{formatted}` objects, moments,
+      `Date`s and `[label, value]` pairs. Fixes defect 7.
+- [x] `ethoscope.remainingtime()`; the scheduled stop shown for `running` as well as
+      `recording`, as an absolute date **and** a live countdown driven off
+      `autostop_at`; `argIsMissing()` helper for the partial's required-field message.
+- [x] `#autostopModal`: +6h / +1 day / +2 days / +1 week quick buttons, a field for a
+      specific time, and "Cancel the automatic stop". Also offered when no stop is set,
+      so a run already going can have one scheduled. Always sends an absolute
+      timestamp, so what is on screen is what the device is asked for.
+- [x] Dropped `$scope.device.countdown`, which nothing read.
+
+**Only two callers, not three.** The plan said all three modals. The stimulator block
+(`ethoscope.html:1039`) is a Bootstrap-styled card - `form-control` on every control,
+`placeholder="{{arg.default}}"`, its own ids - while the tracking and recording blocks
+are plain `<ul>` lists. Folding it in would have meant either restyling that card or
+giving the partial style knobs. The two list-shaped callers were the ones that had
+actually diverged in *behaviour*, and they are now one copy.
+
+**Verified in a browser** (`localhost` harness loading the real partial through real
+Angular, since `device_server.py` hardcodes `/ethoscope_data` and cannot run here
+without root):
+- all 11 argument types render exactly one control each;
+- writes through `argModel` land on the caller's object - `argModel === ` the caller's
+  arguments object, no shadowing from `ng-include`'s child scope;
+- `arg`, `$index`, `argSiblings` and `argForm` all reach the partial correctly;
+- the required-field message is hidden untouched, shown touched-and-empty, hidden once
+  filled;
+- clean console on load;
+- `remainingtime()`, evaluated out of the served controller, gives `null` for no
+  schedule, "any moment now" for a past target, and `2 days, 4h, 12min` style otherwise.
+
+Plus a static cross-check that every `ethoscope.*` binding in the template resolves to
+a controller function.
 
 ### Stage 4 — verification
 - [ ] `python run_tests.py --package device` and `--package node`.
@@ -260,7 +295,22 @@ has — nor stop the run.
 
 ## Discovered during work
 
-- The `datetime` argument type has never had a backend consumer; both its rendering and its
-  wire format are unverified. Budget time for it in Stage 3.
 - `_option_dict` is a **class** attribute mutated by `_parse_user_options`, so option state is
   shared across instances within a process. Pre-existing; do not rely on per-instance state.
+- **`datetime` is still unused, and now diagnosed.** `TimedStop.stop_at` stayed a `str`
+  rather than switching to the picker, because the widget disagrees with its own
+  initialiser: with `singleDatePicker`, the directive's `$parsers` writes a **moment** to
+  the model (`angular-daterangepicker.js:190`), while `updateUserOptions` seeds datetime
+  args as a `[label, value]` **array** (`ethoscopeFormService.js:114`), which the
+  `$formatters` then hands to `moment()` as if it were a date part list. Whoever switches
+  a field to `datetime` must make the initialiser write a moment (or null for an empty
+  default) first. `normaliseArgumentValue` already handles every one of these shapes, so
+  the submit half is done. Also note `autoUpdateInput: true` in the inline picker options:
+  for an *optional* field it would set a value merely because the user opened the picker.
+- **`initDateRangePicker` does not exist.** `ethoscope.html:1092`, in the stimulator card,
+  calls it from `ng-click`; nothing defines it, so the clock icon there is a no-op. Angular
+  swallows the call silently. Pre-existing (68ceb318), untouched, and in the one block the
+  partial extraction deliberately left alone.
+- The node has **no JavaScript test infrastructure** — no karma, jest or spec files. The
+  frontend work here was verified with a browser harness and a throwaway node script rather
+  than committed tests. Standing up a JS runner would be its own task.

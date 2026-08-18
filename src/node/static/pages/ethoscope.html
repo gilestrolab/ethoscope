@@ -102,6 +102,24 @@
                 <br>
                 <span class="fa fa-map-marker"></span> Location: {{device.experimental_info.current.location}}
                 <br>
+                <!-- Scheduled stop. Shown for tracking as well as recording since
+                     #226: an experiment that has to be stopped by hand is a trip to
+                     the lab. autostop_at is an absolute timestamp, so both the date
+                     and the time left can be shown, and the countdown follows the
+                     polling rather than being frozen at whatever was set at start. -->
+                <span ng-if="device.autostop_at" class="fa fa-hourglass-half"></span>
+                <span ng-if="device.autostop_at">
+                    Stopping automatically on {{ethoscope.start_date_time(device.autostop_at)}}
+                    (in {{ethoscope.remainingtime(device.autostop_at)}})
+                    <a href="" ng-click="ethoscope.open_autostop()" title="Change or cancel the automatic stop">change</a>
+                    <br>
+                </span>
+                <span ng-if="!device.autostop_at" class="fa fa-hourglass-o"></span>
+                <span ng-if="!device.autostop_at">
+                    No automatic stop set
+                    <a href="" ng-click="ethoscope.open_autostop()" title="Stop this experiment automatically at a chosen time">schedule one</a>
+                    <br>
+                </span>
                 <span ng-if="device.status == 'running'" class="fas fa-camera"></span> {{device.monitor_info.fps}} FPS
                 <br>
                 <!-- Acquisition quality, sampled once a minute during tracking.
@@ -150,12 +168,22 @@
             <p><span class="fa fa-clock"></span> Recording video since {{ethoscope.start_date_time(device.time)}}
                 (i.e. {{ethoscope.elapsedtime(device.time)}} ago)
                 <br>
-                <span ng-if="device.autostop" class="fa fa-hourglass"></span>
-                <span ng-if="device.autostop">
-                    Automatically stopping. The video will last
-                    {{device.autostop.split(':')[0]}} days,
-                    {{device.autostop.split(':')[1]}} hours, and
-                    {{device.autostop.split(':')[2]}} minutes
+                <!-- Scheduled stop. Shown for tracking as well as recording since
+                     #226: an experiment that has to be stopped by hand is a trip to
+                     the lab. autostop_at is an absolute timestamp, so both the date
+                     and the time left can be shown, and the countdown follows the
+                     polling rather than being frozen at whatever was set at start. -->
+                <span ng-if="device.autostop_at" class="fa fa-hourglass-half"></span>
+                <span ng-if="device.autostop_at">
+                    Stopping automatically on {{ethoscope.start_date_time(device.autostop_at)}}
+                    (in {{ethoscope.remainingtime(device.autostop_at)}})
+                    <a href="" ng-click="ethoscope.open_autostop()" title="Change or cancel the automatic stop">change</a>
+                    <br>
+                </span>
+                <span ng-if="!device.autostop_at" class="fa fa-hourglass-o"></span>
+                <span ng-if="!device.autostop_at">
+                    No automatic stop set
+                    <a href="" ng-click="ethoscope.open_autostop()" title="Stop this experiment automatically at a chosen time">schedule one</a>
                     <br>
                 </span>
                 <span class="fa fa-user"></span> User: {{device.experimental_info.current.name || 'not specified'}}
@@ -1091,88 +1119,9 @@
                                         {{opt.overview}}
                                     </div>
                                     <ul ng-if="selected_options.tracking[name]['name']==opt.name">
-                                        <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.tracking[name]['arguments'])">
-                                            <div ng-if="isSectionStart(arg, $index, opt.arguments, selected_options.tracking[name]['arguments'])" class="config-section-heading">{{arg.section}}</div>
-                                            <label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
-
-                                            <!-- Select type (for ComposedStimulator trigger/action dropdowns) -->
-                                            <div ng-if="arg.type == 'select'" style="margin-bottom: 10px;">
-                                                <label for="input-{{arg.name}}" style="font-weight: 600; color: #337ab7;">{{arg.description}}</label>
-                                                <select id="input-{{arg.name}}" name={{arg.name}} class="form-control" ng-model="selected_options.tracking[name]['arguments'][arg.name]" style="font-weight: 500;">
-                                                    <option ng-repeat="opt in getFilteredActionOptions(arg)" value="{{opt.value}}">{{opt.label}}</option>
-                                                </select>
-                                            </div>
-
-                                            <select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                                <option value="">Available Movies</option>
-                                                <option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option>
-                                            </select>
-                                            <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                            <input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                            <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
-                                                <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
-                                                <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
-                                                <option ng-if="!(node[arg.asknode] | toArray).length" value="" disabled>No {{arg.name}} available</option>
-                                            </select>
-                                            <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.required == 'required')" class="text-danger" ng-show="trackingoptionsform[arg.name].$invalid && trackingoptionsform[arg.name].$touched">
-                                                <small>{{arg.name}} is required</small>
-                                            </div>
-                                            <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.name == 'database_to_append')" class="text-info" ng-show="!(node[arg.asknode] | toArray).length">
-                                                <small><i class="fa fa-info-circle"></i> No databases found for appending. Previous experiments may not be available or cached data may be loading.</small>
-                                                <br>
-                                                <small>
-                                                    <span ng-if="database_status.loading"><i class="fa fa-spinner fa-spin"></i> {{getDatabaseStatusMessage()}}</span>
-                                                    <span ng-if="!database_status.loading">{{getDatabaseStatusMessage()}}</span>
-                                                    <button ng-if="!database_status.loading" type="button" class="btn btn-xs btn-default" ng-click="refreshDatabaseStatus()" style="margin-left: 5px;">
-                                                        <i class="fa fa-refresh"></i> Refresh
-                                                    </button>
-                                                </small>
-                                            </div>
-                                            <select ng-if="(arg.type == 'str' && arg.options != undefined)" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                                <option value="">-- choose {{arg.name}} --</option>
-                                                <option ng-repeat="option in arg.options" value="{{option}}">{{option}}</option>
-                                            </select>
-                                            <select ng-if="arg.type == 'dropdown' && !arg.groups" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                                <option value="">-- choose {{arg.description}} --</option>
-                                                <option ng-repeat="opt in arg.options" value="{{opt.value}}">{{opt.text}}</option>
-                                            </select>
-                                            <select ng-if="arg.type == 'dropdown' && arg.groups" id="input-{{arg.name}}" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]">
-                                                <option value="">-- choose {{arg.description}} --</option>
-                                                <optgroup ng-repeat="group in arg.groups" label="{{group.label}}">
-                                                    <option ng-repeat="opt in group.options" value="{{opt.value}}">{{opt.text}}</option>
-                                                </optgroup>
-                                            </select>
-                                            <!-- Toggle, matching the Machine Information modal. A `transform: scale()`d
-                                                 checkbox does not resize its layout box, so no amount of margin lines it
-                                                 up with its own label. -->
-                                            <div ng-if="arg.type == 'boolean'" style="display: flex; align-items: center; justify-content: space-between; margin: 8px 0;">
-                                                <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}}</label>
-                                                <label class="switch" style="margin: 0;">
-                                                    <input id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.tracking[name]['arguments'][arg.name]"><span class="slider"></span>
-                                                </label>
-                                            </div>
-
-                                            <div ng-if="arg.type == 'date_range'" class="form-group">
-                                                <label for="input-{{arg.name}}">{{arg.description}}</label>
-                                                <div class="input-group" style="margin-top: 5px;">
-                                                    <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-drp-{{arg.name}}" type="text" ng-model="selected_options.tracking[name]['arguments'][arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
-                                                    <div class="input-group-append">
-                                                        <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;">
-                                                            <i class="fa fa-clock"></i>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <small class="form-text text-muted" style="margin-top: 3px;">
-                                                    Click to select start and end date/time when stimulator should be active
-                                                </small>
-                                            </div>
-
-                                            <div ng-if="arg.type == 'datetime'" class="input-group">
-                                                <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type=text ng-model="selected_options.tracking[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
-                                                <div class="input-group-append">
-                                                    <span class="input-group-text"><i class="fa fa-calendar"></i></span>
-                                                </div>
-                                            </div>
+                                        <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.tracking[name]['arguments'])"
+                                            ng-init="argModel = selected_options.tracking[name]['arguments']; argSiblings = opt.arguments; argForm = 'trackingoptionsform'">
+                                            <div ng-include="'/static/pages/partials/option-argument.html'"></div>
                                         </li>
                                     </ul>
                                 </li>
@@ -1296,44 +1245,10 @@
                                     {{opt.overview}}
                                 </div>
                                 <ul ng-if="selected_options.recording[name]['name']==opt.name">
-                                    <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.recording[name]['arguments'])">
-                                        <label ng-if="arg.type != 'date_range'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
-
-                                        <input ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" type=file name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
-                                        <input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type=number name={{arg.name}} min={{arg.min}} max={{arg.max}} step={{arg.step}} ng-model="selected_options.recording[name]['arguments'][arg.name]">
-                                        <input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
-                                        <select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" ng-required="{{arg.required == 'required'}}">
-                                            <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
-                                            <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
-                                            <option ng-if="!(node[arg.asknode] | toArray).length" value="" disabled>No {{arg.name}} available</option>
-                                        </select>
-                                        <div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.required == 'required')" class="text-danger" ng-show="recordingoptionsform[arg.name].$invalid && recordingoptionsform[arg.name].$touched">
-                                            <small>{{arg.name}} is required</small>
-                                        </div>
-
-                                        <div ng-if="arg.type == 'date_range'" class="form-group">
-                                            <label for="input-{{arg.name}}">{{arg.description}}</label>
-                                            <div class="input-group" style="margin-top: 5px;">
-                                                <input ng-if="arg.type == 'date_range'" date-range-picker class="form-control date-picker" name={{arg.name}} id="input-{{arg.name}}" type="text" ng-model="selected_options.recording[name]['arguments'][arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
-                                                <div class="input-group-append">
-                                                    <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;" onclick="$('#input-{{arg.name}}').focus();">
-                                                        <i class="fa fa-clock"></i>
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <small class="form-text text-muted" style="margin-top: 3px;">
-                                                Click to select start and end date/time for recording schedule
-                                            </small>
-                                        </div>
-
-                                        <div ng-if="arg.type == 'datetime'" class="input-group">
-                                            <input ng-if="arg.type == 'datetime'" date-range-picker class="form-control date-picker" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.recording[name]['arguments'][arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
-                                            <div class="input-group-append">
-                                                <span class="input-group-text"><i class="fa fa-calendar"></i></span>
-                                            </div>
-                                        </div>
-
-                                    </li>
+                                        <li ng-repeat="arg in opt.arguments" ng-if="isArgumentVisible(arg, selected_options.recording[name]['arguments'])"
+                                            ng-init="argModel = selected_options.recording[name]['arguments']; argSiblings = opt.arguments; argForm = 'recordingoptionsform'">
+                                            <div ng-include="'/static/pages/partials/option-argument.html'"></div>
+                                        </li>
                                 </ul>
                             </li>
                         </ul>
@@ -1370,6 +1285,64 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
                 <button type="button" class="btn btn-primary" ng-click="ethoscope.stop()" data-dismiss="modal">Yes, of course!</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Change or cancel the automatic stop of a run already under way (#226). The
+     quick buttons are the common case - "give it another day" - and need no date
+     arithmetic from the user. The field below is for a specific time. Everything
+     here sends an absolute timestamp, so what is on screen is what the device is
+     asked for. -->
+<div class="modal fade" id="autostopModal" tabindex="-1" role="dialog" aria-labelledby="autostopModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="autostopModalLabel">Automatic stop</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+                <p ng-if="device.autostop_at">
+                    “{{device.name}}” is set to stop on
+                    <strong>{{ethoscope.start_date_time(device.autostop_at)}}</strong>,
+                    in {{ethoscope.remainingtime(device.autostop_at)}}.
+                </p>
+                <p ng-if="!device.autostop_at">
+                    “{{device.name}}” has no automatic stop set, so it will run until
+                    it is stopped by hand.
+                </p>
+
+                <div class="alert alert-danger" ng-if="autostop_form.error">
+                    <i class="fa fa-exclamation-triangle"></i> {{autostop_form.error}}
+                </div>
+
+                <label style="font-weight: 600;">{{device.autostop_at ? 'Run for longer' : 'Run for'}}</label>
+                <div class="btn-group" style="display: flex; gap: 8px; margin-bottom: 20px;">
+                    <button type="button" class="btn btn-default" ng-click="ethoscope.extend_autostop(6)">+6 hours</button>
+                    <button type="button" class="btn btn-default" ng-click="ethoscope.extend_autostop(24)">+1 day</button>
+                    <button type="button" class="btn btn-default" ng-click="ethoscope.extend_autostop(48)">+2 days</button>
+                    <button type="button" class="btn btn-default" ng-click="ethoscope.extend_autostop(168)">+1 week</button>
+                </div>
+
+                <label for="autostop-stop-at" style="font-weight: 600;">Or stop at a specific time</label>
+                <div class="input-group">
+                    <input id="autostop-stop-at" type="text" class="form-control"
+                           ng-model="autostop_form.stop_at"
+                           placeholder="YYYY-MM-DD HH:MM:SS">
+                    <div class="input-group-append">
+                        <button type="button" class="btn btn-primary" ng-click="ethoscope.apply_autostop()">Set</button>
+                    </div>
+                </div>
+                <small class="form-text text-muted" style="margin-top: 5px;">
+                    The ethoscope's own clock, which the node keeps in step with its own.
+                </small>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between;">
+                <button type="button" class="btn btn-warning" ng-if="device.autostop_at"
+                        ng-click="ethoscope.set_autostop(null)">Cancel the automatic stop</button>
+                <span ng-if="!device.autostop_at"></span>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
             </div>
         </div>
     </div>

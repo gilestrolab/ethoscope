@@ -1,0 +1,115 @@
+<!--
+    One form control for one option argument, shared by the "Start tracking" and
+    "Record video" modals.
+
+    These two modals used to carry their own near-identical copy of this markup, and
+    the copies had drifted: recording rendered only filepath, number, str, date_range
+    and datetime, so an option declaring a dropdown, a boolean, a select or a str with
+    options rendered as *nothing at all* in the recording form while working perfectly
+    in the tracking one. That is a silent failure - the field is simply absent, and the
+    device is started with its default - which is how the timed stop nearly shipped with
+    an invisible control (#226).
+
+    Expects three things in scope, which the caller supplies with ng-init:
+      arg      - the argument definition from the device's user_options
+      argModel - the arguments map to bind into
+      argForm  - name of the enclosing form, for the required-field message
+
+    ng-include creates a child scope, but every binding here writes to a property of
+    argModel rather than to a scope variable, so the writes land on the caller's object
+    and no shadowing occurs.
+-->
+<div ng-if="isSectionStart(arg, $index, argSiblings, argModel)" class="config-section-heading">{{arg.section}}</div>
+
+<label ng-if="arg.type != 'boolean' && arg.type != 'date_range' && arg.type != 'select'" for="input-{{arg.name}}" ng-hide="arg.hidden">{{arg.description}}</label>
+
+<!-- Select type (for ComposedStimulator trigger/action dropdowns) -->
+<div ng-if="arg.type == 'select'" style="margin-bottom: 10px;">
+    <label for="input-{{arg.name}}" style="font-weight: 600; color: #337ab7;">{{arg.description}}</label>
+    <select id="input-{{arg.name}}" name="{{arg.name}}" class="form-control" ng-model="argModel[arg.name]" style="font-weight: 500;">
+        <option ng-repeat="opt in getFilteredActionOptions(arg)" value="{{opt.value}}">{{opt.label}}</option>
+    </select>
+</div>
+
+<!-- Only MovieVirtualCamera declares a filepath, and it lists uploaded videos. The
+     recording modal used to render a browser file input here instead, which could
+     never have been reached: none of the recording options declare a filepath. -->
+<select ng-if="arg.type == 'filepath'" id="input-{{arg.name}}" name="{{arg.name}}" ng-model="argModel[arg.name]">
+    <option value="">Available Movies</option>
+    <option ng-repeat="entry in videofiles" value="{{entry.fullpath}}">{{entry.filename | limitTo: 40}}{{entry.filename.length < 40 ? '' : '...'}}</option>
+</select>
+
+<input ng-if="arg.type == 'number'" id="input-{{arg.name}}" type="number" name="{{arg.name}}" min="{{arg.min}}" max="{{arg.max}}" step="{{arg.step}}" ng-model="argModel[arg.name]">
+
+<input ng-if="(arg.type == 'str' && arg.asknode == undefined && arg.options == undefined)" id="input-{{arg.name}}" type="text" name="{{arg.name}}" ng-model="argModel[arg.name]" ng-required="{{arg.required == 'required'}}">
+
+<select ng-if="(arg.type == 'str' && arg.asknode != undefined)" id="input-{{arg.name}}" ng-hide="arg.hidden" name="{{arg.name}}" ng-model="argModel[arg.name]" ng-required="{{arg.required == 'required'}}">
+    <option value="">-- choose {{arg.name}}{{arg.required == 'required' ? ' *' : ''}} --</option>
+    <option ng-repeat="entry in node[arg.asknode] | toArray | orderBy: 'name' " ng-if="entry.active" value="{{entry.name}}">{{entry.name}}</option>
+    <option ng-if="!(node[arg.asknode] | toArray).length" value="" disabled>No {{arg.name}} available</option>
+</select>
+
+<div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.required == 'required')" class="text-danger" ng-show="argIsMissing(argForm, arg.name)">
+    <small>{{arg.name}} is required</small>
+</div>
+
+<div ng-if="(arg.type == 'str' && arg.asknode != undefined && arg.name == 'database_to_append')" class="text-info" ng-show="!(node[arg.asknode] | toArray).length">
+    <small><i class="fa fa-info-circle"></i> No databases found for appending. Previous experiments may not be available or cached data may be loading.</small>
+    <br>
+    <small>
+        <span ng-if="database_status.loading"><i class="fa fa-spinner fa-spin"></i> {{getDatabaseStatusMessage()}}</span>
+        <span ng-if="!database_status.loading">{{getDatabaseStatusMessage()}}</span>
+        <button ng-if="!database_status.loading" type="button" class="btn btn-xs btn-default" ng-click="refreshDatabaseStatus()" style="margin-left: 5px;">
+            <i class="fa fa-refresh"></i> Refresh
+        </button>
+    </small>
+</div>
+
+<select ng-if="(arg.type == 'str' && arg.options != undefined)" id="input-{{arg.name}}" name="{{arg.name}}" ng-model="argModel[arg.name]">
+    <option value="">-- choose {{arg.name}} --</option>
+    <option ng-repeat="option in arg.options" value="{{option}}">{{option}}</option>
+</select>
+
+<select ng-if="arg.type == 'dropdown' && !arg.groups" id="input-{{arg.name}}" name="{{arg.name}}" ng-model="argModel[arg.name]">
+    <option value="">-- choose {{arg.description}} --</option>
+    <option ng-repeat="opt in arg.options" value="{{opt.value}}">{{opt.text}}</option>
+</select>
+
+<select ng-if="arg.type == 'dropdown' && arg.groups" id="input-{{arg.name}}" name="{{arg.name}}" ng-model="argModel[arg.name]">
+    <option value="">-- choose {{arg.description}} --</option>
+    <optgroup ng-repeat="group in arg.groups" label="{{group.label}}">
+        <option ng-repeat="opt in group.options" value="{{opt.value}}">{{opt.text}}</option>
+    </optgroup>
+</select>
+
+<!-- Toggle, matching the Machine Information modal. A `transform: scale()`d
+     checkbox does not resize its layout box, so no amount of margin lines it
+     up with its own label. -->
+<div ng-if="arg.type == 'boolean'" style="display: flex; align-items: center; justify-content: space-between; margin: 8px 0;">
+    <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}}</label>
+    <label class="switch" style="margin: 0;">
+        <input id="input-{{arg.name}}" type="checkbox" name="{{arg.name}}" ng-model="argModel[arg.name]"><span class="slider"></span>
+    </label>
+</div>
+
+<div ng-if="arg.type == 'date_range'" class="form-group">
+    <label for="input-drp-{{arg.name}}">{{arg.description}}</label>
+    <div class="input-group" style="margin-top: 5px;">
+        <input date-range-picker class="form-control date-picker" name="{{arg.name}}" id="input-drp-{{arg.name}}" type="text" ng-model="argModel[arg.name]" placeholder="Click to select start and end date/time" style="background-color: #f9f9f9; cursor: pointer; font-weight: 500;" options="dateRangeOptions">
+        <div class="input-group-append">
+            <span class="input-group-text" style="background-color: #337ab7; color: white; cursor: pointer;">
+                <i class="fa fa-clock"></i>
+            </span>
+        </div>
+    </div>
+    <small class="form-text text-muted" style="margin-top: 3px;">
+        Click to select start and end date/time
+    </small>
+</div>
+
+<div ng-if="arg.type == 'datetime'" class="input-group">
+    <input date-range-picker class="form-control date-picker" name="{{arg.name}}" id="input-{{arg.name}}" type="text" ng-model="argModel[arg.name]" options="{singleDatePicker: true, timePicker: true, timePicker24Hour : true, timePickerIncrement: 30, drops: up , autoApply : true , autoUpdateInput : true, locale: { format: 'YYYY-MM-DD HH:mm:ss' }}">
+    <div class="input-group-append">
+        <span class="input-group-text"><i class="fa fa-calendar"></i></span>
+    </div>
+</div>
