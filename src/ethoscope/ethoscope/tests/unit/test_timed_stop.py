@@ -58,16 +58,48 @@ class TestTimedStopDuration:
         assert stop.resolve(T0) is None
         assert stop.describe(T0) is False
 
-    def test_duration_resolves_relative_to_start(self):
-        stop = TimedStop(duration="01:02:30")
+    def test_the_fields_add_up(self):
+        stop = TimedStop(days=5, hours=6, minutes=30)
         assert stop.autostop is True
-        assert stop.resolve(T0) == T0 + 86400 + 2 * 3600 + 30 * 60
+        assert stop.resolve(T0) == T0 + 5 * 86400 + 6 * 3600 + 30 * 60
+
+    def test_minutes_alone_work(self):
+        # Short video recordings are a real case; this is how a two-minute one is said.
+        assert TimedStop(minutes=2).resolve(T0) == T0 + 120
+
+    def test_out_of_range_fields_are_summed_not_refused(self):
+        # Three labelled boxes cannot be misread the way a packed string can, so "36
+        # hours" means 36 hours rather than being an error.
+        assert TimedStop(hours=36).resolve(T0) == T0 + 36 * 3600
+
+    def test_numbers_arriving_as_strings_are_read(self):
+        assert (
+            TimedStop(days="2", hours="3", minutes="0").resolve(T0)
+            == T0 + 2 * 86400 + 3 * 3600
+        )
 
     def test_describe_returns_the_run_length(self):
-        assert TimedStop(duration="02:03:04").describe(T0) == "02:03:04"
+        assert TimedStop(days=2, hours=3, minutes=4).describe(T0) == "02:03:04"
+
+    @pytest.mark.parametrize(
+        "bad", [{"days": "x"}, {"hours": -1}, {"minutes": "later"}]
+    )
+    def test_malformed_fields_are_refused(self, bad):
+        with pytest.raises(TimedStopError):
+            TimedStop(**bad)
+
+
+class TestTimedStopLegacyDuration:
+    """Configurations saved before the duration became three numeric fields."""
+
+    def test_legacy_duration_string_still_starts(self):
+        assert (
+            TimedStop(duration="01:02:30").resolve(T0)
+            == T0 + 86400 + 2 * 3600 + 30 * 60
+        )
 
     def test_legacy_timer_field_still_starts(self):
-        # Configurations saved before this class was shared name the field "timer".
+        # Older still: the field was called "timer" before it was called "duration".
         assert TimedStop(timer="00:00:30").resolve(T0) == T0 + 1800
 
     def test_legacy_class_name_still_resolves(self):
@@ -77,7 +109,8 @@ class TestTimedStopDuration:
     @pytest.mark.parametrize(
         "bad", ["1:2", "aa:bb:cc", "00:25:00", "00:00:99", "-1:00:00", "1:2:3:4"]
     )
-    def test_malformed_duration_is_refused(self, bad):
+    def test_the_packed_string_keeps_its_stricter_parse(self, bad):
+        # Out of range is genuinely ambiguous in DD:HH:MM, unlike in labelled fields.
         with pytest.raises(TimedStopError):
             TimedStop(duration=bad)
 
@@ -93,7 +126,7 @@ class TestTimedStopAbsolute:
         assert TimedStop(stop_at=str(T0 + 500)).resolve(T0) == T0 + 500
 
     def test_absolute_beats_duration(self):
-        stop = TimedStop(duration="10:00:00", stop_at=str(T0 + 60))
+        stop = TimedStop(days=10, stop_at=str(T0 + 60))
         assert stop.resolve(T0) == T0 + 60
 
     def test_describe_measures_from_the_start(self):
@@ -124,13 +157,19 @@ class TestOptionExposure:
         offered = cls.user_options()["time_control"]
 
         assert [o["name"] for o in offered] == ["TimedStop"]
-        # Both modals render every one of these types today, so neither form breaks.
-        assert {a["type"] for a in offered[0]["arguments"]} == {"str"}
+        assert [a["name"] for a in offered[0]["arguments"]] == [
+            "days",
+            "hours",
+            "minutes",
+            "stop_at",
+        ]
+        # Both modals render every one of these types, so neither form breaks.
+        assert {a["type"] for a in offered[0]["arguments"]} == {"number", "str"}
 
     @pytest.mark.parametrize(
         "payload,expected",
         [
-            ({"name": "TimedStop", "arguments": {"duration": "01:00:00"}}, 86400),
+            ({"name": "TimedStop", "arguments": {"days": 1}}, 86400),
             # Saved by earlier versions, which named both the class and the field
             # differently. These configurations must still start.
             ({"name": "timedStop", "arguments": {"timer": "00:06:00"}}, 21600),
@@ -190,7 +229,7 @@ class TestAutostopHarness:
         assert ct._info["autostop"] is False
 
     def test_arming_reports_the_scheduled_stop(self):
-        ct = FakeControlThread(duration="01:00:00")
+        ct = FakeControlThread(days=1)
         ct._arm_autostop(time.time())
 
         assert ct._info["autostop_at"] == pytest.approx(time.time() + 86400, abs=5)
@@ -198,7 +237,7 @@ class TestAutostopHarness:
         assert ct._autostop_thread.daemon is True
 
     def test_a_malformed_stop_time_raises_at_arm(self):
-        ct = FakeControlThread(duration="not a duration")
+        ct = FakeControlThread(days="not a number")
         with pytest.raises(TimedStopError):
             ct._arm_autostop(T0)
 
@@ -262,10 +301,10 @@ class TestSetAutostop:
     """Changing the stop of an experiment that is already under way."""
 
     def test_a_duration_is_counted_from_now_not_from_the_start(self, fast_poll):
-        ct = FakeControlThread(duration="01:00:00")
+        ct = FakeControlThread(days=1)
         ct._arm_autostop(time.time() - 3600)  # started an hour ago
 
-        result = ct.set_autostop({"duration": "02:00:00"})
+        result = ct.set_autostop({"days": 2})
 
         # Two days from now, not two days from when the experiment began.
         assert result["autostop_at"] == pytest.approx(time.time() + 2 * 86400, abs=5)
@@ -281,7 +320,7 @@ class TestSetAutostop:
         assert ct._info["autostop_at"] == target
 
     def test_empty_data_cancels_the_stop(self, fast_poll):
-        ct = FakeControlThread(duration="01:00:00")
+        ct = FakeControlThread(days=1)
         ct._arm_autostop(time.time())
         assert ct._autostop_thread is not None
 
@@ -293,7 +332,7 @@ class TestSetAutostop:
 
     def test_it_does_not_stop_the_experiment(self, fast_poll):
         ct = FakeControlThread()
-        ct.set_autostop({"duration": "00:01:00"})
+        ct.set_autostop({"hours": 1})
 
         assert ct.stop_calls == 0
         assert not ct.stopped.is_set()
@@ -301,7 +340,7 @@ class TestSetAutostop:
     @pytest.mark.parametrize(
         "bad",
         [
-            {"duration": "not a duration"},
+            {"days": "not a number"},
             {"stop_at": "yesterday"},
             {"stop_at": "2000-01-01 00:00:00"},
         ],
@@ -309,7 +348,7 @@ class TestSetAutostop:
     def test_a_bad_request_leaves_the_existing_schedule_alone(self, bad, fast_poll):
         # The experiment is running. A typo in a reschedule must not silently drop the
         # stop the user already has, and must not stop the run either.
-        ct = FakeControlThread(duration="01:00:00")
+        ct = FakeControlThread(days=1)
         ct._arm_autostop(time.time())
         original = ct._info["autostop_at"]
         supervisor = ct._autostop_thread
@@ -323,7 +362,7 @@ class TestSetAutostop:
         assert ct.stop_calls == 0
 
     def test_the_rescheduled_stop_actually_fires(self, fast_poll):
-        ct = FakeControlThread(duration="09:00:00")
+        ct = FakeControlThread(days=9)
         ct._arm_autostop(time.time())
 
         ct.set_autostop({"stop_at": str(time.time() + 0.05)})
@@ -369,9 +408,9 @@ class TestSetAutostopDispatch:
         control = FakeControl(status=status)
         thread = listener(control)
 
-        result = thread.action("set_autostop", {"duration": "01:00:00"})
+        result = thread.action("set_autostop", {"days": 1})
 
-        assert control.calls == [{"duration": "01:00:00"}]
+        assert control.calls == [{"days": 1}]
         assert result["autostop_at"] == 1234.0
 
     @pytest.mark.parametrize("status", ["stopped", "initialising"])
@@ -379,7 +418,7 @@ class TestSetAutostopDispatch:
         control = FakeControl(status=status)
         thread = listener(control)
 
-        result = thread.action("set_autostop", {"duration": "01:00:00"})
+        result = thread.action("set_autostop", {"days": 1})
 
         assert isinstance(result, str) and result.startswith("ERROR:")
         assert control.calls == [], "the request reached a device with no experiment"

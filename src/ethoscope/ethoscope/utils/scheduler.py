@@ -445,53 +445,119 @@ class TimedStop(DescribedObject):
 
     _description = {
         "overview": "Stop the experiment automatically, so it does not have to be "
-        "stopped by hand. Either give a duration to run for, or a date and time to "
-        "stop at. Leave both blank to keep running until stopped manually. If both "
-        "are given, the stop date wins.",
+        "stopped by hand. Either say how long to run for, or give a date and time to "
+        "stop at. Leave it all at zero and blank to keep running until stopped "
+        "manually. If both are given, the stop date wins.",
         "arguments": [
             {
-                "type": "str",
-                "name": "duration",
-                "description": "Run for Days(DD):Hours(HH):Minutes(MM), or 00:00:00 to run until stopped by hand",
-                "default": "00:00:00",
+                "type": "number",
+                "name": "days",
+                "description": "Run for: days",
+                "default": 0,
+                "min": 0,
+                "max": 365,
+                "step": 1,
+            },
+            {
+                "type": "number",
+                "name": "hours",
+                "description": "Run for: hours",
+                "default": 0,
+                "min": 0,
+                "max": 23,
+                "step": 1,
+            },
+            {
+                "type": "number",
+                "name": "minutes",
+                "description": "Run for: minutes",
+                "default": 0,
+                "min": 0,
+                "max": 59,
+                "step": 1,
             },
             {
                 "type": "str",
                 "name": "stop_at",
-                "description": "Or stop at this date and time (YYYY-MM-DD HH:MM:SS), leave blank to ignore",
+                "description": "Or stop at this date and time (YYYY-MM-DD HH:MM), leave blank to ignore",
                 "default": "",
             },
         ],
     }
 
-    def __init__(self, duration="00:00:00", stop_at="", timer=None):
+    def __init__(
+        self, days=0, hours=0, minutes=0, stop_at="", duration=None, timer=None
+    ):
         """
         Args:
-            duration (str): How long to run for, as ``DD:HH:MM``. ``"00:00:00"``
-                means no automatic stop.
+            days (int): Whole days to run for.
+            hours (int): Hours to run for, on top of the days.
+            minutes (int): Minutes to run for, on top of the days and hours.
             stop_at (str|float): An absolute stop time, either a unix timestamp or a
-                ``YYYY-MM-DD HH:MM[:SS]`` string read in the device's local time.
-                Empty means no automatic stop. Takes precedence over ``duration``.
-            timer (str): Deprecated alias for ``duration``. Kept so experiment
-                configurations saved by earlier versions, which named this field
-                ``timer``, still start.
+                ``YYYY-MM-DD HH:MM`` string read in the device's local time. Empty
+                means no automatic stop. Takes precedence over the duration.
+            duration (str): Deprecated ``DD:HH:MM`` string. Kept so experiment
+                configurations saved by earlier versions still start.
+            timer (str): Deprecated alias for ``duration``, under its even earlier name.
 
         Raises:
-            TimedStopError: If either field is present but malformed.
+            TimedStopError: If any field is present but malformed.
         """
-        if timer is not None:
-            duration = timer
+        legacy = timer if timer is not None else duration
+        if legacy is not None:
+            # An old saved configuration. The packed DD:HH:MM string is ambiguous when
+            # a field is out of range, so it keeps its stricter parse; the numeric
+            # fields below simply add up.
+            self._countdown = self._parse_duration(legacy)
+            self.days, self.hours, self.minutes = 0, 0, 0
+        else:
+            self.days = self._whole_number(days, "days")
+            self.hours = self._whole_number(hours, "hours")
+            self.minutes = self._whole_number(minutes, "minutes")
+            self._countdown = self.days * 86400 + self.hours * 3600 + self.minutes * 60
 
-        self.duration = duration
+        self.duration = legacy
         self.stop_at = stop_at
-
-        self._countdown = self._parse_duration(duration)
         self._absolute = self._parse_stop_at(stop_at)
 
         # Reason: an experiment that is not meant to stop by itself is the common
-        # case, so it must be reachable by leaving the form alone. Both fields at
-        # their defaults means exactly that, rather than an error.
+        # case, so it must be reachable by leaving the form alone. Everything at its
+        # default means exactly that, rather than an error.
         self.autostop = self._absolute is not None or self._countdown > 0
+
+    @staticmethod
+    def _whole_number(value, field):
+        """
+        Read one of the duration fields.
+
+        The fields are summed rather than range-checked: three separately labelled
+        boxes cannot be misread the way a packed string can, so "36 hours" is taken to
+        mean 36 hours rather than being rejected for exceeding a day.
+
+        Args:
+            value: Whatever the form sent for this field.
+            field (str): Its name, for the error message.
+
+        Returns:
+            int: The value as a whole number.
+
+        Raises:
+            TimedStopError: If it is not a non-negative whole number.
+        """
+        if value is None or str(value).strip() == "":
+            return 0
+
+        try:
+            number = int(float(str(value).strip()))
+        except ValueError as e:
+            raise TimedStopError(
+                f"{field} must be a whole number, not {value!r}"
+            ) from e
+
+        if number < 0:
+            raise TimedStopError(f"{field} cannot be negative")
+
+        return number
 
     @staticmethod
     def _parse_duration(duration):

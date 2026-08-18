@@ -1433,8 +1433,8 @@
         $scope.ethoscope.open_autostop = function() {
             $scope.autostop_form.error = null;
             $scope.autostop_form.stop_at = $scope.device.autostop_at
-                ? moment.unix($scope.device.autostop_at).format('YYYY-MM-DD HH:mm:ss')
-                : moment().add(1, 'days').format('YYYY-MM-DD HH:mm:ss');
+                ? moment.unix($scope.device.autostop_at).format('YYYY-MM-DD HH:mm')
+                : moment().add(1, 'days').format('YYYY-MM-DD HH:mm');
             $("#autostopModal").modal('show');
         };
 
@@ -1482,10 +1482,13 @@
          * Apply the date and time typed into the modal.
          */
         $scope.ethoscope.apply_autostop = function() {
-            var parsed = moment($scope.autostop_form.stop_at, 'YYYY-MM-DD HH:mm:ss', true);
+            // Seconds are accepted but not asked for: nobody schedules the end of a
+            // multi-day experiment to the second.
+            var parsed = moment($scope.autostop_form.stop_at,
+                                ['YYYY-MM-DD HH:mm', 'YYYY-MM-DD HH:mm:ss'], true);
             if (!parsed.isValid()) {
                 $scope.autostop_form.error =
-                    'Could not read that date. Use YYYY-MM-DD HH:MM:SS.';
+                    'Could not read that date. Use YYYY-MM-DD HH:MM.';
                 return;
             }
             $scope.ethoscope.set_autostop(parsed.unix());

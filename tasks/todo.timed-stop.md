@@ -284,13 +284,51 @@ without root):
 Plus a static cross-check that every `ethoscope.*` binding in the template resolves to
 a controller function.
 
-### Stage 4 — verification
-- [ ] `python run_tests.py --package device` and `--package node`.
-- [ ] Manual: start a recording with a 2-minute duration on a real device, confirm it stops,
-      writes `recording.info`, and leaves no live timer thread.
-- [ ] Manual: start tracking with an absolute stop 2 minutes out, confirm clean stop, the DB
-      is finalised, and `stop_reason` reads `autostop`.
-- [ ] Manual: extend a running autostop from the UI and confirm the countdown updates.
+### Stage 4 — verification on real hardware  ✅ done 2026-08-18
+Run against **ETHOSCOPE_900** (192.168.4.137, imx219 camera) with a node served from this
+working tree. The device was moved onto the branch by fetching a git bundle over SSH into
+its own `/opt/ethoscope` — nothing was pushed anywhere public, and the original branch
+(`fix/222-decouple-exposure-from-maxfps` at `a2c27452`) is recorded for restoring it.
+
+- [x] Device suite and node suite pass.
+- [x] **Recording, 2-minute duration.** Armed a stop at 17:53:12, stopped itself at 17:53:16
+      (poll interval, not drift). `recording.info` carried
+      `"status": "completed", "stop_reason": "autostop"`, and a 30 MB `.h264` chunk was
+      written. No timer thread left behind.
+- [x] **Tracking, absolute stop.** `stop_at` sent as a unix timestamp, accepted verbatim,
+      ran, and stopped itself at 17:57:18 against a 17:57:17 target - one second. The run's
+      cache recorded `stopped_gracefully: True`, `stop_reason: autostop`.
+- [x] **Extend from the UI on a running experiment.** "+6 hours" moved the stop from
+      16:56:51 to 22:56:51 GMT through browser → node → device, without restarting the run.
+      This is the reporter's scenario.
+- [x] **Cancel from the UI.** Stop cleared, experiment kept running.
+- [x] **Schedule from scratch on a running experiment**, via the modal's own field.
+- [x] The node needed `set_autostop` in `ALLOWED_INSTRUCTIONS` - confirmed in the live path.
+
+### Stage 5 — interface revision after bench feedback  ✅ done 2026-08-18
+Giorgio, watching it run: seconds in the stop time are overkill, and the `DD:HH:MM`
+duration format "always bothered me" (his own original design).
+
+- [x] The duration is now **three number fields** - `days`, `hours`, `minutes` - instead of a
+      packed `DD:HH:MM` string. Self-describing, validated by the widget, nothing to parse,
+      and still able to express both a three-week experiment and a two-minute test recording.
+      Out-of-range values are summed rather than refused (36 hours means 36 hours): three
+      labelled boxes cannot be misread the way a packed string can.
+- [x] `stop_at` drops seconds: `YYYY-MM-DD HH:MM`. Minutes stay, because "stop at 09:30 on
+      Friday" is a real thing to want and costs nothing.
+- [x] The `DD:HH:MM` string survives as a **deprecated `duration`/`timer` kwarg** with its
+      original stricter parse, so configurations saved by earlier versions still start. It is
+      no longer offered in the form.
+- [x] Re-verified on the device: the recording modal renders three spinners with proper
+      ranges, and a run started from the real form with `minutes: 2` armed and fired correctly.
+
+**This is what Stage 3's partial extraction bought.** The revision needed `number` fields in
+the recording modal, which is exactly the class of argument that modal used to drop silently.
+
+### Remaining
+- [ ] Restore ETHOSCOPE_900 to `fix/222-decouple-exposure-from-maxfps` (`a2c27452`) and drop
+      the `test-timed-stop` branch, once the bench work is finished.
+- [ ] Squash the `wip: interface feedback` commit into the stage commits before this goes out.
 - [ ] Update `CLAUDE.md` / `README.md` if the option needs documenting.
 
 ## Discovered during work
