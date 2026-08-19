@@ -449,8 +449,11 @@ EOF
     pip3 install picamera2 --break-system-packages 2>/dev/null || true
 
     print_info "Installing systemd service files..."
-    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update}.service 2>/dev/null
-    ln -sf /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update}.service /usr/lib/systemd/system/
+    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update,ethoscope_camera_firstboot}.service 2>/dev/null
+    ln -sf /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update,ethoscope_camera_firstboot}.service /usr/lib/systemd/system/
+
+    # Camera-config helper (shared by step 12 and the first-boot service).
+    chmod +x /opt/ethoscope/accessories/configure_pi_camera.sh 2>/dev/null || true
 
     print_info "Creating ethoclient command line tool..."
     echo $'#!/bin/env bash\npython /opt/ethoscope/src/ethoscope/scripts/ethoclient.py $@' > /usr/bin/ethoclient
@@ -556,7 +559,7 @@ step_enable_system_services() {
     print_info "Enabling ethoscope services..."
     systemctl enable ethoscope_device.service ethoscope_listener.service \
         ethoscope_update.service ethoscope_GPIO_listener.service \
-        ethoscope_light.service
+        ethoscope_light.service ethoscope_camera_firstboot.service
 
     # pigpiod drives the PWM light backend where it exists. From Trixie onwards
     # it is absent and the daemon uses gpiozero/lgpio instead, which needs no
@@ -795,39 +798,24 @@ EOF
 step_configure_raspberry_pi_hardware() {
     print_info "Configuring hardware for $PI_MODEL..."
 
-    echo 'dtoverlay=disable-bt' >> "$BOOTCFG"
-    echo 'hdmi_force_hotplug=1' >> "$BOOTCFG"
-    echo 'dtparam=i2c_arm=on' >> "$BOOTCFG"
-    echo 'i2c-dev' >> /etc/modules-load.d/raspberrypi.conf
-    echo 'disable_camera_led=1' >> "$BOOTCFG"
+    # Model-agnostic hardware config. Idempotent so re-running --step 12 (or the
+    # reset path) never double-appends.
+    local line
+    for line in 'dtoverlay=disable-bt' 'hdmi_force_hotplug=1' \
+                'dtparam=i2c_arm=on' 'disable_camera_led=1'; do
+        grep -qxF "$line" "$BOOTCFG" 2>/dev/null || echo "$line" >> "$BOOTCFG"
+    done
+    grep -qxF 'i2c-dev' /etc/modules-load.d/raspberrypi.conf 2>/dev/null || \
+        echo 'i2c-dev' >> /etc/modules-load.d/raspberrypi.conf
 
-    case "$PI_MODEL" in
-        pi2|pi3)
-            print_info "Configuring legacy camera (Pi 2/3)..."
-            echo 'start_file=start_x.elf' >> "$BOOTCFG"
-            echo 'fixup_file=fixup_x.dat' >> "$BOOTCFG"
-            echo 'gpu_mem=256' >> "$BOOTCFG"
-            echo 'cma_lwm=' >> "$BOOTCFG"
-            echo 'cma_hwm=' >> "$BOOTCFG"
-            echo 'cma_offline_start=' >> "$BOOTCFG"
-            echo 'awb_auto_is_greyworld=1' >> "$BOOTCFG"
-            echo 'bcm2835-v4l2' > /etc/modules-load.d/picamera.conf
-            ;;
-        pi4|pi5)
-            print_info "Configuring camera for Pi ${PI_MODEL#pi}..."
-            echo 'dtoverlay=vc4-kms-v3d' >> "$BOOTCFG"
-            echo 'gpu_mem=256' >> "$BOOTCFG"
-            echo 'dtoverlay=imx219' >> "$BOOTCFG"
-            ;;
-        *)
-            print_info "Using basic camera configuration..."
-            echo 'gpu_mem=128' >> "$BOOTCFG"
-            echo 'dtoverlay=imx219' >> "$BOOTCFG"
-            ;;
-    esac
-
-    echo 'camera_auto_detect=1' >> "$BOOTCFG"
-    echo 'dtparam=camera=on' >> "$BOOTCFG"
+    # Camera config is model-specific (legacy firmware camera on Pi 2/3 vs
+    # KMS/libcamera on Pi 4/5) and is written into a managed block by
+    # configure_pi_camera.sh — the SAME script ethoscope_camera_firstboot.service
+    # runs on every boot. So this image auto-corrects its camera the first time
+    # it is flashed onto a different Pi model, and one image serves 2/3/4/5.
+    print_info "Writing camera config for $PI_MODEL (managed block)..."
+    bash /opt/ethoscope/accessories/configure_pi_camera.sh \
+        --model "$PI_MODEL" --config "$BOOTCFG" || true
 
     print_success "Hardware configured for $PI_MODEL"
 }
