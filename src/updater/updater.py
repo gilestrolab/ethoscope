@@ -12,6 +12,46 @@ class DeviceUpdateError(Exception):
     pass
 
 
+def ensure_fetch_refspec(repo: Repo, remote_name: str = "origin") -> bool:
+    """
+    Ensure `remote.<remote_name>.fetch` maps every remote head to a tracking ref.
+
+    Without this config entry `git fetch` still exits 0 but updates nothing under
+    refs/remotes/, leaving the tracking refs frozen at whatever they last were. Any
+    comparison against them then silently reports stale information.
+
+    :param repo: The repository whose config should be checked.
+    :param remote_name: Name of the remote to configure (default is 'origin').
+
+    Returns:
+        bool: True if the refspec was already correct, False if it had to be added.
+
+    Raises:
+        Exception: propagated from git if the config could not be read or written.
+    """
+    wanted = f"+refs/heads/*:refs/remotes/{remote_name}/*"
+
+    fetch_refspecs = None
+    try:
+        fetch_refspecs = repo.config_reader().get_value(
+            f'remote "{remote_name}"', "fetch", default=None
+        )
+    except Exception as e:
+        # Handle cases where 'fetch' option might not exist at all
+        logging.debug(f"'fetch' option not found for remote '{remote_name}': {e}")
+
+    if fetch_refspecs and wanted in str(fetch_refspecs):
+        logging.debug(f"Fetch refspec for remote '{remote_name}' is already set.")
+        return True
+
+    logging.info(
+        f"Fetch refspec for remote '{remote_name}' is missing or narrowed "
+        f"({fetch_refspecs!r}); setting it to '{wanted}'."
+    )
+    repo.config_writer().set_value(f'remote "{remote_name}"', "fetch", wanted).release()
+    return False
+
+
 class DeviceUpdater:
     """
     A class to manage and update a device's Git repository.
@@ -61,6 +101,16 @@ class DeviceUpdater:
                 f"Remote '{self._remote_name}' not found in the repository."
             ) from None
 
+        # A missing fetch refspec does not stop the device from working, so repair it
+        # if we can and carry on if we cannot.
+        try:
+            ensure_fetch_refspec(self._working_repo, self._remote_name)
+        except Exception as e:
+            logging.warning(
+                f"Could not repair the fetch refspec for remote "
+                f"'{self._remote_name}': {e}"
+            )
+
     def get_local_and_origin_commits(self) -> tuple[Repo.commit, Repo.commit]:
         """
         Retrieves the latest commits from the local repository and the origin.
@@ -68,10 +118,27 @@ class DeviceUpdater:
         :return: A tuple containing the local commit and the origin commit.
         """
         try:
-            self._remote.fetch()
+            active_branch = str(self._working_repo.active_branch)
+
+            # Reason: a bare `fetch()` relies on remote.<name>.fetch being configured.
+            # Where it is missing the fetch still succeeds but never writes
+            # refs/remotes/<remote>/<branch>, so that ref stays frozen -- often at the
+            # very commit HEAD is on -- and the device ends up comparing itself against
+            # a stale mirror of itself and reporting that it is up to date forever.
+            # An explicit refspec both refreshes the tracking ref and hands back the
+            # commit that was actually fetched.
+            refspec = (
+                f"+refs/heads/{active_branch}:"
+                f"refs/remotes/{self._remote_name}/{active_branch}"
+            )
+            fetch_info = self._remote.fetch(refspec=refspec)
+
             local_commit = self._working_repo.commit()
-            active_branch = self._working_repo.active_branch
-            origin_commit = self._remote.refs[str(active_branch)].commit
+            origin_commit = (
+                fetch_info[0].commit
+                if fetch_info
+                else self._remote.refs[active_branch].commit
+            )
             logging.debug(
                 f"Local commit: {local_commit.hexsha}, Origin commit: {origin_commit.hexsha}"
             )
@@ -331,37 +398,7 @@ class BareRepoUpdater:
         This is crucial for bare repositories to properly fetch all branches.
         """
         try:
-            # Check if the fetch refspec is already set
-            fetch_refspecs = None
-            try:
-                fetch_refspecs = self._working_repo.config_reader().get_value(
-                    f'remote "{self._remote_name}"', "fetch", default=None
-                )
-            except Exception as e:
-                # Handle cases where 'fetch' option might not exist at all
-                logging.debug(
-                    f"'fetch' option not found for remote '{self._remote_name}': {e}"
-                )
-
-            if (
-                fetch_refspecs
-                and "+refs/heads/*:refs/remotes/origin/*" in fetch_refspecs
-            ):
-                logging.info(
-                    f"Fetch refspec for remote '{self._remote_name}' is already set."
-                )
-                return
-
-            # If not set, add it
-            logging.info(f"Adding fetch refspec for remote '{self._remote_name}'.")
-            self._working_repo.config_writer().set_value(
-                f'remote "{self._remote_name}"',
-                "fetch",
-                "+refs/heads/*:refs/remotes/origin/*",
-            ).release()
-            logging.info(
-                f"Successfully added fetch refspec for remote '{self._remote_name}'."
-            )
+            ensure_fetch_refspec(self._working_repo, self._remote_name)
         except Exception as e:
             logging.error(
                 f"Failed to ensure fetch refspec for remote '{self._remote_name}': {e}"
