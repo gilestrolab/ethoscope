@@ -1,22 +1,5 @@
 {
-    "images": [{
-            "title": "Ethoscope000 for PI3",
-            "filename": "20260819_ethoscope000_PI3.img.zip",
-            "url": "https://imperialcollegelondon.box.com/shared/static/xtsd9c80apcwi2pykyc5zu34xq28lzvn.zip",
-            "date": "19 Aug 2026",
-            "md5sum": "934131a353f8572edbb418548831737a",
-            "SDsize": "32Gb",
-            "tested_on": "SD"
-        },
-        {
-            "title": "Ethoscope000 for PI4",
-            "filename": "20260511_ethoscope000_PI4.img.zip",
-            "url": "https://imperialcollegelondon.box.com/shared/static/vp4pjpb4ws2fmd582ojblndj0lr9gzwt.zip",
-            "date": "11 May 2026",
-            "md5sum": "2a5f185912c833cb446e71ecdd77bbea",
-            "SDsize": "32Gb",
-            "tested_on": "SD"
-        },
+    "images": [
         {
             "title": "Ethoscope Node, LiveCD",
             "filename": "manjaro-ethoscope-25.1.0-minimal-251014-linux66.iso",
@@ -25,9 +8,8 @@
             "md5sum": "19dfc2ce6728d733cc7194f045d2887d"
         }
     ],
-
-
-    "gcodes": [{
+    "gcodes": [
+        {
             "filename": "CE3PRO_1_etho_v1.8_LIGHT_BOX_WITH_STRIP_2x.gcode",
             "url": "https://github.com/gilestrolab/ethoscope/tree/dev/accessories/3D_printed_files",
             "prints": "Light box with strip",
@@ -57,9 +39,9 @@
             "prints": "SSD adapter - mounts on wall stabilizers",
             "material": "PLA - CE3PRO"
         }
-
     ],
-    "onshape": [{
+    "onshape": [
+        {
             "name": "Upper case and lid - RPI3",
             "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/d228e2116a5933cf39312517"
         },
@@ -83,7 +65,6 @@
             "name": "SSD mounting plate",
             "url": "https://cad.onshape.com/documents/1166d5bbca939d2544d087f1/w/d50990341370df72c14403d2/e/7a6406ee502010e636557252"
         }
-
     ],
     "gcodes_zip": {
         "filename": "ethoscope_gcodes_v1.8.zip",
