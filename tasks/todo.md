@@ -485,8 +485,10 @@ only at import time — so the deployed copy on `ctb.gilest.ro` had already drif
       bind-mounted read-only into `repo.ethoscope` (old compose kept as
       `docker-compose.yml.bak`). Verified end to end with a miniature test image: HTTPS 200,
       correct md5, range requests honoured, directory listing works; test file then removed.
-- [ ] Deploy the new `pa_server.py`: push `dev`, then on `ctb` reset the drifted clone,
-      `git pull`, `docker compose up -d --build` in `Docker/resource_server`. Until then the
-      resources page still serves the box.com list from `links.json`.
+- [x] `pa_server.py` deployed: `dev` pushed, the drifted clone reset and pulled, resource
+      server rebuilt (healthy). Verified live — a published manifest appears first in
+      `/resources` with its size, `/latest_sd_image/pi3|pi4` follows it, and deleting the
+      manifest instantly reverts to the previous entry with no restart. The remaining
+      box.com entries still resolve, their models parsed from the `_PI3`/`_PI4` filenames.
 - [ ] `--zerofree` could not be executed here (loop devices need sudo); the rest of the
       pipeline was verified end to end against a miniature test image.
