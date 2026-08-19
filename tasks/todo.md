@@ -563,3 +563,53 @@ ETHOSCOPE_391 was actually in this state (running 13b7f78, disk 7820b89), so thi
   it treats a `None` default as "no default given".
 - [ ] After deploying, confirm the five devices flip to Outdated and that 312/361/380/390
       answer `check_update` instead of erroring.
+
+## The fix could not reach the devices that needed it (2026-08-19)
+
+Devices whose fetch refspec was broken kept reporting themselves up to date, so they
+were never selected for an update -- and the update was the only thing that would have
+repaired the refspec. The fault suppressed its own fix, and 358, 361, 363 and 380 sat
+green on April/May commits through three rounds of updating everything else.
+
+The device's reported HEAD is reliable; only its conclusion is not. The node's bare repo
+at /srv/git/ethoscope.git is literally what devices pull from
+(`git remote set-url origin git://node.local/ethoscope.git`, install_ethoscope_debian.sh:431),
+so the node has everything it needs to answer the question itself.
+
+- [x] `BareRepoUpdater.branch_tip()` and `.is_current(sha, branch, monitored_paths)` --
+      decide from the node's mirror, applying the same monitored-paths rule the device
+      used to apply. Returns None when undecidable (unknown branch, or a commit the node
+      has never seen), so the device's own answer survives where the node cannot improve
+      on it.
+- [x] `judge_devices_locally()` runs over the map at the end of `/devices`, overwriting
+      `up_to_date` and `origin_commit`. Falls back to the running `version` when
+      check_update could not answer at all -- a lower bound, but enough to know the code
+      being executed is stale.
+- [x] `monitored_paths(for_node=)` so the node can ask about a device rather than about
+      itself; the dict lifts to a module constant.
+- [x] Module-level defaults for `is_node` / `bare_repo_updater` / `device_id` /
+      `ethoscope_updater`, so update_server can be imported and tested without starting
+      a server.
+- [x] `tests/test_node_side_verdict.py`: 12 tests over a real bare repo, including the
+      ETHOSCOPE_358 shape end to end.
+
+### Also fixed this round
+
+- [x] Discovery dropped any device that missed a 2s probe (`if id is None: continue`) --
+      no row, no log. Now seeded from the node's own id/name knowledge, probed with 5s,
+      retried once after 4s (a device mid-update is restarting the very server being
+      probed), and listed as Unreachable if still silent. `_probe_devices()` +
+      `_enrich_device_map()` replace four copies of the same fan-out loop.
+- [x] Frontend `is_listed()` replaces the `status == 'stopped'` row filter, so
+      unreachable and software-broken devices are visible rather than implicitly fine.
+
+### Open
+
+- [ ] `[Restart Required]` lags one update behind on some devices. The running version
+      does advance, so the listener is restarting -- the open question is whether it is
+      merely slower than the scan or whether `reload_device_daemon()` is losing a step.
+      Needs `journalctl -u ethoscope_update` and `systemctl show ethoscope_listener -p
+      ActiveEnterTimestamp` from a device to settle; do not theorise further without it.
+- [ ] `/bare/update` and `/devices` are fired in parallel by the frontend. The verdict
+      reads the bare repo at the end of `/devices`, by which point the fetch has
+      finished in practice, but nothing enforces it.

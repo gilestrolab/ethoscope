@@ -631,6 +631,79 @@ class BareRepoUpdater:
         # Update all visible branches after discovery attempt
         return self.update_all_visible_branches()
 
+    def branch_tip(self, branch: str):
+        """
+        The commit a device would land on if it pulled `branch` from this node.
+
+        :param branch: Branch name, e.g. 'dev'.
+
+        Returns:
+            git.Commit | None: the branch head, or None if this repo has no such branch.
+        """
+        try:
+            return self._working_repo.commit(branch)
+        except Exception:
+            logging.debug(f"Branch '{branch}' is not known to the bare repository.")
+            return None
+
+    def is_current(
+        self, commit_sha: str, branch: str, monitored_paths: list[str] | None = None
+    ) -> tuple[bool | None, object]:
+        """
+        Judge, from this repository, whether a device sitting on `commit_sha` is current.
+
+        A device's own verdict cannot be trusted. One whose fetch refspec is broken
+        compares its HEAD against a tracking ref that never refreshes, reports itself
+        up to date forever, and is therefore never offered the update that would repair
+        it -- the fault suppresses its own fix. What the device reports as its HEAD is
+        reliable; what it concludes from it is not, so the conclusion is drawn here
+        instead. This repo is also exactly what the device pulls from, which makes it
+        the right yardstick rather than merely a convenient one.
+
+        :param commit_sha: the commit the device says it is on.
+        :param branch: the branch the device tracks.
+        :param monitored_paths: only changes under these paths count as needing an
+            update; None means any change counts.
+
+        Returns:
+            tuple: (up_to_date, tip_commit). up_to_date is None when the question
+            cannot be answered here -- an unknown branch, or a commit this repository
+            has never seen.
+        """
+        tip = self.branch_tip(branch)
+        if tip is None:
+            return None, None
+
+        try:
+            # Reason: `commit()` builds a lazy object and happily accepts a sha that
+            # does not exist, so ask git to verify it before drawing any conclusion --
+            # otherwise an unknown commit surfaces as a crash inside the diff below.
+            self._working_repo.git.rev_parse(f"{commit_sha}^{{commit}}", verify=True)
+            local = self._working_repo.commit(commit_sha)
+
+            if local.hexsha == tip.hexsha:
+                return True, tip
+
+            if not monitored_paths:
+                return False, tip
+
+            diffs = local.diff(tip)
+        except Exception:
+            logging.warning(
+                f"Commit {commit_sha} could not be compared against '{branch}' in the "
+                "bare repository; leaving the device's own verdict alone."
+            )
+            return None, tip
+
+        for diff_item in diffs:
+            for path in (diff_item.a_path, diff_item.b_path):
+                if path and any(
+                    path == mp or path.startswith(mp + "/") for mp in monitored_paths
+                ):
+                    return False, tip
+
+        return True, tip
+
     def fetch_all_refs(self) -> None:
         """
         Fetches all references from the remote repository to discover new branches.

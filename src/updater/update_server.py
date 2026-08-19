@@ -37,14 +37,24 @@ ACTION_RESTART_DAEMON = "restart_daemon"
 ACTION_CHANGE_BRANCH = "change_branch"
 
 
-def monitored_paths():
-    """Get the monitored paths based on device type"""
-    MONITORED_PATHS = {
-        "NODE": ["src/node", "services", "src/updater", "accessories"],
-        "ETHOSCOPE": ["src/ethoscope", "services", "src/updater", "accessories"],
-    }
+MONITORED_PATHS = {
+    "NODE": ["src/node", "services", "src/updater", "accessories"],
+    "ETHOSCOPE": ["src/ethoscope", "services", "src/updater", "accessories"],
+}
 
-    return MONITORED_PATHS["NODE"] if is_node else MONITORED_PATHS["ETHOSCOPE"]
+
+def monitored_paths(for_node=None):
+    """
+    Get the paths whose changes make an update worth doing.
+
+    :param for_node: whether to answer for a node. Defaults to this machine's own
+        role; pass False to ask about a device from the node, which is what the node
+        does when judging the ethoscopes it manages.
+    """
+    if for_node is None:
+        for_node = is_node
+
+    return MONITORED_PATHS["NODE"] if for_node else MONITORED_PATHS["ETHOSCOPE"]
 
 
 def _schedule_restart(delay=5):
@@ -193,6 +203,13 @@ def process_device_restart(device):
 
 app = bottle.Bottle()
 STATIC_DIR = "./static"
+
+# Set for real in __main__ once the command line has been parsed. Declared here so the
+# module can be imported -- and its routing logic tested -- without starting a server.
+is_node = False
+device_id = None
+bare_repo_updater = None
+ethoscope_updater = None
 
 ##################
 # Bottle framework
@@ -370,11 +387,48 @@ def node_info():  # , device):
         return {"error": traceback.format_exc()}
 
 
+def judge_devices_locally(devices_map):
+    """
+    Re-decide `up_to_date` for every device from the node's own bare repository.
+
+    Devices used to be taken at their word, which fails in the one case that matters:
+    a device whose fetch refspec is broken compares its HEAD against a tracking ref
+    that never refreshes and so reports itself up to date indefinitely. It is then
+    never offered an update, and the update is the only thing that would repair it.
+
+    Its reported HEAD is trustworthy, and the node's bare repo is literally what the
+    device pulls from, so the node can settle the question without asking. Where the
+    node cannot decide -- an unknown branch, or a commit it has never seen -- the
+    device's own answer is left in place.
+    """
+    if bare_repo_updater is None:
+        return
+
+    device_paths = monitored_paths(for_node=False)
+
+    for device in devices_map.values():
+        branch = device.get("active_branch")
+        # local_commit is the device's HEAD as reported by check_update; version is the
+        # commit its running process started from, and is all we have when check_update
+        # could not answer at all.
+        reported = (device.get("local_commit") or device.get("version") or {}).get("id")
+        if not branch or not reported:
+            continue
+
+        up_to_date, tip = bare_repo_updater.is_current(reported, branch, device_paths)
+
+        if tip is not None:
+            device["origin_commit"] = get_commit_version(tip)
+        if up_to_date is not None:
+            device["up_to_date"] = up_to_date
+
+
 @app.get("/devices")
 def scan_subnet():
     try:
         assert_node(is_node)
         devices_map = generate_new_device_map()
+        judge_devices_locally(devices_map)
         return devices_map
 
     except Exception:
@@ -631,7 +685,7 @@ if __name__ == "__main__":
         action="store_true",
     )
 
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
 
     if not options.local_repo:
         raise Exception(
