@@ -221,11 +221,14 @@ op_universalize() {
   echo "    config.txt migrated to the managed camera block (model=pi3)"
   echo "    first boot on a Pi 4/5 will auto-swap the block and reboot once"
 
-  # The image now serves every model, so drop the per-model tag from its name.
+  # The image serves several models now, so retag its name with the models it
+  # supports (pigpio light PWM covers Pi 2/3/4; the Pi 5 has no pigpio). Collapse
+  # any trailing _piN chain to _pi2_pi3_pi4, so re-running is idempotent rather
+  # than stacking tokens.
   local namef="$root/etc/sdimagename" cur new
   if [[ -f "$namef" ]]; then
     cur=$(<"$namef"); cur=${cur//$'\n'/}
-    new=$(printf '%s' "$cur" | sed -E 's/_[Pp][Ii][0-9]+/_universal/')
+    new=$(printf '%s' "$cur" | sed -E 's/(_[Pp][Ii][0-9]+)+(\.img)?$/_pi2_pi3_pi4\2/')
     if [[ "$new" != "$cur" ]]; then
       printf '%s\n' "$new" > "$namef"
       echo "    /etc/sdimagename: '$cur' -> '$new'"
