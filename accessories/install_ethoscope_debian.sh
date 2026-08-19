@@ -15,6 +15,7 @@
 #   sudo ./install_ethoscope_debian.sh --from 3     # Resume from step 3
 #   sudo ./install_ethoscope_debian.sh --step 5     # Run only step 5
 #   sudo ./install_ethoscope_debian.sh --reset      # Reset device to ETHOSCOPE_000 defaults
+#   sudo ./install_ethoscope_debian.sh --prepare-image  # Sanitise for public .img capture
 #   sudo ./install_ethoscope_debian.sh --list       # List all steps
 #   sudo ./install_ethoscope_debian.sh --help       # Show this help
 #
@@ -123,6 +124,7 @@ show_help() {
     echo "  --from N        Resume installation from step N"
     echo "  --step N        Run only step N"
     echo "  --reset         Reset device to ETHOSCOPE_000 defaults"
+    echo "  --prepare-image Sanitise this device for public .img capture"
     echo "  --list          List all installation steps"
     echo "  --help          Show this help message"
     echo ""
@@ -938,6 +940,72 @@ do_reset() {
 }
 
 #===============================================================================
+# PREPARE FOR IMAGING
+#===============================================================================
+# Sanitise a configured card so it can be captured as a distributable .img.
+# Everything here was learned making the first Trixie public image (2026-08):
+#
+#  * SSH host keys are per-device. Baked into an image, every flashed device
+#    would share them — a security hole and an endless stream of host-key
+#    mismatch warnings. Delete them; sshd-keygen.service and
+#    regenerate_ssh_host_keys.service (both enabled on the RPi/Trixie image)
+#    mint fresh, unique keys on first boot.
+#
+#  * DO **NOT** blank /etc/machine-id. systemd reads an empty machine-id as
+#    ConditionFirstBoot=yes, which can fire first-boot units that block on a
+#    console the headless device doesn't have — i.e. a hung first boot. A shared
+#    base machine-id is harmless here: the ethoscope regenerates its own when it
+#    is renamed from ETHOSCOPE_000 to a real device number. So we only guarantee
+#    a valid, NON-EMPTY machine-id and otherwise leave it alone.
+#
+#  * Drop install logs, shell history, stale ssh known_hosts, package/pip caches
+#    and the journal so the image is clean and as small as possible before
+#    ethoscope-image.sh --shrink runs on the captured file.
+#
+# After this: power off cleanly (sudo poweroff — never pull power), capture the
+# card (dd / rpi-imager), then finish on the .img with:
+#     sudo ./ethoscope-image.sh --rename --shrink path/to/image.img
+prepare_image() {
+    check_root
+    print_header
+    print_info "Preparing this device for image capture..."
+
+    print_info "Removing install artefacts, shell history and known_hosts..."
+    rm -f /home/ethoscope/install*.log /home/ethoscope/install_ethoscope_debian.sh
+    rm -f /home/ethoscope/.bash_history /root/.bash_history
+    rm -f /home/ethoscope/.ssh/known_hosts /root/.ssh/known_hosts
+    clear_progress
+
+    print_info "Deleting SSH host keys (regenerated uniquely on first boot)..."
+    rm -f /etc/ssh/ssh_host_*
+
+    # Guarantee a valid machine-id, but never an empty one (see header note).
+    if [[ ! -s /etc/machine-id ]]; then
+        print_warning "machine-id was empty — regenerating (an empty one can hang first boot)"
+        systemd-machine-id-setup
+    fi
+    print_info "Leaving machine-id intact: $(cat /etc/machine-id)"
+
+    reset_clean_package_cache
+    rm -rf /root/.cache/pip /home/ethoscope/.cache/pip
+
+    print_info "Vacuuming the systemd journal..."
+    journalctl --rotate >/dev/null 2>&1 || true
+    journalctl --vacuum-time=1s >/dev/null 2>&1 || true
+
+    echo ""
+    echo -e "${GREEN}===============================================${NC}"
+    echo -e "${GREEN} Device ready for image capture${NC}"
+    echo -e "${GREEN}===============================================${NC}"
+    echo ""
+    echo -e "  Next:"
+    echo -e "    1. ${BOLD}sudo poweroff${NC}   (clean shutdown — never pull power)"
+    echo -e "    2. Capture the card, e.g. ${BOLD}dd if=/dev/mmcblkX of=ethoscope.img bs=4M${NC}"
+    echo -e "    3. ${BOLD}sudo ./ethoscope-image.sh --rename --shrink ethoscope.img${NC}"
+    echo ""
+}
+
+#===============================================================================
 # STEP DISPATCHER
 #===============================================================================
 
@@ -1009,6 +1077,10 @@ main() {
                 ;;
             --reset)
                 do_reset
+                exit 0
+                ;;
+            --prepare-image|--prepare)
+                prepare_image
                 exit 0
                 ;;
             --apt-install)
