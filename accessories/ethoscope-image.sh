@@ -220,6 +220,17 @@ op_universalize() {
     bash "$helper" --model pi3 --config "$cfg" || true
   echo "    config.txt migrated to the managed camera block (model=pi3)"
   echo "    first boot on a Pi 4/5 will auto-swap the block and reboot once"
+
+  # The image now serves every model, so drop the per-model tag from its name.
+  local namef="$root/etc/sdimagename" cur new
+  if [[ -f "$namef" ]]; then
+    cur=$(<"$namef"); cur=${cur//$'\n'/}
+    new=$(printf '%s' "$cur" | sed -E 's/_[Pp][Ii][0-9]+/_universal/')
+    if [[ "$new" != "$cur" ]]; then
+      printf '%s\n' "$new" > "$namef"
+      echo "    /etc/sdimagename: '$cur' -> '$new'"
+    fi
+  fi
 }
 
 op_rename() {
