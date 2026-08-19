@@ -492,3 +492,74 @@ only at import time — so the deployed copy on `ctb.gilest.ro` had already drif
       box.com entries still resolve, their models parsed from the `_PI3`/`_PI4` filenames.
 - [ ] `--zerofree` could not be executed here (loop devices need sudo); the rest of the
       pipeline was verified end to end against a miniature test image.
+
+## Updater table reported "Up to Date" for devices months behind (2026-08-19)
+
+**Root cause: a frozen remote-tracking ref.** `get_local_and_origin_commits()` called a
+bare `self._remote.fetch()` and then read `origin_commit` off
+`refs/remotes/origin/<branch>`. A bare fetch relies on `remote.origin.fetch` being
+configured; where that entry is missing or narrowed, `git fetch` still exits 0 but writes
+nothing under `refs/remotes/`. The tracking ref then stays frozen -- in every affected
+case at the device's own HEAD -- so the device compared itself against a stale mirror of
+itself and reported up_to_date forever.
+
+Confirmed against prod `/devices`: ETHOSCOPE_224, _310, _311, _358 and _363 all had
+`origin_commit` byte-identical to `local_commit`, on commits from 2026-04-28 to
+2026-07-01, while devices whose fetch worked correctly reported `origin_commit` =
+`7820b89`. `DeviceUpdater` never called `_ensure_fetch_refspec()` -- only
+`BareRepoUpdater` (the node) did, which is why the node itself was never affected.
+
+Where the refspec was absent entirely, GitPython's `fetch()` raises
+`AssertionError: Remote 'origin' has no refspec set`, so `check_update` returned an error
+and `up_to_date` was simply missing. Those devices (312, 361, 380, 390) then failed the
+`up_to_date == false` row filter and vanished from the table altogether -- they could not
+be selected for an update at all.
+
+- [x] `updater.py`: `ensure_fetch_refspec()` lifted out of `BareRepoUpdater` to module
+      level and now called from `DeviceUpdater.__init__` too (non-fatally -- a device
+      with an unwritable config should still answer). Returns whether it had to repair.
+- [x] `updater.py`: `get_local_and_origin_commits()` fetches an explicit
+      `+refs/heads/<branch>:refs/remotes/<remote>/<branch>` refspec and takes the commit
+      from the returned `FetchInfo`. This refreshes the tracking ref, gives an
+      authoritative answer even if it did not, and sidesteps the `_assert_refspec`
+      crash (GitPython only asserts when `refspec` is None).
+- [x] `tests/test_updater_stale_tracking_ref.py`: six tests over real temporary git
+      repos. Verified they fail on the unfixed code with exactly the prod signature
+      (`assert '128392e...' != '128392e...'`) and pass after.
+
+### Secondary: the version column and the badge measured different things
+
+- `device.version` <- `/data/<id>` (port 9000) -> the listener's `GIT_VERSION`, which
+  `device_listener.py:338` snapshots **once at process start** and reuses for every
+  `ControlThread` it spawns.
+- `device.up_to_date` <- `/device/check_update/<id>` (port 8888) -> the checkout on disk.
+
+A device pulled but never restarted shows an old version with a current disk. Only
+ETHOSCOPE_391 was actually in this state (running 13b7f78, disk 7820b89), so this was
+*not* the cause of the reported symptom -- but it is real and was invisible.
+
+- [x] `script.js`: single `device_state()` classifier -- `unknown` / `outdated` /
+      `stale` / `current` -- with `state_label()`, `state_color()`, `needs_action()`, so
+      the three places that render the badge cannot drift apart.
+- [x] `index.html`: badge routed through those helpers; the version cell shows the
+      on-disk commit under the running one when they differ; row filter uses
+      `needs_action()` so `[Unknown]` devices are no longer hidden.
+- [x] `main.css`: `.color-grey` added, pulse extended to `.color-yellow`.
+- [x] `helpers.py`: `update_dev_map_wrapped()` takes a `timeout`; `check_update` gets 45s
+      instead of 10s, since the device runs a live `git fetch` to answer it.
+- [x] Verified by rendering the real page in headless Chrome against a stub reproducing
+      the prod table: all four states render with the right colour, and the default view
+      lists exactly the stopped devices needing attention.
+
+### Discovered during work
+
+- `GIT_VERSION` is also stamped into every experiment's metadata, so a device pulled
+  without a restart records the wrong version into its result databases too.
+- `update_active_branch()` uses `self._remote.pull()`, which with a broken refspec merges
+  FETCH_HEAD and advances HEAD without updating the tracking ref -- ETHOSCOPE_391's exact
+  state (disk 7820b89, tracking ref still 13b7f78). Repairing the refspec in
+  `__init__` fixes this path too.
+- GitPython's `config_reader().get_value(section, option, default=None)` still raises:
+  it treats a `None` default as "no default given".
+- [ ] After deploying, confirm the five devices flip to Outdated and that 312/361/380/390
+      answer `check_update` instead of erroring.

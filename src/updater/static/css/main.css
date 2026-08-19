@@ -151,6 +151,10 @@ header {
     color: var(--deep-purple) !important;
 }
 
+.color-grey {
+    color: var(--warm-gray) !important;
+}
+
 /* Button Styling */
 .btn {
     border-radius: 6px;
@@ -481,6 +485,7 @@ select:focus {
 }
 
 .fa-circle.color-red,
+.fa-circle.color-yellow,
 .fa-circle.color-green {
     animation: pulse 2s infinite;
 }

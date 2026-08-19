@@ -111,8 +111,8 @@
                 if ($scope.selectAll) {
                     // Add valid devices to the SAME array - must match the HTML filter condition
                     angular.forEach($scope.devices, function(device) {
-                        // Match the HTML filter: (device.status == 'stopped' && device.up_to_date == false) || showAll
-                        var shouldInclude = (device.status == 'stopped' && device.up_to_date == false) || $scope.showAll;
+                        // Match the HTML filter: (device.status == 'stopped' && needs_action(device)) || showAll
+                        var shouldInclude = (device.status == 'stopped' && $scope.needs_action(device)) || $scope.showAll;
 
                         if (shouldInclude && validStates.includes(device.status)) {
                             $scope.selected_devices.push(device);
@@ -292,6 +292,61 @@
                 }
             };
             return false;
+        };
+
+        /**
+         * Classify a device (or the node) into one of four update states.
+         *
+         * The table used to colour rows purely on `up_to_date`, which comes from the
+         * updater daemon and describes the git checkout on disk. The version string in
+         * the same row comes from the *running* listener process, which snapshots its
+         * git version once at start-up. A device that was pulled but never had its
+         * services restarted therefore showed "Up to Date" next to an old commit,
+         * while still executing the old code.
+         *
+         *   'unknown'  - check_update did not answer (timeout / daemon down)
+         *   'outdated' - the checkout on disk is behind origin
+         *   'stale'    - the disk is current but the running code is not: needs a restart
+         *   'current'  - disk and running code both match origin
+         */
+        $scope.device_state = function(device) {
+            if (!device || device.up_to_date === undefined || device.up_to_date === null) {
+                return 'unknown';
+            }
+            if (device.up_to_date === false) {
+                return 'outdated';
+            }
+            // Reason: local_commit is the on-disk HEAD reported by the updater;
+            // version is what the running process was started from.
+            var on_disk = device.local_commit && device.local_commit.id;
+            var running = device.version && device.version.id;
+            if (on_disk && running && on_disk !== running) {
+                return 'stale';
+            }
+            return 'current';
+        };
+
+        $scope.state_label = function(device) {
+            return {
+                unknown: '[Unknown]',
+                outdated: '[Outdated]',
+                stale: '[Restart Required]',
+                current: '[Up to Date]'
+            }[$scope.device_state(device)];
+        };
+
+        $scope.state_color = function(device) {
+            return {
+                unknown: 'color-grey',
+                outdated: 'color-red',
+                stale: 'color-yellow',
+                current: 'color-green'
+            }[$scope.device_state(device)];
+        };
+
+        /** A device needs attention unless it is fully current. */
+        $scope.needs_action = function(device) {
+            return $scope.device_state(device) !== 'current';
         };
 
         var check_error = function(data) {

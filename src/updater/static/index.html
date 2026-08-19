@@ -90,7 +90,8 @@
                     <tr>
                         <td>
 
-                            <span ng-if="node.check_update.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="node.check_update.up_to_date==true" class="fa fa-circle color-green"></span><span> Node <span ng-if="node.check_update.up_to_date==false"> [Outdated]</span> <span ng-if="node.check_update.up_to_date==true">[Up to Date]</span></span>
+                            <span class="fa fa-circle" ng-class="state_color(node.check_update)"></span>
+                            <span> Node {{state_label(node.check_update)}}</span>
 
                         </td>
                         <td>{{node.status}}</td>
@@ -105,16 +106,20 @@
                                 <input type="checkbox" checklist-model="selected_devices" checklist-value="node"></center>
                         </td>
                     </tr>
-                    <tr ng-repeat="(id,device) in devices" ng-if="(device.status == 'stopped' && device.up_to_date == false) || showAll">
+                    <tr ng-repeat="(id,device) in devices" ng-if="(device.status == 'stopped' && needs_action(device)) || showAll">
 
                         <td>
 
-                            <span ng-if="device.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle color-green"></span>
-                            <span> {{device.name}}<span ng-if="device.up_to_date==false"> [Outdated]</span> <span ng-if="device.up_to_date==true">[Up to Date]</span></span>
+                            <span class="fa fa-circle" ng-class="state_color(device)"></span>
+                            <span> {{device.name}} {{state_label(device)}}</span>
 
                         </td>
                         <td> {{device.status}}</td>
-                        <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})</td>
+                        <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})
+                            <div ng-if="device_state(device) == 'stale'" class="color-yellow">
+                                <small>on disk: {{device.local_commit.id.substring(0,6)}}... &mdash; restart to load it</small>
+                            </div>
+                        </td>
                         <td>{{device.ip}}</td>
                         <td>{{device.id.substring(0,6)}}</td>
                         <td>
@@ -158,7 +163,7 @@
 
                                     <td>
                                         <a ng-href="/#ethoscope/{{device.id}}" target="_blank">
-                                            <span ng-if="device.up_to_date==false" class="fa fa-circle color-red"></span> <span ng-if="device.up_to_date==true" class="fa fa-circle color-green"></span>
+                                            <span class="fa fa-circle" ng-class="state_color(device)"></span>
                                             <span> {{device.name}}</span>
                                         </a>
                                     </td>

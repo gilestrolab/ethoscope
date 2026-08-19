@@ -154,6 +154,7 @@ def update_dev_map_wrapped(
     port=9000,
     data=None,
     result_main_dir="/ethoscope_data/results",
+    timeout=10,
 ):
     """
     Just a routine to format our GET urls. This improves readability whilst allowing us to change convention (e.g. port) without rewriting everything.
@@ -162,6 +163,7 @@ def update_dev_map_wrapped(
     :param what: e.g. /data, /control
     :param type: the type of request for POST
     :param port:
+    :param timeout: seconds to wait for the device to answer
     :return:
     """
 
@@ -178,7 +180,7 @@ def update_dev_map_wrapped(
     logging.info(f"requesting {request_url}")
 
     try:
-        f = urllib.request.urlopen(req, timeout=10)
+        f = urllib.request.urlopen(req, timeout=timeout)
         message = f.read()
 
         if message:
@@ -336,6 +338,9 @@ def generate_new_device_map():
                     id,
                     what="device/check_update",
                     port="8888",
+                    # Reason: the device runs a live `git fetch` to answer this,
+                    # which regularly takes longer than the default 10s on a Pi.
+                    timeout=45,
                 )
             ] = id
         for f in concurrent.futures.as_completed(fs):
