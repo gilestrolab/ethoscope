@@ -117,9 +117,22 @@ case "$MODEL" in pi2|pi3) WANT_MODULE=1 ;; *) WANT_MODULE=0 ;; esac
 # this matches what awk extracts from the file byte-for-byte.
 want_body=$(printf '%s\n%s\n%s' "$BEGIN_MARK" "$(desired_block "$MODEL")" "$END_MARK")
 
-extract_block() {
+# Camera keys this script owns. They must live ONLY inside the managed block;
+# any copy elsewhere (e.g. the direct lines older installers appended) is a
+# stray that would fight the block on another model, so we strip them. Precise
+# on dtoverlay so the non-camera overlays (disable-bt, ...) are never touched.
+STRAY_RE='^[[:space:]]*(start_file|fixup_file|gpu_mem|cma_lwm|cma_hwm|cma_offline_start|awb_auto_is_greyworld|camera_auto_detect)=|^[[:space:]]*dtparam=camera=|^[[:space:]]*dtoverlay=(vc4-kms-v3d|imx219)'
+
+extract_block() {  # print just the managed block (markers included)
   awk -v b="$BEGIN_MARK" -v e="$END_MARK" \
     'index($0,b){f=1} f{print} index($0,e){f=0}' "$1"
+}
+strip_block() {    # print the file with the managed block removed
+  awk -v b="$BEGIN_MARK" -v e="$END_MARK" \
+    'index($0,b){skip=1} !skip{print} index($0,e){skip=0}' "$1"
+}
+has_strays() {     # any owned camera key sitting outside the managed block?
+  strip_block "$1" | grep -Eq "$STRAY_RE"
 }
 
 module_ok() {
@@ -130,21 +143,19 @@ module_ok() {
   fi
 }
 
-current_body=$(extract_block "$CONFIG")
-if [[ "$current_body" == "$want_body" ]] && module_ok; then
+if [[ "$(extract_block "$CONFIG")" == "$want_body" ]] && ! has_strays "$CONFIG" && module_ok; then
   log "config.txt already correct for $MODEL — no change"
   exit 0
 fi
 
 log "applying camera config for $MODEL -> $CONFIG"
 
-# Strip any existing managed block (markers included), then append the new one.
-tmp=$(mktemp)
-awk -v b="$BEGIN_MARK" -v e="$END_MARK" \
-  'index($0,b){skip=1} !skip{print} index($0,e){skip=0}' "$CONFIG" > "$tmp"
-printf '%s\n' "$want_body" >> "$tmp"
-cat "$tmp" > "$CONFIG"
-rm -f "$tmp"
+# Rebuild: keep everything except the managed block and any stray camera keys,
+# then append a fresh block. This migrates config.txt written by older installers
+# (direct start_x.elf/imx219 lines) into the managed, model-swappable form.
+tmp="${CONFIG}.ethoscope.tmp"
+{ strip_block "$CONFIG" | grep -Ev "$STRAY_RE"; printf '%s\n' "$want_body"; } > "$tmp"
+mv "$tmp" "$CONFIG"
 
 # Legacy-camera V4L2 module: present for Pi 2/3, absent otherwise.
 if [[ "$WANT_MODULE" == 1 ]]; then
@@ -155,7 +166,7 @@ else
 fi
 
 # Verify the write landed — guards against a reboot loop on a read-only rootfs.
-if [[ "$(extract_block "$CONFIG")" != "$want_body" ]]; then
+if [[ "$(extract_block "$CONFIG")" != "$want_body" ]] || has_strays "$CONFIG"; then
   log "ERROR: $CONFIG did not update as expected — not rebooting"
   exit 1
 fi
