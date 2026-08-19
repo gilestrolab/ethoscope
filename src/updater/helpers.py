@@ -250,6 +250,47 @@ def receive_known_devices():
     return devices
 
 
+# Seconds to wait before re-probing devices that missed the first round. Long enough
+# for a service restart to finish binding its port, short enough not to drag out a scan
+# in which everything is healthy (the retry only runs when something did not answer).
+PROBE_RETRY_DELAY = 4
+
+
+def _probe_devices(known):
+    """
+    Ask each device's update server who it is, in parallel.
+
+    :param known: (id, name, url) tuples as returned by receive_known_devices().
+
+    Returns:
+        tuple: ({device_reported_id: (url, name)}, [(id, name, url) that did not answer])
+    """
+    answered = {}
+    silent = []
+
+    with futures.ThreadPoolExecutor(max_workers=128) as executor:
+        fs = {
+            executor.submit(scan_one_device, url): (node_id, name, url)
+            for node_id, name, url in known
+        }
+        for f in concurrent.futures.as_completed(fs):
+            node_id, name, url = fs[f]
+            try:
+                id, ip = f.result()
+            except Exception:
+                logging.error(f"Error whilst pinging {url}")
+                logging.error(traceback.format_exc())
+                silent.append((node_id, name, url))
+                continue
+
+            if id is None:
+                silent.append((node_id, name, url))
+            else:
+                answered[id] = (ip, name)
+
+    return answered, silent
+
+
 def _enrich_device_map(
     devices_map, ids, what="data", port=9000, timeout=10, mark_broken_on_error=False
 ):
@@ -307,46 +348,41 @@ def generate_new_device_map():
     devices_map = {}
     known = receive_known_devices()
 
-    # We can use a with statement to ensure threads are cleaned up promptly
-    with futures.ThreadPoolExecutor(max_workers=128) as executor:
-        # Start the load operations and mark each future with its URL
+    answered, silent = _probe_devices(known)
 
-        fs = {
-            executor.submit(scan_one_device, url): (node_id, name)
-            for node_id, name, url in known
+    # Reason: restarting a device's services is exactly what an update does, and a
+    # device mid-restart cannot answer. One retry after a pause clears most of the
+    # spurious "Unreachable" rows without slowing a healthy scan down at all.
+    if silent:
+        logging.info(
+            f"{len(silent)} device(s) did not answer the first probe; retrying once "
+            f"in {PROBE_RETRY_DELAY}s"
+        )
+        time.sleep(PROBE_RETRY_DELAY)
+        retried, silent = _probe_devices(silent)
+        answered.update(retried)
+
+    for id, (ip, name) in answered.items():
+        devices_map[id] = {
+            "ip": ip,
+            "status": "Software broken",
+            "id": id,
+            "name": name,
         }
-        for f in concurrent.futures.as_completed(fs):
-            node_id, name = fs[f]
 
-            try:
-                id, ip = f.result()
-            except Exception:
-                logging.error("Error whilst pinging url")
-                logging.error(traceback.format_exc())
-                continue
-
-            if id is None:
-                # Reason: the update server did not answer in time. Listing the device
-                # as unreachable keeps it visible and selectable; dropping it silently
-                # removed the very devices most likely to need attention.
-                logging.warning(
-                    f"Device {name} ({ip}) did not answer its update server; "
-                    "listing it as unreachable."
-                )
-                devices_map[node_id] = {
-                    "ip": ip,
-                    "status": "Unreachable",
-                    "id": node_id,
-                    "name": name,
-                }
-                continue
-
-            devices_map[id] = {
-                "ip": ip,
-                "status": "Software broken",
-                "id": id,
-                "name": name,
-            }
+    for node_id, name, url in silent:
+        # Listing the device as unreachable keeps it visible and selectable; dropping
+        # it silently removed the very devices most likely to need attention.
+        logging.warning(
+            f"Device {name} ({url}) did not answer its update server; "
+            "listing it as unreachable."
+        )
+        devices_map[node_id] = {
+            "ip": url,
+            "status": "Unreachable",
+            "id": node_id,
+            "name": name,
+        }
 
     if len(devices_map) < 1:
         logging.warning("No device detected")
