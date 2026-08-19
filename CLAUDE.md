@@ -408,6 +408,48 @@ If using MySQLResultWriter, the default credentials are:
 - Serial communication for external hardware (Lynx motion controllers, Arduinos)
 - Network discovery via Zeroconf for automatic device detection
 
+## Releasing a new SD image
+
+Images are hosted on the lab server (`ctb.gilest.ro`), not on box.com. Publishing is
+one command — no commit, no pull, no container restart:
+
+```bash
+# prepare the image (update /opt/ethoscope, shrink, retag, zero free space)
+sudo ./accessories/ethoscope-image.sh --all /path/to/ethoscope.img
+
+# zip, checksum, upload, verify, publish
+./accessories/publish-image.sh /path/to/ethoscope.img
+```
+
+`publish-image.sh` reads `/etc/sdimagename` out of the image to derive the published
+name, compresses it, uploads it with a resumable `rsync`, verifies the checksum
+remotely, and only then uploads a sidecar `<file>.img.zip.json` manifest. Because the
+manifest lands last, an interrupted upload is never advertised — just re-run the
+command and it resumes. Run it as a normal user (it uses your ssh keys); reading the
+image needs no root. Use `--dry-run` to rehearse, `--prune N` to keep only the N newest
+images on the server.
+
+### Where things live
+
+| Piece | Location |
+|---|---|
+| Image files + manifests | `ctb.gilest.ro:/srv/http/ethoscope/images/` |
+| Public download URL | `https://repo.ethoscope.lab.gilest.ro/images/<name>.img.zip` |
+| Stable per-model redirect | `https://ethoscope-resources.lab.gilest.ro/latest_sd_image/pi4` |
+| Web server for the files | `repo.ethoscope` container — `Docker/image_server/docker-compose.yml` |
+| Resources API | `ethoscope-resources` container — `Docker/resource_server/` |
+
+`pa_server.py` builds its image list from the sidecar manifests (newest first) and
+appends any entry in `contents/links.json` that no manifest supersedes — so the LiveCD
+ISO and the older box.com links keep working, and are retired simply by re-publishing
+that image. `links.json` and `news.txt` are now re-read whenever they change on disk;
+only a change to `pa_server.py` itself needs
+`docker compose up -d --build` (the Dockerfile copies it in at build time).
+
+To roll back a release, delete the sidecar manifest on the server
+(`rm /srv/http/ethoscope/images/<name>.img.zip.json`) — the previous image becomes the
+newest again immediately, and the file itself stays downloadable by direct URL.
+
 ## Important Notes
 
 - Python 3.11+ required for both device and node packages. The code uses PEP 604

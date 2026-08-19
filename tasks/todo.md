@@ -441,3 +441,52 @@ Remaining known defects, not fixed here:
 - [ ] Devices cannot self-update on this network: `origin` is
       `git://node.local/ethoscope.git`, which does not resolve from a device and
       whose git daemon port is closed.
+
+---
+
+# Self-hosted SD image publishing
+
+Date: 2026-08-19
+
+## Problem
+
+Releasing an image meant: zip, md5, upload to box.com, create a share link, hand-edit
+`Docker/resource_server/contents/links.json`, get that file onto the server, restart the
+container. The box URLs are opaque and unscriptable, and `pa_server.py` read `links.json`
+only at import time — so the deployed copy on `ctb.gilest.ro` had already drifted from git.
+
+## Tasks
+
+- [x] `accessories/publish-image.sh` — zip, md5, resumable rsync to `ctb.gilest.ro`,
+      remote checksum verification, sidecar manifest published last, `--prune`, `--dry-run`.
+- [x] `pa_server.py` — build the image list from sidecar manifests (newest first) merged
+      with the remaining `links.json` entries; mtime-cached reads so `links.json` and
+      `news.txt` no longer need a restart; `/latest_sd_image/<pi>` selects by model instead
+      of a hardcoded list index, and 404s honestly when there is no match.
+- [x] `--zerofree` in `accessories/ethoscope-image.sh` (in `--all`), with a fill-and-delete
+      fallback when `zerofree` is not installed.
+- [x] `Docker/resource_server/docker-compose.yml` synced with what is actually deployed
+      (`intranet` network, healthcheck, no vestigial `VIRTUAL_HOST`) + images mount.
+- [x] `Docker/image_server/docker-compose.yml` — versioned copy of the `repo.ethoscope`
+      container that serves the files.
+- [x] Archive size surfaced on the resources page (node UI + resource server index).
+- [x] Release process documented in `CLAUDE.md`.
+
+## Discovered during work
+
+- The front proxy on `ctb.gilest.ro` is Nginx Proxy Manager, not docker-gen nginx-proxy:
+  the `VIRTUAL_HOST` / `LETSENCRYPT_HOST` env vars in the repo's compose files do nothing.
+- The deployed clone at `/home/gg/mydocker_images/lab/ethoscope` carries uncommitted edits
+  to `links.json` and `docker-compose.yml`; they need resolving before the next `git pull`.
+
+## Remaining
+
+- [x] Download host deployed on `ctb.gilest.ro`: `/srv/http/ethoscope/images` created and
+      bind-mounted read-only into `repo.ethoscope` (old compose kept as
+      `docker-compose.yml.bak`). Verified end to end with a miniature test image: HTTPS 200,
+      correct md5, range requests honoured, directory listing works; test file then removed.
+- [ ] Deploy the new `pa_server.py`: push `dev`, then on `ctb` reset the drifted clone,
+      `git pull`, `docker compose up -d --build` in `Docker/resource_server`. Until then the
+      resources page still serves the box.com list from `links.json`.
+- [ ] `--zerofree` could not be executed here (loop devices need sudo); the rest of the
+      pipeline was verified end to end against a miniature test image.

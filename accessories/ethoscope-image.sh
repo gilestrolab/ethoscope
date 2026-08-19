@@ -12,7 +12,10 @@
 #               32 GB card (target = 30000 MiB total, ~528 MiB margin).
 #   --rename    Update /etc/sdimagename inside the image so its date
 #               prefix matches today (YYYYMMDD).
-#   --all       Equivalent to --update --shrink --rename (not --info / --fsck).
+#   --zerofree  Zero the rootfs free space so the image compresses far better
+#               (typically 30-60% smaller once zipped). Runs after --shrink.
+#   --all       Equivalent to --update --shrink --rename --zerofree
+#               (not --info / --fsck).
 #   --universal-camera
 #               Retrofit an existing image so ONE card serves Pi 2/3/4/5:
 #               fast-forward /opt/ethoscope, enable the first-boot camera
@@ -43,10 +46,11 @@ DO_FSCK=0
 DO_UPDATE=0
 DO_SHRINK=0
 DO_RENAME=0
+DO_ZEROFREE=0
 DO_UNIVERSAL=0
 IMG=""
 
-usage() { sed -n '2,23p' "$0"; exit "${1:-0}"; }
+usage() { sed -n '2,26p' "$0"; exit "${1:-0}"; }
 
 for arg in "$@"; do
   case "$arg" in
@@ -55,7 +59,8 @@ for arg in "$@"; do
     --update) DO_UPDATE=1 ;;
     --shrink) DO_SHRINK=1 ;;
     --rename) DO_RENAME=1 ;;
-    --all)    DO_UPDATE=1; DO_SHRINK=1; DO_RENAME=1 ;;
+    --zerofree) DO_ZEROFREE=1 ;;
+    --all)    DO_UPDATE=1; DO_SHRINK=1; DO_RENAME=1; DO_ZEROFREE=1 ;;
     --universal-camera) DO_UNIVERSAL=1; DO_UPDATE=1 ;;  # implies --update
     -h|--help) usage 0 ;;
     -*) echo "Unknown flag: $arg" >&2; usage 1 ;;
@@ -63,7 +68,7 @@ for arg in "$@"; do
   esac
 done
 
-(( DO_INFO || DO_FSCK || DO_UPDATE || DO_SHRINK || DO_RENAME || DO_UNIVERSAL )) || { echo "No operation requested." >&2; usage 1; }
+(( DO_INFO || DO_FSCK || DO_UPDATE || DO_SHRINK || DO_RENAME || DO_ZEROFREE || DO_UNIVERSAL )) || { echo "No operation requested." >&2; usage 1; }
 
 # Write ops require rw mount; --info alone gets ro mount.
 NEEDS_WRITE=$(( DO_UPDATE | DO_RENAME | DO_UNIVERSAL ))
@@ -274,6 +279,31 @@ op_shrink() {
   sfdisk -l "$LOOP"
 }
 
+op_zerofree() {
+  # Deleted files leave their old contents behind on disk, and random garbage
+  # compresses terribly. Writing zeros over the free blocks typically halves the
+  # size of the resulting .zip.
+  local part="${LOOP}p2"
+  echo "==> Zeroing free space on the rootfs (${part})"
+  e2fsck -f -y "$part"
+  if command -v zerofree >/dev/null; then
+    zerofree -v "$part"
+  else
+    echo "    'zerofree' not installed (pacman -S zerofree) — using a fill-and-delete pass"
+    local mnt
+    mnt=$(mktemp -d /tmp/ethoscope-zerofree.XXXXXX)
+    mount "$part" "$mnt"
+    # dd stops with ENOSPC once the filesystem is full; that is the success case.
+    dd if=/dev/zero of="$mnt/.zerofill" bs=4M status=none || true
+    sync
+    rm -f "$mnt/.zerofill"
+    sync
+    umount "$mnt"
+    rmdir "$mnt"
+    e2fsck -f -y "$part"
+  fi
+}
+
 # --- orchestration ----------------------------------------------------------
 # 1. Mount-required ops first (info, update, universalize, rename).
 if (( DO_INFO || DO_UPDATE || DO_RENAME || DO_UNIVERSAL )); then
@@ -306,9 +336,17 @@ if (( DO_SHRINK )); then
   truncate -s "$SHRINK_IMG_BYTES" "$IMG"
 fi
 
-# 4. Final summary
+# 4. Zero the free space (needs an attached loop and an unmounted partition).
+#    Runs last so it also zeroes whatever --update and --shrink left behind.
+if (( DO_ZEROFREE )); then
+  [[ -n "$LOOP" ]] || attach_loop
+  op_zerofree
+  detach_loop
+fi
+
+# 5. Final summary
 echo "==> Done."
-if (( DO_UPDATE || DO_SHRINK || DO_RENAME )); then
+if (( DO_UPDATE || DO_SHRINK || DO_RENAME || DO_ZEROFREE )); then
   ls -lah "$IMG"
   fdisk -l "$IMG" | head -10
 fi

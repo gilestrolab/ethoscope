@@ -7,14 +7,21 @@ services:
     restart: always
     expose:
       - 8080
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     volumes:
 #      - ./:/opt/ethoscope_resources
       - ./contents:/opt/ethoscope_resources/contents
-    environment:
-      - VIRTUAL_HOST=ethoscope-resources.lab.gilest.ro
-      - LETSENCRYPT_HOST=ethoscope-resources.lab.gilest.ro
+      # Published SD images live here; pa_server.py reads their .json manifests
+      # to build the image list. Written by accessories/publish-image.sh and
+      # served to the world by the image_server container.
+      - ${ETHOSCOPE_IMAGES_DIR:-/srv/http/ethoscope/images}:/opt/ethoscope_resources/images:ro
 
 networks:
   default:
-    name: nginx-proxy
+    name: intranet
     external: true

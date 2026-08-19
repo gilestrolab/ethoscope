@@ -79,7 +79,7 @@
             <ul>
                 % for sd_image in images:
                 <li>{{sd_image['title']}}: <a href="{{sd_image['url']}}">{{sd_image['filename']}}</a>
-                    <pre>MD5SUM: {{sd_image['md5sum']}}</pre> ({{sd_image['date']}})
+                    <pre>MD5SUM: {{sd_image['md5sum']}}</pre> ({{sd_image['date']}}{{' - ' + sd_image['size'] if sd_image.get('size') else ''}})
                 </li>
                 % end
             </ul>

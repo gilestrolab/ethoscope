@@ -1,0 +1,32 @@
+---
+# Serves the published ethoscope SD images (and the pacman repo) over HTTPS at
+# https://repo.ethoscope.lab.gilest.ro. Fronted by Nginx Proxy Manager, which
+# terminates TLS and proxies to this container on the shared "intranet" network.
+#
+# Images are uploaded here by accessories/publish-image.sh; the resource server
+# (Docker/resource_server) mounts the same directory read-only to read their
+# .json manifests.
+services:
+  repo.ethoscope:
+    image: httpd:2.4-alpine
+    container_name: repo.ethoscope
+    restart: always
+    expose:
+      - 8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    environment:
+      VIRTUAL_HOST: repo.ethoscope.lab.gilest.ro
+      LETSENCRYPT_HOST: repo.ethoscope.lab.gilest.ro
+    volumes:
+      - /srv/http/ethoscope/repo:/usr/local/apache2/htdocs
+      - ${ETHOSCOPE_IMAGES_DIR:-/srv/http/ethoscope/images}:/usr/local/apache2/htdocs/images:ro
+
+networks:
+  default:
+    name: intranet
+    external: true

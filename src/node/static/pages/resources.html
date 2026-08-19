@@ -13,7 +13,7 @@
         <h3>SD cards for Ethoscopes</h3>
         <ul>
             <li ng-repeat="sd_image in resources.images">{{sd_image['title']}}: <a href="{{sd_image['url']}}">{{sd_image['filename']}}</a>
-                <pre style="display: inline; margin: 0; padding: 0px;">MD5SUM: {{sd_image['md5sum']}}</pre> ({{sd_image['date']}})
+                <pre style="display: inline; margin: 0; padding: 0px;">MD5SUM: {{sd_image['md5sum']}}</pre> ({{sd_image['date']}}<span ng-if="sd_image['size']"> - {{sd_image['size']}}</span>)
             </li>
         </ul>
     </div>
