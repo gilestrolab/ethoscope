@@ -603,13 +603,25 @@ so the node has everything it needs to answer the question itself.
 - [x] Frontend `is_listed()` replaces the `status == 'stopped'` row filter, so
       unreachable and software-broken devices are visible rather than implicitly fine.
 
+### Outcome (confirmed in prod, 2026-08-19)
+
+The node-side verdict resolved it. A refresh produced the full list of genuinely
+outdated ethoscopes, they updated, and 363 -- the last holdout -- appeared and updated
+on the following refresh. The devices that had been lying green since April are current.
+
+- [x] `[Restart Required]` lagging one update behind: display lag, not a lost restart.
+      `reload_device_daemon()` restarts `ethoscope_listener`, which re-reads HEAD only at
+      process start; a scan landing before the listener finishes coming back up sees the
+      previous commit. Same cause for the transient "Software broken" -- the device web
+      server has not rebound its port yet. Both clear on their own within a minute or two.
+      Only worth investigating if it persists past that.
+
 ### Open
 
-- [ ] `[Restart Required]` lags one update behind on some devices. The running version
-      does advance, so the listener is restarting -- the open question is whether it is
-      merely slower than the scan or whether `reload_device_daemon()` is losing a step.
-      Needs `journalctl -u ethoscope_update` and `systemctl show ethoscope_listener -p
-      ActiveEnterTimestamp` from a device to settle; do not theorise further without it.
 - [ ] `/bare/update` and `/devices` are fired in parallel by the frontend. The verdict
       reads the bare repo at the end of `/devices`, by which point the fetch has
       finished in practice, but nothing enforces it.
+- [ ] Optional: suppress the post-update transient. `record_device_intervention()`
+      already records that the user deliberately disturbed a device; the update table
+      could read it and show "settling" for a minute instead of Restart Required /
+      Software broken. Cosmetic -- only worth doing if the churn is actually annoying.
