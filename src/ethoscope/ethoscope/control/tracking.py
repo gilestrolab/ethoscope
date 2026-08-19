@@ -1905,6 +1905,16 @@ class ControlThread(Thread):
             # Clear light schedule so the daemon turns off the LED
             self._clear_light_schedule()
 
+            # Reason: the reset below wipes the user/location, but they are still
+            # needed further down to fill experimental_info["previous"], which is
+            # what the node shows as the last known user/location of the device.
+            _exp_info = self._info.get("experimental_info") or {}
+            if not isinstance(_exp_info, dict):
+                _exp_info = {}
+            _last_exp_info = _exp_info.get("current", _exp_info) or {}
+            _last_user = _last_exp_info.get("name", "")
+            _last_location = _last_exp_info.get("location", "")
+
             # we reset all the user data of the latest experiment except the run_id
             # a new run_id will be created when we start another experiment
             if (
@@ -2000,14 +2010,8 @@ class ControlThread(Thread):
                     {
                         "date_time": self._info["time"],
                         "backup_filename": self._info["backup_filename"],
-                        "user": self._info["experimental_info"]
-                        .get("current", {})
-                        .get("name", "")
-                        or self._info["experimental_info"].get("name", ""),
-                        "location": self._info["experimental_info"]
-                        .get("current", {})
-                        .get("location", "")
-                        or self._info["experimental_info"].get("location", ""),
+                        "user": _last_user,
+                        "location": _last_location,
                     }
                 )
 

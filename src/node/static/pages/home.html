@@ -231,12 +231,13 @@
                 <span>{{getBackupStatusText(device)}}</span>
             </td>
             <td>
-                <span ng-if="device.experimental_info.current.name != ''">{{device.experimental_info.current.name}}</span>
-                <span ng-if="device.previous_user != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_user}}</span>
+                <span ng-if="device.experimental_info.current.name">{{device.experimental_info.current.name}}</span>
+                <span ng-if="!device.experimental_info.current.name && lastKnownUser(device)" style="color:grey;" title="Last known user">{{lastKnownUser(device)}}</span>
             </td>
             <td>
-                <span ng-if="device.experimental_info.current.location != ''">{{device.experimental_info.current.location}}</span>
-                <span ng-if="device.previous_location != '' && device.status == 'stopped'" style="color:grey;">{{device.previous_location}}</span>
+                <span ng-if="device.experimental_info.current.location">{{device.experimental_info.current.location}}</span>
+                <span ng-if="!device.experimental_info.current.location && lastKnownLocation(device)" style="color:grey;" title="Last known location">{{lastKnownLocation(device)}}</span>
+            </td>
             <td>
                 <span ng-if="device.status == 'offline' && device.last_ip" ng-click="pokeDevice(device)" class="poke-ip-button" title="Click to attempt re-adding this device ({{device.last_ip}})">
                     <span class="fa fa-refresh fa-xs"></span> {{device.last_ip}}

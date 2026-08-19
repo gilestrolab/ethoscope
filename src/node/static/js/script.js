@@ -955,6 +955,21 @@
             return text;
         };
 
+        // Last known user/location of a device that is not currently running an
+        // experiment. The device reports these under experimental_info.previous;
+        // older firmware used the flat previous_user/previous_location fields.
+        // Reason: the user key is 'user' when it comes from the device cache but
+        // 'name' when the node copied a finished experiment from current.
+        $scope.lastKnownUser = function(device) {
+            var previous = (device.experimental_info && device.experimental_info.previous) || {};
+            return previous.user || previous.name || device.previous_user || '';
+        };
+
+        $scope.lastKnownLocation = function(device) {
+            var previous = (device.experimental_info && device.experimental_info.previous) || {};
+            return previous.location || device.previous_location || '';
+        };
+
 
         $scope.elapsedtime = function(t) {
             // Calculate the number of days left
