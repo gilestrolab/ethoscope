@@ -111,8 +111,8 @@
                 if ($scope.selectAll) {
                     // Add valid devices to the SAME array - must match the HTML filter condition
                     angular.forEach($scope.devices, function(device) {
-                        // Match the HTML filter: (device.status == 'stopped' && needs_action(device)) || showAll
-                        var shouldInclude = (device.status == 'stopped' && $scope.needs_action(device)) || $scope.showAll;
+                        // Match the HTML filter: is_listed(device) || showAll
+                        var shouldInclude = $scope.is_listed(device) || $scope.showAll;
 
                         if (shouldInclude && validStates.includes(device.status)) {
                             $scope.selected_devices.push(device);
@@ -347,6 +347,16 @@
         /** A device needs attention unless it is fully current. */
         $scope.needs_action = function(device) {
             return $scope.device_state(device) !== 'current';
+        };
+
+        // Reason: a device mid-experiment cannot be updated or restarted, so listing it
+        // is just noise. Anything else that needs attention belongs in the default view
+        // -- including unreachable ones, which used to be dropped from the map entirely.
+        var BUSY_STATES = ['running', 'recording', 'streaming'];
+
+        /** Should this device appear in the default (unfiltered) view? */
+        $scope.is_listed = function(device) {
+            return $scope.needs_action(device) && BUSY_STATES.indexOf(device.status) === -1;
         };
 
         var check_error = function(data) {

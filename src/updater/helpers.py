@@ -111,7 +111,7 @@ def get_machine_name(path="/etc/machine-name"):
         return "VIRTUASCOPE_" + str(random.randint(100, 999))
 
 
-def scan_one_device(ip, timeout=2, port=8888, page="id"):
+def scan_one_device(ip, timeout=5, port=8888, page="id"):
     """
     :param url: the url to parse
     :param timeout: the timeout of the url request
@@ -219,10 +219,16 @@ def update_dev_map_wrapped(
     return devices_map
 
 
-def receive_device_IPs():
+def receive_known_devices():
     """
-    Interrogates the NODE on its current knowledge of devices, then extracts from the JSON record
-    only the IPs
+    Interrogate the NODE on its current knowledge of devices.
+
+    The node's scanner already knows every device's id and name, so we carry those
+    through rather than just the IP. That way a device whose update server fails to
+    answer can still be listed as unreachable instead of vanishing from the table.
+
+    Returns:
+        list: (id, name, url) tuples for every device the node does not call offline.
     """
     devices = []
     try:
@@ -230,10 +236,11 @@ def receive_device_IPs():
         req = urllib.request.Request(url, headers={"Content-Type": "application/json"})
         f = urllib.request.urlopen(req, timeout=10)
         js = json.load(f)
-        for key in js:
-            if js[key]["status"] != "offline" and "ip" in js[key]:
-                devices.append("http://{}".format(js[key]["ip"]))
-        # devices = [ "http://" + js[key]['ip'] for key in js.keys() if js[key]['status'] != "offline" ]
+        for key, info in js.items():
+            if info.get("status") != "offline" and info.get("ip"):
+                devices.append(
+                    (key, info.get("name") or key, "http://{}".format(info["ip"]))
+                )
     except Exception:
         logging.error(
             "The node ethoscope server is not running or cannot be reached. A list of available ethoscopes could not be found."
@@ -243,34 +250,130 @@ def receive_device_IPs():
     return devices
 
 
+def _enrich_device_map(
+    devices_map, ids, what="data", port=9000, timeout=10, mark_broken_on_error=False
+):
+    """
+    Query one endpoint on every given device in parallel and merge the replies.
+
+    :param devices_map: the map to update in place.
+    :param ids: the device ids to query.
+    :param what: endpoint path, e.g. "data" or "device/check_update".
+    :param port: port to query.
+    :param timeout: seconds to wait for each device.
+    :param mark_broken_on_error: whether a non-network error marks the device as
+        "Software broken" -- only meaningful for the first round, which is what
+        establishes that a device is running at all.
+    """
+    if not ids:
+        return
+
+    with futures.ThreadPoolExecutor(max_workers=128) as executor:
+        fs = {
+            executor.submit(
+                update_dev_map_wrapped,
+                devices_map,
+                id,
+                what=what,
+                port=port,
+                timeout=timeout,
+            ): id
+            for id in ids
+        }
+
+        for f in concurrent.futures.as_completed(fs):
+            id = fs[f]
+            try:
+                devices_map[id].update(f.result())
+            except Exception as e:
+                if isinstance(e.__cause__, (TimeoutError, urllib.error.URLError)):
+                    devices_map[id]["status"] = "Unreachable"
+                    logging.warning(
+                        f"Device {id} is unreachable (timeout/network error) "
+                        f"whilst requesting {what}"
+                    )
+                else:
+                    if mark_broken_on_error:
+                        devices_map[id]["status"] = "Software broken"
+                    logging.error(f"Could not get {what} from device {id}:")
+                    logging.error(traceback.format_exc())
+
+
 def generate_new_device_map():
     """
     Generate the device map as JSON dictionary
     Interrogates only IPs passed on by the NODE, thus piggybacking on the node's knowledge of the subnet
     """
     devices_map = {}
-    urls = receive_device_IPs()
+    known = receive_known_devices()
 
     # We can use a with statement to ensure threads are cleaned up promptly
     with futures.ThreadPoolExecutor(max_workers=128) as executor:
         # Start the load operations and mark each future with its URL
 
-        fs = [executor.submit(scan_one_device, url) for url in urls]
+        fs = {
+            executor.submit(scan_one_device, url): (node_id, name)
+            for node_id, name, url in known
+        }
         for f in concurrent.futures.as_completed(fs):
+            node_id, name = fs[f]
 
             try:
                 id, ip = f.result()
-                if id is None:
-                    continue
-                devices_map[id] = {"ip": ip, "status": "Software broken", "id": id}
-
             except Exception:
                 logging.error("Error whilst pinging url")
                 logging.error(traceback.format_exc())
+                continue
+
+            if id is None:
+                # Reason: the update server did not answer in time. Listing the device
+                # as unreachable keeps it visible and selectable; dropping it silently
+                # removed the very devices most likely to need attention.
+                logging.warning(
+                    f"Device {name} ({ip}) did not answer its update server; "
+                    "listing it as unreachable."
+                )
+                devices_map[node_id] = {
+                    "ip": ip,
+                    "status": "Unreachable",
+                    "id": node_id,
+                    "name": name,
+                }
+                continue
+
+            devices_map[id] = {
+                "ip": ip,
+                "status": "Software broken",
+                "id": id,
+                "name": name,
+            }
 
     if len(devices_map) < 1:
         logging.warning("No device detected")
         return devices_map
+
+    logging.info(f"Detected {len(devices_map)} devices:\n{list(devices_map.keys())}")
+
+    # Devices that never answered the probe cannot answer these either; querying them
+    # would only add the full timeout of each round to the scan.
+    reachable = [
+        id for id, dev in devices_map.items() if dev["status"] != "Unreachable"
+    ]
+
+    _enrich_device_map(devices_map, reachable, mark_broken_on_error=True)
+    _enrich_device_map(devices_map, reachable, what="device/active_branch", port="8888")
+    _enrich_device_map(
+        devices_map,
+        reachable,
+        what="device/check_update",
+        port="8888",
+        # Reason: the device runs a live `git fetch` to answer this, which regularly
+        # takes longer than the default 10s on a Pi. Kept well under the front proxy's
+        # timeout, since the three rounds are sequential.
+        timeout=30,
+    )
+
+    return devices_map
 
     logging.info(f"Detected {len(devices_map)} devices:\n{list(devices_map.keys())}")
 

@@ -106,7 +106,7 @@
                                 <input type="checkbox" checklist-model="selected_devices" checklist-value="node"></center>
                         </td>
                     </tr>
-                    <tr ng-repeat="(id,device) in devices" ng-if="(device.status == 'stopped' && needs_action(device)) || showAll">
+                    <tr ng-repeat="(id,device) in devices" ng-if="is_listed(device) || showAll">
 
                         <td>
 
@@ -115,7 +115,9 @@
 
                         </td>
                         <td> {{device.status}}</td>
-                        <td>[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})
+                        <td>
+                            <span ng-if="device.version.id">[{{device.active_branch}}] {{device.version.id.substring(0,6)}}... ({{device.version.date}})</span>
+                            <span ng-if="!device.version.id">&mdash;</span>
                             <div ng-if="device_state(device) == 'stale'" class="color-yellow">
                                 <small>on disk: {{device.local_commit.id.substring(0,6)}}... &mdash; restart to load it</small>
                             </div>
