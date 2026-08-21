@@ -10,6 +10,11 @@ from pathlib import Path
 
 import bottle
 
+from ethoscope_node.incubators.hierarchy import (
+    ROOM,
+    children_of,
+    validate_parent,
+)
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
 from .base import BaseAPI, error_decorator
@@ -573,6 +578,26 @@ class SetupAPI(BaseAPI):
         }
 
     @staticmethod
+    def _reparent_children(db, parent_name, new_parent):
+        """Move every virtual box currently inside ``parent_name``.
+
+        Args:
+            db (ExperimentalDB): Open database handle.
+            parent_name (str): The incubator the boxes are parented to.
+            new_parent (str): Where they go — another incubator's name, or
+                the 'Room' sentinel when the parent is gone.
+
+        Returns:
+            list: Names of the boxes that were moved.
+        """
+        records = db.getAllIncubators(active_only=False, asdict=True) or {}
+        moved = []
+        for child in children_of(records, parent_name):
+            if db.updateIncubator(name=child, parent=new_parent) >= 0:
+                moved.append(child)
+        return moved
+
+    @staticmethod
     def _normalise_period_and_anchor(period_minutes, anchor):
         """
         Apply coherence rules between period and anchor.
@@ -659,6 +684,18 @@ class SetupAPI(BaseAPI):
 
             if not incubator_data["name"]:
                 return {"result": "error", "message": "Incubator name is required"}
+
+            # Parent: a virtual "shoe box" sits inside a physical incubator, or
+            # in the Room when it stands on its own. Anything else has none.
+            parent, parent_error = validate_parent(
+                data.get("parent"),
+                incubator_type=incubator_data.get("type"),
+                self_name=incubator_data["name"],
+                lookup=lambda n: db.getIncubatorByName(n, asdict=True),
+            )
+            if parent_error:
+                return {"result": "error", "message": parent_error}
+            incubator_data["parent"] = parent
 
             result = db.addIncubator(**incubator_data)
 
@@ -753,10 +790,25 @@ class SetupAPI(BaseAPI):
                         else int(data[fade_key])
                     )
 
+            current = db.getIncubatorByName(original_name, asdict=True) or {}
+
+            # Parent: resolved against the category the record will *have*
+            # after this patch, so a box promoted to 'normal' loses its parent
+            # and one demoted to 'virtual' gains one (the Room by default).
+            parent, parent_error = validate_parent(
+                data.get("parent", current.get("parent")),
+                incubator_type=update_data.get("type", current.get("type")),
+                self_name=new_name or original_name,
+                lookup=lambda n: db.getIncubatorByName(n, asdict=True),
+            )
+            if parent_error:
+                return {"result": "error", "message": parent_error}
+            if parent != (current.get("parent") or ""):
+                update_data["parent"] = parent
+
             # Period / anchor: merge with current row, then normalise so the
             # period↔anchor invariant holds regardless of which field the user
             # touched.
-            current = db.getIncubatorByName(original_name, asdict=True) or {}
             period_supplied = "light_period_minutes" in data
             anchor_supplied = "light_cycle_anchor" in data
             if period_supplied or anchor_supplied:
@@ -802,6 +854,13 @@ class SetupAPI(BaseAPI):
 
             if result >= 0:
                 final_name = new_name or original_name
+                # A renamed incubator takes its boxes with it, and one that has
+                # just become virtual can no longer host any — those go back to
+                # the Room rather than pointing at a box.
+                if new_name and new_name != original_name:
+                    self._reparent_children(db, original_name, final_name)
+                if update_data.get("type", current.get("type")) == "virtual":
+                    self._reparent_children(db, final_name, ROOM)
                 self._auto_push_schedule(final_name)
                 # On rename, mirror the new name onto the bound unit's sensor
                 # identity so the associated sensor follows the incubator.
@@ -836,9 +895,18 @@ class SetupAPI(BaseAPI):
             result = db.deleteIncubator(name=name)
 
             if result >= 0:
+                # The boxes that sat inside it still exist — they are simply in
+                # the room now. Leaving a dangling parent name would lose them.
+                orphaned = self._reparent_children(db, name, ROOM)
+                message = f"Incubator {name} deleted successfully"
+                if orphaned:
+                    message += (
+                        f" — {len(orphaned)} virtual incubator(s) moved to the "
+                        f"{ROOM}: {', '.join(orphaned)}"
+                    )
                 return {
                     "result": "success",
-                    "message": f"Incubator {name} deleted successfully",
+                    "message": message,
                 }
             else:
                 return {"result": "error", "message": "Failed to delete incubator"}

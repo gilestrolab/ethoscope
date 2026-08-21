@@ -22,6 +22,8 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Any
 
+from ethoscope_node.incubators.hierarchy import ROOM, is_room, normalise_type
+
 # A normalised incubator record is just a dict with these keys. Anything missing
 # from the dict defaults at the storage layer; anything extra is ignored.
 INCUBATOR_FIELDS = (
@@ -43,12 +45,22 @@ INCUBATOR_FIELDS = (
     "crepuscular",
     "type",
     "set_temp",
+    "parent",
 )
 
 IncubatorRecord = dict[str, Any]
 
 _UPDATABLE_TEXT_FIELDS = frozenset(
-    {"name", "location", "owner", "description", "lights_on", "lights_off", "type"}
+    {
+        "name",
+        "location",
+        "owner",
+        "description",
+        "lights_on",
+        "lights_off",
+        "type",
+        "parent",
+    }
 )
 _UPDATABLE_INT_FIELDS = frozenset(
     {
@@ -123,7 +135,7 @@ class SQLiteIncubatorStorage(IncubatorStorage):
     Bottle server.
     """
 
-    SCHEMA_VERSION = 2
+    SCHEMA_VERSION = 3
 
     def __init__(self, db_path: str):
         self._db_path = db_path
@@ -159,7 +171,8 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                     max_light INTEGER DEFAULT 100,
                     crepuscular INTEGER DEFAULT 0,
                     type TEXT DEFAULT 'normal',
-                    set_temp REAL
+                    set_temp REAL,
+                    parent TEXT DEFAULT ''
                 )
                 """
             )
@@ -178,6 +191,11 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                 )
             if "set_temp" not in existing_cols:
                 conn.execute("ALTER TABLE incubators ADD COLUMN set_temp REAL")
+            if "parent" not in existing_cols:
+                # Enclosing physical incubator for a virtual "shoe box"
+                # ('' / 'Room' = standing in the open room). See
+                # ethoscope_node.incubators.hierarchy.
+                conn.execute("ALTER TABLE incubators ADD COLUMN parent TEXT DEFAULT ''")
             current = conn.execute(
                 "SELECT version FROM schema_version LIMIT 1"
             ).fetchone()
@@ -252,9 +270,12 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                     self._logger.error("Incubator '%s' already exists", name)
                     return -1
 
-                inc_type = record.get("type") or "normal"
-                if inc_type not in ("normal", "smart", "virtual"):
-                    inc_type = "normal"
+                inc_type = normalise_type(record.get("type"))
+                # Only a virtual box declares a parent; it defaults to the Room
+                # sentinel so the record always says where the box is.
+                parent = ROOM if inc_type == "virtual" else ""
+                if inc_type == "virtual" and not is_room(record.get("parent")):
+                    parent = str(record["parent"]).strip()
                 set_temp = record.get("set_temp")
                 cur = conn.execute(
                     """
@@ -263,8 +284,8 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                         lights_on, lights_off, light_period_minutes,
                         light_cycle_anchor, hostname,
                         fade_in_seconds, fade_out_seconds, max_light, crepuscular,
-                        type, set_temp
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        type, set_temp, parent
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         name,
@@ -284,6 +305,7 @@ class SQLiteIncubatorStorage(IncubatorStorage):
                         1 if int(record.get("crepuscular") or 0) else 0,
                         inc_type,
                         None if set_temp is None else float(set_temp),
+                        parent,
                     ),
                 )
                 return int(cur.lastrowid or -1)

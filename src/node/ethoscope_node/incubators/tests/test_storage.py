@@ -193,3 +193,48 @@ class TestDelete:
 
     def test_requires_name_or_id(self, storage):
         assert storage.delete() == -1
+
+
+class TestParentColumn:
+    """A virtual "shoe box" records which incubator it sits inside."""
+
+    def test_virtual_defaults_to_the_room_sentinel(self, storage):
+        storage.add({"name": "Box", "type": "virtual"})
+        assert storage.get(name="Box")["parent"] == "Room"
+
+    def test_virtual_keeps_an_explicit_parent(self, storage):
+        storage.add({"name": "Box", "type": "virtual", "parent": " Big "})
+        assert storage.get(name="Box")["parent"] == "Big"
+
+    def test_physical_records_store_no_parent(self, storage):
+        storage.add({"name": "Big", "type": "normal", "parent": "Whatever"})
+        assert storage.get(name="Big")["parent"] == ""
+
+    def test_parent_is_updatable(self, storage):
+        storage.add({"name": "Box", "type": "virtual"})
+        assert storage.update(name="Box", parent="Big") >= 0
+        assert storage.get(name="Box")["parent"] == "Big"
+
+    def test_added_to_a_pre_existing_database(self, tmp_path):
+        """A DB file written before the column exists gains it on open."""
+        import sqlite3
+
+        path = str(tmp_path / "legacy.db")
+        conn = sqlite3.connect(path)
+        conn.execute(
+            "CREATE TABLE incubators ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, "
+            "location TEXT, owner TEXT, description TEXT, created TIMESTAMP, "
+            "active INTEGER, lights_on TEXT, lights_off TEXT, "
+            "light_period_minutes INTEGER, light_cycle_anchor REAL, hostname TEXT, "
+            "fade_in_seconds INTEGER, fade_out_seconds INTEGER, max_light INTEGER, "
+            "crepuscular INTEGER)"
+        )
+        conn.execute("INSERT INTO incubators (name, created) VALUES ('Legacy', 0)")
+        conn.commit()
+        conn.close()
+
+        storage = SQLiteIncubatorStorage(path)
+        record = storage.get(name="Legacy")
+        assert record["parent"] is None or record["parent"] == ""
+        assert storage.update(name="Legacy", parent="Room") >= 0

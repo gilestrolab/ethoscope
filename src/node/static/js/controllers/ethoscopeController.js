@@ -846,15 +846,28 @@
         }
 
         /**
-         * Get sensor IP address by location
+         * Get sensor IP address by location (an incubator name).
+         *
+         * A virtual "shoe box" has no sensor of its own — the temperature and
+         * humidity it experiences are those of the incubator it sits inside,
+         * so fall back to the parent's sensor. Parents are always physical
+         * incubators, so this recurses at most once.
          */
         $scope.get_ip_of_sensor = function(location) {
             if (!location || !$scope.node.sensors) return null;
 
-            location = location.replace(/\s+/g, '_');
+            var normalised = String(location).replace(/\s+/g, '_');
             for (var sensor in $scope.node.sensors) {
-                if ($scope.node.sensors[sensor].location === location) {
+                if ($scope.node.sensors[sensor].location === normalised) {
                     return $scope.node.sensors[sensor].ip;
+                }
+            }
+
+            var incubator = $scope.node.incubators ? $scope.node.incubators[location] : null;
+            if (incubator && incubator.type === 'virtual') {
+                var parent = (incubator.parent || '').trim();
+                if (parent && parent.toLowerCase() !== 'room' && parent !== location) {
+                    return $scope.get_ip_of_sensor(parent);
                 }
             }
             return null;

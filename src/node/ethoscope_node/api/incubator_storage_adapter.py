@@ -35,6 +35,7 @@ _ADD_FIELDS = {
     "crepuscular",
     "type",
     "set_temp",
+    "parent",
 }
 
 

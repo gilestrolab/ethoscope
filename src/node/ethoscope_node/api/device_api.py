@@ -12,6 +12,8 @@ import tempfile
 
 import bottle
 
+from ethoscope_node.utils.device_locations import resolve_device_locations
+
 from .base import BaseAPI, error_decorator, warning_decorator
 
 
@@ -23,6 +25,7 @@ class DeviceAPI(BaseAPI):
         # Device listing and management
         self.app.route("/devices", method="GET")(self._get_devices)
         self.app.route("/devices_list", method="GET")(self._get_devices_list)
+        self.app.route("/devices/locations", method="GET")(self._get_device_locations)
         self.app.route("/devices/retire-inactive", method="POST")(
             self._retire_inactive_devices
         )
@@ -92,6 +95,20 @@ class DeviceAPI(BaseAPI):
     def _get_devices_list(self):
         """Alias for _get_devices."""
         return self._get_devices()
+
+    @error_decorator
+    def _get_device_locations(self):
+        """Which incubator each device is in, keyed by device id.
+
+        Live info places the devices that are online; the node's runs table
+        places the ones that are switched off. See
+        :mod:`ethoscope_node.utils.device_locations` for the precedence.
+        """
+        devices = (
+            self.device_scanner.get_all_devices_info() if self.device_scanner else {}
+        )
+        last_runs = self.database.getLastKnownLocations() if self.database else {}
+        return resolve_device_locations(devices or {}, last_runs or {})
 
     @error_decorator
     def _retire_inactive_devices(self):

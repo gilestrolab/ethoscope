@@ -2480,3 +2480,43 @@ body {
     font-size: 12px !important;
     white-space: nowrap !important;
 }
+
+/* Incubator table: every record is followed by a normally-hidden detail row
+   holding the ethoscopes inside it, so the two rows are striped as one unit
+   (table-striped would shade every record row identically). */
+.incubator-table tr.incubator-row-alt > td {
+    background-color: rgba(0, 0, 0, .04);
+}
+
+.incubator-table td.incubator-details-cell {
+    padding: 0 !important;
+    border-top: 0 !important;
+}
+
+.incubator-details {
+    padding: 6px 10px 10px 38px;
+}
+
+.incubator-details .occupant {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 0;
+}
+
+.incubator-details .occupant-nested {
+    padding-left: 22px;
+}
+
+.incubator-details .occupant-name {
+    min-width: 170px;
+}
+
+.incubator-details .occupant-when {
+    margin-left: auto;
+    font-size: 0.9em;
+}
+
+.incubator-details .occupant-box {
+    margin-top: 4px;
+}

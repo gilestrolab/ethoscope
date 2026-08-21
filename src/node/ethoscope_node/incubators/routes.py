@@ -25,6 +25,12 @@ from ethoscope_node.incubators.firmware_client import (
     IncubatorFirmwareClient,
     IncubatorHTTPError,
 )
+from ethoscope_node.incubators.hierarchy import (
+    ROOM,
+    children_of,
+    effective_location,
+    validate_parent,
+)
 from ethoscope_node.incubators.scanner import IncubatorScanner
 from ethoscope_node.incubators.schedule import build_firmware_payload
 from ethoscope_node.incubators.storage import IncubatorStorage
@@ -48,6 +54,7 @@ _WRITE_FIELDS = (
     "crepuscular",
     "type",
     "set_temp",
+    "parent",
 )
 
 
@@ -85,9 +92,10 @@ class IncubatorRoutes:
         """Join storage records and live telemetry. Same shape as Phase 1.
 
         Each entry gains a ``source`` field ('configured' | 'discovered' |
-        'both') and, when a live unit is present, its telemetry plus an
-        online/offline ``live_status``. Configured incubators with no
-        ``hostname`` (never bound) report ``live_status='unbound'``.
+        'both'), an ``effective_location`` resolved through the parent chain,
+        and, when a live unit is present, its telemetry plus an online/offline
+        ``live_status``. Configured incubators with no ``hostname`` (never
+        bound) report ``live_status='unbound'``.
         """
         discovered = {}
         if self._scanner is not None:
@@ -100,6 +108,10 @@ class IncubatorRoutes:
         merged: dict[str, dict[str, Any]] = {}
         for name, cfg in configured.items():
             entry = dict(cfg)
+            # Derived: where the box actually stands. For a virtual box that is
+            # its parent incubator (plus that incubator's own location); for
+            # everything else it is just its own location.
+            entry["effective_location"] = effective_location(cfg, configured.get)
             hostname = cfg.get("hostname")
             live = discovered.pop(hostname, None) if hostname else None
             if live is not None:
@@ -174,6 +186,15 @@ class IncubatorRoutes:
         record = self._sanitize_write(payload)
         if not record.get("name"):
             return _err("Incubator name is required")
+        parent, parent_error = validate_parent(
+            record.get("parent"),
+            incubator_type=record.get("type"),
+            self_name=record["name"],
+            lookup=self._lookup,
+        )
+        if parent_error:
+            return _err(parent_error)
+        record["parent"] = parent
         new_id = self._storage.add(record)
         if new_id < 0:
             return _err(f"Could not add incubator '{record['name']}'")
@@ -191,9 +212,25 @@ class IncubatorRoutes:
             return _err(f"Incubator '{name}' not found")
         patch = self._sanitize_write(payload)
         patch.pop("name", None)
+        # Parent is resolved against the category the record will *have* after
+        # this patch, so switching a box to 'normal' also drops its parent and
+        # switching it to 'virtual' gives it one (the Room by default).
+        new_type = patch.get("type", record.get("type"))
+        parent, parent_error = validate_parent(
+            patch.get("parent", record.get("parent")),
+            incubator_type=new_type,
+            self_name=name,
+            lookup=self._lookup,
+        )
+        if parent_error:
+            return _err(parent_error)
+        patch["parent"] = parent
         rows = self._storage.update(name=name, **patch)
         if rows < 0:
             return _err(f"Could not update incubator '{name}'")
+        # A record that just stopped being physical can no longer host
+        # anything: send its boxes back to the Room.
+        self._orphan_children(name, unless_physical=True)
         pushed = self._maybe_push(name)
         return _ok(rows_affected=rows, pushed=pushed)
 
@@ -201,7 +238,10 @@ class IncubatorRoutes:
         rows = self._storage.delete(name=name)
         if rows < 0:
             return _err(f"Could not delete incubator '{name}'")
-        return _ok(rows_affected=rows)
+        # The boxes that sat inside it are still there — they are just in the
+        # room now. Better a truthful 'Room' than a dangling parent name.
+        orphaned = self._orphan_children(name)
+        return _ok(rows_affected=rows, orphaned=orphaned)
 
     def bind(self, name: str, hostname: str | None) -> dict[str, Any]:
         """Bind a record to a physical unit hostname (or None to unbind).
@@ -223,6 +263,9 @@ class IncubatorRoutes:
         update_fields: dict[str, Any] = {
             "hostname": clean_hostname,
             "type": "smart" if clean_hostname else "normal",
+            # Either way the record is now physical, so it has no parent of
+            # its own (a box that was virtual until now loses one).
+            "parent": "",
         }
         rows = self._storage.update(name=name, **update_fields)
         if rows < 0:
@@ -317,6 +360,35 @@ class IncubatorRoutes:
     def _sanitize_write(payload: dict[str, Any]) -> dict[str, Any]:
         """Return a copy of `payload` containing only writable fields."""
         return {k: v for k, v in payload.items() if k in _WRITE_FIELDS}
+
+    def _lookup(self, name: str) -> dict[str, Any] | None:
+        """Name -> record resolver handed to the hierarchy rules."""
+        return self._storage.get(name=name)
+
+    def _orphan_children(
+        self, name: str, *, unless_physical: bool = False
+    ) -> list[str]:
+        """Send the virtual boxes parented to ``name`` back to the Room.
+
+        Args:
+            name (str): The parent that is going away (deleted) or is no
+                longer able to host boxes.
+            unless_physical (bool): When True, keep the children where they
+                are if ``name`` still exists as a physical incubator. Used on
+                update, where most patches leave the parenting untouched.
+
+        Returns:
+            list[str]: Names of the boxes that were re-parented to the Room.
+        """
+        if unless_physical:
+            record = self._storage.get(name=name)
+            if record is not None and str(record.get("type") or "") != "virtual":
+                return []
+        orphaned = []
+        for child in children_of(self._storage.list_all() or {}, name):
+            if self._storage.update(name=child, parent=ROOM) >= 0:
+                orphaned.append(child)
+        return orphaned
 
     def _maybe_push(self, name: str, *, force: bool = False) -> bool:
         """Push the storage schedule to the bound firmware. Best-effort.

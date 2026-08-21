@@ -33,6 +33,7 @@ import sqlite3
 import string
 import traceback
 
+from ethoscope_node.incubators.hierarchy import ROOM, is_room, normalise_type
 from ethoscope_node.utils.configuration import migrate_conf_file
 from ethoscope_node.utils.paths import resolve_config_dir
 
@@ -211,7 +212,8 @@ class ExperimentalDB(multiprocessing.Process):
                                 max_light INTEGER DEFAULT 100,
                                 crepuscular INTEGER DEFAULT 0,
                                 type TEXT DEFAULT 'normal',
-                                set_temp REAL
+                                set_temp REAL,
+                                parent TEXT DEFAULT ''
                             );"""
 
         # device_interventions: append-only log of user-originated mutating actions
@@ -278,6 +280,9 @@ class ExperimentalDB(multiprocessing.Process):
             # Migration 13: Add incubator category ('type': normal/smart/virtual)
             # and a temperature setpoint ('set_temp') used only by smart units.
             self._migrate_incubators_add_type_and_set_temp()
+            # Migration 14: Add the incubator 'parent' column — the physical
+            # incubator a virtual "shoe box" sits inside ('' / 'Room' = none).
+            self._migrate_incubators_add_parent()
         except Exception as e:
             logging.error(f"Error during database migration: {e}")
 
@@ -835,6 +840,40 @@ class ExperimentalDB(multiprocessing.Process):
                 logging.info("Added set_temp to incubators table")
         except Exception as e:
             logging.error(f"Error migrating incubators table (type/set_temp): {e}")
+
+    def _migrate_incubators_add_parent(self):
+        """
+        Add the ``parent`` column to the incubators table if absent.
+
+        A virtual incubator (a short-lived "shoe box") normally sits inside a
+        proper incubator, so its own record does not say where the animals
+        are. ``parent`` holds the name of that enclosing physical incubator,
+        or the sentinel 'Room' when the box stands in the open room. Normal
+        and smart incubators leave it empty. See
+        :mod:`ethoscope_node.incubators.hierarchy` for the rules.
+        """
+        try:
+            table_info = self.executeSQL(
+                f"PRAGMA table_info({self._incubators_table_name})"
+            )
+            if not isinstance(table_info, list):
+                return
+
+            existing = {col[1] for col in table_info}
+            if "parent" not in existing:
+                self.executeSQL(
+                    f"ALTER TABLE {self._incubators_table_name} "
+                    f"ADD COLUMN parent TEXT DEFAULT ''"
+                )
+                logging.info("Added parent to incubators table")
+                # Existing virtual boxes predate the column: default them to
+                # the Room sentinel rather than leaving "where is it?" blank.
+                self.executeSQL(
+                    f"UPDATE {self._incubators_table_name} "
+                    f"SET parent = '{ROOM}' WHERE type = 'virtual'"
+                )
+        except Exception as e:
+            logging.error(f"Error migrating incubators table (parent): {e}")
 
     def getRun(self, run_id, asdict=False):
         """
@@ -1539,6 +1578,7 @@ class ExperimentalDB(multiprocessing.Process):
         crepuscular: int = 0,
         type: str = "normal",
         set_temp: float = None,
+        parent: str = "",
     ):
         """
         Add a new incubator to the database.
@@ -1567,6 +1607,9 @@ class ExperimentalDB(multiprocessing.Process):
                 (short-lived manual unit). Invalid values fall back to 'normal'.
             set_temp: Target temperature in °C for smart units (pushed to the
                 firmware); None for non-smart incubators
+            parent: Name of the physical incubator a virtual "shoe box" sits
+                inside, or 'Room' when it stands in the open room. Ignored
+                (stored empty) for normal and smart incubators.
 
         Returns:
             ID of the inserted incubator or -1 if error
@@ -1605,20 +1648,30 @@ class ExperimentalDB(multiprocessing.Process):
             fade_out_sql = int(fade_out_seconds) if fade_out_seconds is not None else 1
             max_light_sql = int(max_light) if max_light is not None else 100
             crepuscular_sql = 1 if int(crepuscular or 0) else 0
-            type_sql = type if type in ("normal", "smart", "virtual") else "normal"
+            type_sql = normalise_type(type)
             set_temp_sql = "NULL" if set_temp is None else f"{float(set_temp)}"
+            # Only a virtual box carries a parent, and it always declares one:
+            # a physical incubator's name or the 'Room' sentinel.
+            if type_sql != "virtual":
+                parent_value = ""
+            elif is_room(parent):
+                parent_value = ROOM
+            else:
+                parent_value = str(parent).strip()
+            escaped_parent = parent_value.replace("'", "''")
 
             sql_add_incubator = f"""
             INSERT INTO {self._incubators_table_name}
             (name, location, owner, description, created, active,
              lights_on, lights_off, light_period_minutes, light_cycle_anchor, hostname,
-             fade_in_seconds, fade_out_seconds, max_light, crepuscular, type, set_temp)
+             fade_in_seconds, fade_out_seconds, max_light, crepuscular, type, set_temp,
+             parent)
             VALUES ('{escaped_name}', '{escaped_location}', '{escaped_owner}',
                     '{escaped_description}', '{created}', {active},
                     '{escaped_lights_on}', '{escaped_lights_off}',
                     {period_sql}, {anchor_sql}, {hostname_sql},
                     {fade_in_sql}, {fade_out_sql}, {max_light_sql}, {crepuscular_sql},
-                    '{type_sql}', {set_temp_sql})
+                    '{type_sql}', {set_temp_sql}, '{escaped_parent}')
             """
 
             result = self.executeSQL(sql_add_incubator)
@@ -1684,6 +1737,7 @@ class ExperimentalDB(multiprocessing.Process):
                     "lights_on",
                     "lights_off",
                     "type",
+                    "parent",
                 ]:
                     escaped_value = str(value).replace("'", "''")
                     set_clauses.append(f"{field} = '{escaped_value}'")
@@ -1914,6 +1968,53 @@ class ExperimentalDB(multiprocessing.Process):
         except Exception as e:
             logging.error(f"Error checking recent intervention for {device_id}: {e}")
             return False
+
+    def getLastKnownLocations(self) -> dict:
+        """
+        Where each ethoscope last ran, according to the runs table.
+
+        The scanner only knows where a device is while it is online — a device
+        that is switched off reports nothing at all. The runs table remembers,
+        so this is what lets an offline ethoscope still be shown inside the
+        incubator it was last used in.
+
+        Returns:
+            dict: ``{ethoscope_id: {"location", "since", "user", "run_id",
+            "status"}}`` for every device that has at least one run with a
+            recorded location. ``since`` is a unix timestamp (None when the
+            stored start_time cannot be parsed).
+        """
+        try:
+            # Bare columns alongside MAX() are well defined in SQLite: they come
+            # from the row that holds the maximum. start_time is written by
+            # addRun() as an ISO string, which sorts chronologically.
+            rows = self.executeSQL(
+                f"SELECT ethoscope_id, location, user_name, run_id, status, "
+                f"MAX(start_time) AS start_time FROM {self._runs_table_name} "
+                "WHERE location IS NOT NULL AND TRIM(location) != '' "
+                "GROUP BY ethoscope_id"
+            )
+            if not isinstance(rows, list):
+                return {}
+
+            locations = {}
+            for row in rows:
+                record = dict(row)
+                device_id = record.get("ethoscope_id")
+                if not device_id:
+                    continue
+                parsed = self._parse_session_time(record.get("start_time"))
+                locations[device_id] = {
+                    "location": str(record.get("location") or "").strip(),
+                    "since": parsed.timestamp() if parsed else None,
+                    "user": record.get("user_name") or "",
+                    "run_id": record.get("run_id") or "",
+                    "status": record.get("status") or "",
+                }
+            return locations
+        except Exception as e:
+            logging.error(f"Error fetching last known device locations: {e}")
+            return {}
 
     def getOpenRunsForDevice(self, device_id: str) -> list[str]:
         """Return run_ids of any runs for this device that are not yet finalised."""

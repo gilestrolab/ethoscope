@@ -625,3 +625,126 @@ on the following refresh. The devices that had been lying green since April are 
       already records that the user deliberately disturbed a device; the update table
       could read it and show "settling" for a minute instead of Restart Required /
       Software broken. Cosmetic -- only worth doing if the churn is actually annoying.
+
+---
+
+# Incubators: a virtual box must say where it is
+
+Date: 2026-08-20
+
+## Problem
+
+A virtual ("shoe box") incubator is not a box that stands on its own -- it normally sits
+*inside* a proper incubator, and until now nothing in the record said which one. The
+`location` free-text field describes a room, so a shoe box carrying a light regime of its
+own gave no way to tell where the animals in it actually were, nor which sensor was
+measuring their conditions.
+
+## Change
+
+Every virtual incubator now declares a **parent**: the name of a physical (normal/smart)
+incubator, or the sentinel `Room` when it stands out in the open. Parents must be
+physical, so the hierarchy is one level deep and cycles are impossible by construction.
+
+- [x] `incubators/hierarchy.py` -- the single home of the rule (`ROOM`, `validate_parent`,
+      `children_of`, `effective_location`). No imports, so the subpackage stays standalone.
+- [x] `parent` column in both backends: `etho_db` migration 14 (existing virtual rows
+      default to `Room`) and `SQLiteIncubatorStorage` schema v3 with the idempotent ALTER.
+- [x] Both write paths validate through the same helper: `setup_api` (node) and
+      `IncubatorRoutes` (standalone). Unknown parent, self-parent and box-inside-box are
+      refused with a message rather than silently coerced.
+- [x] Category changes carry the parenting: promoting a box to normal drops its parent,
+      demoting a host to virtual sends its boxes back to the Room, binding hardware
+      clears the parent (the record is physical from then on).
+- [x] Rename cascades to the children; delete re-parents them to the Room instead of
+      leaving a dangling name (the delete message names the boxes that moved).
+- [x] `/incubators/merged` gains a derived `effective_location` resolved through the parent.
+- [x] UI: a "Sits inside" selector on the incubator modal (virtual only, listing physical
+      incubators + Room); the Location field becomes read-only and inherited when the box
+      has a parent; the table's search resolves through the parent, so looking for an
+      incubator also turns up the shoe boxes kept inside it. (The Location column itself
+      was dropped later -- see the next entry.)
+- [x] A device in a shoe box now falls back to the **parent's sensor** for temperature and
+      humidity (`get_ip_of_sensor` in `ethoscopeController.js`) -- the box has no sensor of
+      its own, and the conditions it sees are the enclosing incubator's.
+
+## Verification
+
+- 1713 node tests pass, including new suites for the rules (`test_hierarchy.py`), the
+  standalone routes/storage, `etho_db`, and `setup_api`.
+- Driven end to end against a live dev node on :8099 -- add/move/rename/delete, the two
+  rejection paths, and the UI round trip (edit modal -> save -> table) all behave.
+- pre-commit clean on every touched file.
+
+## Discovered During Work
+
+- [ ] The wizard's add/edit incubator modals still have no category field, so they can only
+      create normal incubators. Fine for first-time setup; worth revisiting if users start
+      creating shoe boxes during installation.
+- [ ] A shoe box inside an incubator with a light regime of its own is a light *override*,
+      not an inheritance -- currently nothing warns when the two schedules conflict.
+
+---
+
+# Incubators: see which ethoscopes sit in which incubator
+
+Date: 2026-08-20
+
+## Problem
+
+Nothing in the UI answered "what is in Incubator_4A?". The information exists but is
+scattered: a tracking device reports its incubator in `experimental_info.current.location`,
+an idle one still remembers `previous.location`, and a device that is switched off reports
+nothing at all -- on the production fleet that is 23 of 54 devices, i.e. most of the room
+would have been invisible.
+
+## Change
+
+- [x] `utils/device_locations.py` -- pure resolver, no scanner or DB needed to test it.
+      Precedence: current run -> device's previous run -> node `runs` table. Each
+      attribution carries its `source` so the UI can distinguish "is here" from
+      "was here in June". Unplaceable devices are still listed, never silently dropped.
+- [x] `ExperimentalDB.getLastKnownLocations()` -- newest located run per ethoscope in one
+      GROUP BY, timestamps normalised through the existing `_parse_session_time`.
+- [x] `GET /devices/locations` -- wires scanner + DB into the resolver.
+- [x] Expandable rows on the incubators table: each row carries a caret and a count,
+      and opens a detail row listing the ethoscopes inside — shoe boxes nested under the
+      incubator that holds them, counts rolled up, greyed-out rows for last-known
+      placements. Groups are rebuilt on load (not from the template) so the 15 s poll
+      cannot churn the digest.
+      Started as a second "Occupancy" tab; folded into the table on review, so all the
+      information stays on one page.
+- [x] Page-wide "show offline ethoscopes" toggle, off by default, mirroring the main
+      device list. An offline device is placed by memory, not observation, so it is not
+      counted until asked for; an expanded row says how many it is hiding.
+- [x] Dropped the Location and Sensor columns on review: the room name is not what
+      anyone needs from this table, and a sensor's *name* says nothing — the Live column
+      now shows that sensor's readings instead, and a shoe box's "in <incubator>" moved
+      into the Name cell.
+- [x] Devices whose recorded incubator no longer exists are silently left out. Deleting
+      an incubator is a normal act and its old runs are history, not a fault to report.
+      (Only devices that never recorded any incubator are still listed, once.)
+- [x] Fixed `loadDevices()` in `incubatorsController`: it fetched `/node/ethoscopes`,
+      which has never existed in `NodeAPI`, so `$scope.devices` was always empty and the
+      "light schedule locked while devices are running" banner never appeared. Now `/devices`.
+
+## Verification
+
+- 1733 node tests pass (20 new: resolver, DB query, endpoint).
+- Rendered against real data -- production `/devices` snapshot + a local copy of the node
+  DB -- first via a throwaway stub, then via the real server with only its three scanners
+  stubbed out (`scratchpad/devnode.py`), so nothing on the lab network was discovered,
+  SSH-keyed or pushed a schedule. 49 of 54 devices placed (2 current, 29 previous, 18
+  rescued by the runs table), 5 unplaced.
+- Opening that production DB copy also exercised migration 14 on 120 MB of real data: both
+  existing virtual incubators were back-filled to `Room` as intended.
+- `getLastKnownLocations()` takes 7.7 ms over 2258 runs -- fine for the 15 s poll.
+
+## Discovered During Work
+
+- [ ] Production has duplicate device registrations (two ids, same `ETHOSCOPE_073` name),
+      which now show as two rows in one incubator. Worth a cleanup pass on the ethoscopes
+      table, unrelated to this view.
+- [ ] Bound smart incubators show "offline" in Live when their unit is unreachable, even
+      when a sensor of the same name is still reporting readings. Falling back to the
+      sensor there too would be consistent with what non-smart incubators now do.

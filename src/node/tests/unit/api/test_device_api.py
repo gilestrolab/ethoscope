@@ -62,13 +62,14 @@ class TestDeviceAPI(unittest.TestCase):
         self.api.app.route = mock_route
         self.api.register_routes()
 
-        # Should register 24 routes (including firmware status and update)
-        self.assertEqual(len(route_calls), 24)
+        # Should register 25 routes (including firmware status and update)
+        self.assertEqual(len(route_calls), 25)
 
         # Check specific routes
         paths = [call[0] for call in route_calls]
         self.assertIn("/devices", paths)
         self.assertIn("/devices_list", paths)
+        self.assertIn("/devices/locations", paths)
         self.assertIn("/devices/retire-inactive", paths)
         self.assertIn("/devices/cleanup-busy", paths)
         self.assertIn("/device/add", paths)
@@ -104,6 +105,40 @@ class TestDeviceAPI(unittest.TestCase):
         self.api.device_scanner.get_all_devices_info.assert_called_once_with(
             include_inactive=False
         )
+
+    def test_get_device_locations_merges_live_info_and_runs_table(self):
+        """Running devices come from live info; offline ones from the DB."""
+        self.api.device_scanner.get_all_devices_info.return_value = {
+            "d1": {
+                "name": "ETHOSCOPE_354",
+                "status": "running",
+                "experimental_info": {
+                    "current": {"location": "Incubator_4A", "name": "lguo"}
+                },
+            },
+            "d2": {"name": "ETHOSCOPE_130", "status": "offline"},
+        }
+        self.api.database.getLastKnownLocations.return_value = {
+            "d2": {"location": "Incubator_2A", "since": 1.0, "user": "gg"}
+        }
+
+        result = self.api._get_device_locations()
+
+        self.assertEqual(result["d1"]["incubator"], "Incubator_4A")
+        self.assertEqual(result["d1"]["source"], "current")
+        self.assertEqual(result["d2"]["incubator"], "Incubator_2A")
+        self.assertEqual(result["d2"]["source"], "last_run")
+
+    def test_get_device_locations_without_a_database(self):
+        """Edge case: no DB means live info only, not a failure."""
+        self.api.database = None
+        self.api.device_scanner.get_all_devices_info.return_value = {
+            "d1": {"name": "ETHOSCOPE_001", "status": "offline"}
+        }
+
+        result = self.api._get_device_locations()
+
+        self.assertIsNone(result["d1"]["incubator"])
 
     @patch("ethoscope_node.api.device_api.BaseAPI.get_query_param")
     def test_get_devices_with_inactive(self, mock_get_param):

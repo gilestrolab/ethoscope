@@ -26,6 +26,15 @@
     </label>
 </div>
 
+<!-- Offline ethoscopes are hidden from the occupancy lists by default: they are
+     placed by where they last ran, which may be months old. -->
+<div class="alert alert-neutral" style="background-color:#f2f2f2;">
+    <label class="toggle-check">Show offline ethoscopes, where they were last seen
+        <input name="showOffline" type="checkbox" class="toggle-check-input" ng-model="showOffline" ng-checked="false">
+        <span class="toggle-check-text"></span>
+    </label>
+</div>
+
 <!-- Discovered-but-unadopted WiFi units -->
 <div class="alert alert-info" ng-if="discoveredUnbound().length > 0" ng-cloak style="margin-top: 10px;">
     <i class="fa fa-wifi"></i>
@@ -36,8 +45,9 @@
 </div>
 
 <!-- INCUBATORS TABLE -->
-<table class="table table-striped" ng-cloak>
+<table class="table incubator-table" ng-cloak>
     <thead>
+        <th style="width:1%;" title="Ethoscopes inside"><i class="fa fa-microchip"></i></th>
         <th>
             <a href="#" ng-click="sortType = 'name'; sortReverse = !sortReverse">
                 Name
@@ -50,13 +60,6 @@
                 Type
                 <span ng-show="sortType == 'type' && !sortReverse" class="fa fa-caret-down"></span>
                 <span ng-show="sortType == 'type' && sortReverse" class="fa fa-caret-up"></span>
-            </a>
-        </th>
-        <th>
-            <a href="#" ng-click="sortType = 'location'; sortReverse = !sortReverse">
-                Location
-                <span ng-show="sortType == 'location' && !sortReverse" class="fa fa-caret-down"></span>
-                <span ng-show="sortType == 'location' && sortReverse" class="fa fa-caret-up"></span>
             </a>
         </th>
         <th>
@@ -73,8 +76,7 @@
                 <span ng-show="sortType == 'lights_on' && sortReverse" class="fa fa-caret-up"></span>
             </a>
         </th>
-        <th>Sensor</th>
-        <th>Live</th>
+        <th title="Current readings from the linked unit or the incubator's sensor">Live</th>
         <th>
             <a href="#" ng-click="sortType = 'active'; sortReverse = !sortReverse">
                 Status
@@ -85,11 +87,30 @@
         <th>Actions</th>
     </thead>
     <tbody>
-        <tr ng-repeat="incubator in incubatorFilter(incubators, searchText, showAll) | orderBy:sortPredicate():sortReverse">
+        <tr ng-repeat-start="incubator in incubatorFilter(incubators, searchText, showAll) | orderBy:sortPredicate():sortReverse"
+            ng-class="{'incubator-row-alt': $odd}">
+            <td>
+                <!-- Expander: what is inside this incubator, on the same page. -->
+                <a href="" ng-click="toggleExpanded(incubator)"
+                   title="{{isExpanded(incubator) ? 'Hide' : 'Show'}} the ethoscopes in {{incubator.name}}"
+                   style="white-space:nowrap; color:inherit;">
+                    <i class="fa" ng-class="isExpanded(incubator) ? 'fa-caret-down' : 'fa-caret-right'"></i>
+                    <span class="badge"
+                          ng-class="occupancyCount(incubator) ? 'badge-secondary' : 'badge-light'">
+                        {{occupancyCount(incubator)}}
+                    </span>
+                </a>
+            </td>
             <td>
                 <span ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
                     <i class="fa fa-thermometer-half"></i>
                     {{incubator.name}}
+                </span>
+                <!-- Where a shoe box sits. The room itself is not shown: it is
+                     rarely what anyone needs from this table. -->
+                <span class="text-muted" ng-if="hasParent(incubator)"
+                      style="font-size:0.9em;" title="This shoe box is kept inside {{incubator.parent}}">
+                    <i class="fa fa-box-open"></i> in {{incubator.parent}}
                 </span>
             </td>
             <td>
@@ -102,11 +123,6 @@
                                              'fa-thermometer-half': incubatorType(incubator) === 'normal',
                                              'fa-box': incubatorType(incubator) === 'virtual'}"></i>
                     {{incubatorType(incubator)}}
-                </span>
-            </td>
-            <td>
-                <span ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
-                    {{incubator.location || '—'}}
                 </span>
             </td>
             <td>
@@ -130,15 +146,6 @@
                 </span>
             </td>
             <td>
-                <span ng-if="getSensorForIncubator(incubator.name)" ng-style="{'color': incubator.active ? 'inherit' : 'grey'}">
-                    <i class="fa fa-temperature-quarter"></i>
-                    {{getSensorForIncubator(incubator.name).name || getSensorForIncubator(incubator.name).ip}}
-                </span>
-                <span ng-if="!getSensorForIncubator(incubator.name)" style="color: grey;">
-                    —
-                </span>
-            </td>
-            <td>
                 <!-- Live readings from the bound WiFi unit (monitor-only) -->
                 <span ng-if="isLiveOnline(liveForIncubator(incubator))" title="Live readings from the linked unit">
                     <i class="fa fa-circle" style="color:#5cb85c; font-size:0.6em; vertical-align:middle;"></i>
@@ -156,7 +163,26 @@
                       style="color:#d9534f;" title="Linked unit not responding">
                     <i class="fa fa-circle" style="font-size:0.6em; vertical-align:middle;"></i> offline
                 </span>
-                <span ng-if="!incubator.hostname" style="color: grey;" title="Not linked to a physical unit">
+                <!-- No linked unit: an ordinary incubator is measured by its own
+                     sensor, so show what that sensor reads rather than its name. -->
+                <span ng-if="!incubator.hostname && sensorReading(incubator)"
+                      ng-style="{'color': incubator.active ? 'inherit' : 'grey'}"
+                      title="{{sensorReading(incubator).name}} — {{sensorReading(incubator).status}}">
+                    <i class="fa fa-circle"
+                       ng-style="{'color': sensorReading(incubator).status === 'online' ? '#5cb85c' : '#d9534f'}"
+                       style="font-size:0.6em; vertical-align:middle;"></i>
+                    {{sensorReading(incubator).temperature | number:1}}&deg;C
+                    <span ng-if="sensorReading(incubator).humidity !== undefined && sensorReading(incubator).humidity !== null"
+                          style="font-size:0.85em; color:#888;" title="Relative humidity">
+                        · {{sensorReading(incubator).humidity | number:0}}%
+                    </span>
+                    <span ng-if="sensorReading(incubator).light !== undefined && sensorReading(incubator).light !== null"
+                          style="font-size:0.85em; color:#888;" title="Light">
+                        · <i class="fa fa-lightbulb"></i> {{sensorReading(incubator).light}}
+                    </span>
+                </span>
+                <span ng-if="!incubator.hostname && !sensorReading(incubator)" style="color: grey;"
+                      title="No linked unit and no sensor reporting from this incubator">
                     —
                 </span>
             </td>
@@ -174,9 +200,72 @@
             </td>
         </tr>
 
+        <!-- Hidden detail row: the ethoscopes inside this incubator. A device is
+             placed by its current run while tracking, and by the last run the node
+             recorded otherwise — those older placements are greyed out. -->
+        <tr ng-repeat-end ng-class="{'incubator-row-alt': $odd}">
+            <td colspan="8" class="incubator-details-cell">
+                <div ng-if="isExpanded(incubator)" class="incubator-details">
+
+                    <div ng-repeat="device in devicesIn(incubator) track by device.id"
+                         class="occupant"
+                         ng-style="{'opacity': device.source === 'current' ? 1 : 0.6}">
+                        <a href="#!/ethoscope/{{device.id}}" class="occupant-name">
+                            <i class="fa fa-microchip"></i> {{device.name}}
+                        </a>
+                        <span class="badge"
+                              ng-class="{'badge-success': isDeviceRunning(device),
+                                         'badge-light': isDeviceOffline(device),
+                                         'badge-secondary': !isDeviceRunning(device) && !isDeviceOffline(device)}">
+                            {{device.status}}
+                        </span>
+                        <span class="text-muted" ng-if="device.user">{{device.user}}</span>
+                        <span class="text-muted occupant-when">{{placementLabel(device)}}</span>
+                    </div>
+
+                    <!-- Shoe boxes kept inside this incubator, with their own contents -->
+                    <div ng-repeat="box in boxesIn(incubator) track by box.key" class="occupant-box">
+                        <div class="text-muted">
+                            <i class="fa fa-box"></i> {{box.name}}
+                            <span ng-if="box.record.lights_on && box.record.lights_off">
+                                — <i class="fa fa-sun"></i>
+                                {{formatTime(box.record.lights_on)}}&ndash;{{formatTime(box.record.lights_off)}}
+                            </span>
+                            <span ng-if="!visibleDevices(box.devices).length">— empty</span>
+                        </div>
+                        <div ng-repeat="device in visibleDevices(box.devices) track by device.id"
+                             class="occupant occupant-nested"
+                             ng-style="{'opacity': device.source === 'current' ? 1 : 0.6}">
+                            <a href="#!/ethoscope/{{device.id}}" class="occupant-name">
+                                <i class="fa fa-microchip"></i> {{device.name}}
+                            </a>
+                            <span class="badge"
+                                  ng-class="{'badge-success': isDeviceRunning(device),
+                                             'badge-light': isDeviceOffline(device),
+                                             'badge-secondary': !isDeviceRunning(device) && !isDeviceOffline(device)}">
+                                {{device.status}}
+                            </span>
+                            <span class="text-muted" ng-if="device.user">{{device.user}}</span>
+                            <span class="text-muted occupant-when">{{placementLabel(device)}}</span>
+                        </div>
+                    </div>
+
+                    <div class="text-muted" ng-if="!occupancyCount(incubator) && !boxesIn(incubator).length">
+                        No ethoscopes recorded in this incubator.
+                    </div>
+                    <div class="text-muted" ng-if="hiddenOfflineCount(incubator)">
+                        <i class="fa fa-eye-slash"></i>
+                        {{hiddenOfflineCount(incubator)}} offline ethoscope(s) hidden —
+                        use the <em>show offline</em> toggle above.
+                    </div>
+                </div>
+            </td>
+        </tr>
+
         <!-- Discovered smart units not yet adopted into a record. They appear here
              spontaneously (mDNS); "Add & bind" creates a smart record bound to the unit. -->
         <tr ng-repeat="unit in discoveredUnbound() | orderBy:nameSortKey" style="background-color:#f0f8ff;">
+            <td></td>
             <td>
                 <i class="fa fa-wifi" style="color:#5bc0de;"></i>
                 {{unit.name || unit.hostname}}
@@ -187,7 +276,6 @@
                 </span>
             </td>
             <td><span style="color:grey;">—</span></td>
-            <td><span style="color:grey;">—</span></td>
             <td>
                 <span ng-if="unit.lights_on !== undefined && unit.lights_off !== undefined" style="color:#888;">
                     <i class="fa fa-sun"></i>
@@ -195,7 +283,6 @@
                 </span>
                 <span ng-if="unit.lights_on === undefined || unit.lights_off === undefined" style="color:grey;">—</span>
             </td>
-            <td><span style="color:grey;">—</span></td>
             <td>
                 <span title="Live readings from the discovered unit">
                     <i class="fa fa-circle" style="color:#5cb85c; font-size:0.6em; vertical-align:middle;"></i>
@@ -218,6 +305,18 @@
         </tr>
     </tbody>
 </table>
+
+<!-- Ethoscopes that never recorded an incubator at all. Devices whose recorded
+     incubator no longer exists are simply not shown: deleting an incubator is a
+     normal thing to do, and its old runs are not a problem to report. -->
+<div class="alert alert-neutral" style="background-color:#f2f2f2;"
+     ng-if="visibleDevices(unplacedDevices).length" ng-cloak>
+    <i class="fa fa-map-marker-alt"></i>
+    <strong>{{visibleDevices(unplacedDevices).length}} ethoscope(s) have never recorded an incubator:</strong>
+    <span ng-repeat="device in visibleDevices(unplacedDevices) track by device.id">
+        <a href="#!/ethoscope/{{device.id}}">{{device.name}}</a><span ng-if="!$last">, </span>
+    </span>
+</div>
 
 <!-- Add/Edit Incubator Modal -->
 <div class="modal fade" id="incubatorModal" tabindex="-1" role="dialog" aria-labelledby="incubatorModalLabel" aria-hidden="true">
@@ -251,7 +350,17 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label class="form-label">Location</label>
-                                <input type="text"
+                                <!-- A shoe box kept inside an incubator is wherever
+                                     that incubator is: shown read-only, not editable. -->
+                                <div ng-if="hasParent(selectedIncubator)"
+                                     class="form-control-plaintext" style="padding-top:7px;">
+                                    {{parentLocation(selectedIncubator) || '—'}}
+                                    <small class="text-muted">
+                                        inherited from {{selectedIncubator.parent}}
+                                    </small>
+                                </div>
+                                <input ng-if="!hasParent(selectedIncubator)"
+                                       type="text"
                                        class="form-control"
                                        name="location"
                                        ng-model="selectedIncubator.location"
@@ -274,10 +383,28 @@
                                 <select ng-if="!isSmart(selectedIncubator)"
                                         class="form-control"
                                         name="type"
-                                        ng-model="selectedIncubator.type">
+                                        ng-model="selectedIncubator.type"
+                                        ng-change="onTypeChanged()">
                                     <option value="normal">Normal — manual, light only</option>
                                     <option value="virtual">Virtual — short-lived "shoe box"</option>
                                 </select>
+                            </div>
+                        </div>
+                        <!-- A shoe box has to sit somewhere: inside a proper
+                             incubator, or (default) out in the room. -->
+                        <div class="col-md-6" ng-if="isVirtual(selectedIncubator)">
+                            <div class="form-group">
+                                <label class="form-label">Sits inside</label>
+                                <select class="form-control"
+                                        name="parent"
+                                        ng-model="selectedIncubator.parent">
+                                    <option value="Room">— Room (not inside an incubator) —</option>
+                                    <option ng-repeat="candidate in parentCandidates()"
+                                            value="{{candidate}}">{{candidate}}</option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    The physical incubator this shoe box is kept in.
+                                </small>
                             </div>
                         </div>
                     </div>

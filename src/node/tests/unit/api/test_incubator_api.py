@@ -156,6 +156,7 @@ class TestIncubatorAPI(unittest.TestCase):
             incubator_id=None,
             hostname="incubator-1",
             type="smart",
+            parent="",
         )
         # The unit's sensor name + location mirror the incubator name.
         scanner.set_identity.assert_called_once_with(
@@ -187,7 +188,11 @@ class TestIncubatorAPI(unittest.TestCase):
         self.assertFalse(result["location_pushed"])
         # Unbinding reverts the record to a plain manual 'normal' incubator.
         self.mock_server.database.updateIncubator.assert_called_with(
-            name="Incubator 1", incubator_id=None, hostname=None, type="normal"
+            name="Incubator 1",
+            incubator_id=None,
+            hostname=None,
+            type="normal",
+            parent="",
         )
         scanner.set_location.assert_not_called()
 

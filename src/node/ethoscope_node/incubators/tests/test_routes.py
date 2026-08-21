@@ -12,6 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from ethoscope_node.incubators.firmware_client import IncubatorHTTPError
+from ethoscope_node.incubators.hierarchy import ROOM
 from ethoscope_node.incubators.routes import IncubatorRoutes
 from ethoscope_node.incubators.schedule import build_firmware_payload
 from ethoscope_node.incubators.storage import SQLiteIncubatorStorage
@@ -306,3 +307,88 @@ class TestGetTelemetry:
         client.get_telemetry.return_value = {"temperature": 25.0}
         result = routes.get_telemetry("Inc1")
         assert result == {"temperature": 25.0}
+
+
+class TestParenting:
+    """A virtual "shoe box" must always say which incubator it sits in."""
+
+    def test_new_box_defaults_to_the_room(self, routes):
+        assert routes.add({"name": "Box", "type": "virtual"})["result"] == "success"
+        assert routes._storage.get(name="Box")["parent"] == ROOM
+
+    def test_new_box_can_be_placed_inside_a_physical_incubator(self, routes):
+        routes.add({"name": "Big", "type": "normal", "location": "Room 101"})
+        routes.add({"name": "Box", "type": "virtual", "parent": "Big"})
+        assert routes._storage.get(name="Box")["parent"] == "Big"
+
+    def test_physical_incubators_get_no_parent(self, routes):
+        routes.add({"name": "Big", "type": "normal"})
+        routes.add({"name": "Other", "type": "normal", "parent": "Big"})
+        assert routes._storage.get(name="Other")["parent"] == ""
+
+    def test_unknown_parent_is_rejected(self, routes):
+        result = routes.add({"name": "Box", "type": "virtual", "parent": "Ghost"})
+        assert result["result"] == "error"
+        assert "Ghost" in result["message"]
+        assert routes._storage.get(name="Box") is None
+
+    def test_boxes_cannot_nest(self, routes):
+        routes.add({"name": "Box", "type": "virtual"})
+        result = routes.add({"name": "Box2", "type": "virtual", "parent": "Box"})
+        assert result["result"] == "error"
+
+    def test_update_moves_a_box(self, routes):
+        routes.add({"name": "Big", "type": "normal"})
+        routes.add({"name": "Box", "type": "virtual"})
+        assert routes.update("Box", {"parent": "Big"})["result"] == "success"
+        assert routes._storage.get(name="Box")["parent"] == "Big"
+
+    def test_update_to_unknown_parent_is_rejected_and_changes_nothing(self, routes):
+        routes.add({"name": "Big", "type": "normal"})
+        routes.add({"name": "Box", "type": "virtual", "parent": "Big"})
+        result = routes.update("Box", {"parent": "Ghost"})
+        assert result["result"] == "error"
+        assert routes._storage.get(name="Box")["parent"] == "Big"
+
+    def test_promoting_a_box_to_normal_drops_its_parent(self, routes):
+        routes.add({"name": "Big", "type": "normal"})
+        routes.add({"name": "Box", "type": "virtual", "parent": "Big"})
+        routes.update("Box", {"type": "normal"})
+        assert routes._storage.get(name="Box")["parent"] == ""
+
+    def test_demoting_a_host_sends_its_boxes_back_to_the_room(self, routes):
+        routes.add({"name": "Big", "type": "normal"})
+        routes.add({"name": "Box", "type": "virtual", "parent": "Big"})
+        routes.update("Big", {"type": "virtual"})
+        assert routes._storage.get(name="Box")["parent"] == ROOM
+
+    def test_unrelated_update_leaves_children_alone(self, routes):
+        routes.add({"name": "Big", "type": "normal"})
+        routes.add({"name": "Box", "type": "virtual", "parent": "Big"})
+        routes.update("Big", {"owner": "Alice"})
+        assert routes._storage.get(name="Box")["parent"] == "Big"
+
+    def test_deleting_a_host_sends_its_boxes_back_to_the_room(self, routes):
+        routes.add({"name": "Big", "type": "normal"})
+        routes.add({"name": "Box", "type": "virtual", "parent": "Big"})
+        result = routes.delete("Big")
+        assert result["orphaned"] == ["Box"]
+        assert routes._storage.get(name="Box")["parent"] == ROOM
+
+    def test_binding_a_box_to_hardware_clears_its_parent(self, routes, scanner):
+        _bind_live_unit(scanner, hostname="incubator-1")
+        routes.add({"name": "Big", "type": "normal"})
+        routes.add({"name": "Box", "type": "virtual", "parent": "Big"})
+        routes.bind("Box", "incubator-1")
+        record = routes._storage.get(name="Box")
+        assert record["type"] == "smart"
+        assert record["parent"] == ""
+
+    def test_merged_view_resolves_where_a_box_is(self, routes):
+        routes.add({"name": "Big", "type": "normal", "location": "Room 101"})
+        routes.add({"name": "Box", "type": "virtual", "parent": "Big"})
+        routes.add({"name": "Loose", "type": "virtual"})
+        merged = routes.list_merged()
+        assert merged["Big"]["effective_location"] == "Room 101"
+        assert merged["Box"]["effective_location"] == "Big (Room 101)"
+        assert merged["Loose"]["effective_location"] == ROOM

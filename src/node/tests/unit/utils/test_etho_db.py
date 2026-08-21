@@ -781,6 +781,34 @@ class TestIncubatorCRUD:
         rec = populated_db.getIncubatorByName("Incubator_01", asdict=True)
         assert rec["set_temp"] is None
 
+    def test_add_virtual_incubator_defaults_to_the_room(self, test_db):
+        """A shoe box with no stated parent is recorded as standing in the room."""
+        assert test_db.addIncubator(name="Shoe_box", type="virtual") > 0
+        rec = test_db.getIncubatorByName("Shoe_box", asdict=True)
+        assert rec["parent"] == "Room"
+
+    def test_add_virtual_incubator_inside_another(self, test_db):
+        """Expected use: the box declares the incubator it sits inside."""
+        test_db.addIncubator(name="Big_box", location="Room C")
+        assert (
+            test_db.addIncubator(name="Shoe_box", type="virtual", parent="Big_box") > 0
+        )
+        rec = test_db.getIncubatorByName("Shoe_box", asdict=True)
+        assert rec["parent"] == "Big_box"
+
+    def test_physical_incubator_stores_no_parent(self, test_db):
+        """Edge case: a parent handed to a non-virtual record is dropped."""
+        assert test_db.addIncubator(name="Big_box", parent="Somewhere") > 0
+        rec = test_db.getIncubatorByName("Big_box", asdict=True)
+        assert rec["parent"] == ""
+
+    def test_update_incubator_parent(self, test_db):
+        """The box can be moved between incubators after creation."""
+        test_db.addIncubator(name="Shoe_box", type="virtual")
+        assert test_db.updateIncubator(name="Shoe_box", parent="Big_box") >= 0
+        rec = test_db.getIncubatorByName("Shoe_box", asdict=True)
+        assert rec["parent"] == "Big_box"
+
 
 class TestDeviceManagement:
     """Test ethoscope device management."""
@@ -916,6 +944,67 @@ class TestRunOperations:
 
         run = populated_db.getRun("test_run_001", asdict=False)
         assert "Test problem message" in run[0]["problems"]
+
+    def test_last_known_location_is_the_newest_run(self, test_db):
+        """Expected use: an offline device is placed by where it last ran."""
+        test_db.addRun(
+            run_id="old_run",
+            ethoscope_name="ETHOSCOPE_001",
+            ethoscope_id="etho_001",
+            username="alice",
+            user_id=1,
+            location="Incubator_1A",
+        )
+        test_db.addRun(
+            run_id="new_run",
+            ethoscope_name="ETHOSCOPE_001",
+            ethoscope_id="etho_001",
+            username="bob",
+            user_id=2,
+            location="Incubator_4A",
+        )
+
+        locations = test_db.getLastKnownLocations()
+
+        assert locations["etho_001"]["location"] == "Incubator_4A"
+        assert locations["etho_001"]["run_id"] == "new_run"
+        assert locations["etho_001"]["user"] == "bob"
+        assert isinstance(locations["etho_001"]["since"], float)
+
+    def test_last_known_location_covers_each_device_once(self, test_db):
+        """Every device with a located run gets exactly one entry."""
+        for i, (device, location) in enumerate(
+            [("etho_001", "Incubator_1A"), ("etho_002", "Incubator_2A")]
+        ):
+            test_db.addRun(
+                run_id=f"run_{i}",
+                ethoscope_name=device.upper(),
+                ethoscope_id=device,
+                username="alice",
+                user_id=1,
+                location=location,
+            )
+
+        locations = test_db.getLastKnownLocations()
+
+        assert set(locations) == {"etho_001", "etho_002"}
+
+    def test_runs_without_a_location_are_ignored(self, test_db):
+        """Edge case: a run started with no incubator places nothing."""
+        test_db.addRun(
+            run_id="no_place",
+            ethoscope_name="ETHOSCOPE_009",
+            ethoscope_id="etho_009",
+            username="alice",
+            user_id=1,
+            location="   ",
+        )
+
+        assert test_db.getLastKnownLocations() == {}
+
+    def test_no_runs_at_all_returns_empty(self, test_db):
+        """Failure case: an empty runs table is not an error."""
+        assert test_db.getLastKnownLocations() == {}
 
 
 class TestAlertOperations:

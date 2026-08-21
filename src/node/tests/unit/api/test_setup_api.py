@@ -746,6 +746,7 @@ class TestSetupAPI(unittest.TestCase):
         mock_db = Mock()
         mock_db_class.return_value = mock_db
         mock_db.getIncubatorByName.return_value = {"id": 5, "name": "Old name"}
+        mock_db.getAllIncubators.return_value = {}
         mock_db.updateIncubator.return_value = 1
         # No devices running here, so the busy guard does not block the rename.
         self.api._devices_running_in_incubator = Mock(return_value=[])
@@ -773,6 +774,7 @@ class TestSetupAPI(unittest.TestCase):
             "name": "incubator-1",
             "hostname": "incubator-1",
         }
+        mock_db.getAllIncubators.return_value = {}
         mock_db.updateIncubator.return_value = 1
         self.api._devices_running_in_incubator = Mock(return_value=[])
 
@@ -813,6 +815,148 @@ class TestSetupAPI(unittest.TestCase):
 
         self.assertEqual(result["result"], "error")
         self.assertIn("Original incubator name is required", result["message"])
+
+    # ---- Virtual incubators: where the shoe box sits ----
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_virtual_incubator_defaults_to_the_room(
+        self, mock_db_class, mock_request
+    ):
+        """A shoe box with no stated parent is recorded as standing in the room."""
+        mock_request.json = {"name": "Box1", "type": "virtual"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 7
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "success")
+        self.assertEqual(mock_db.addIncubator.call_args[1]["parent"], "Room")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_virtual_incubator_inside_a_physical_one(
+        self, mock_db_class, mock_request
+    ):
+        """Expected use: the box declares the incubator it is kept in."""
+        mock_request.json = {"name": "Box1", "type": "virtual", "parent": "Big"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 7
+        mock_db.getIncubatorByName.return_value = {"name": "Big", "type": "normal"}
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "success")
+        self.assertEqual(mock_db.addIncubator.call_args[1]["parent"], "Big")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_virtual_incubator_with_unknown_parent_is_rejected(
+        self, mock_db_class, mock_request
+    ):
+        """Failure case: a parent that does not exist is refused, not guessed."""
+        mock_request.json = {"name": "Box1", "type": "virtual", "parent": "Ghost"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {}
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "error")
+        self.assertIn("Ghost", result["message"])
+        mock_db.addIncubator.assert_not_called()
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_add_normal_incubator_never_gets_a_parent(
+        self, mock_db_class, mock_request
+    ):
+        """Edge case: a parent sent for a physical incubator is dropped."""
+        mock_request.json = {"name": "Big", "type": "normal", "parent": "Other"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.addIncubator.return_value = 7
+
+        result = self.api._setup_add_incubator()
+
+        self.assertEqual(result["result"], "success")
+        self.assertEqual(mock_db.addIncubator.call_args[1]["parent"], "")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_update_moves_a_box_to_another_incubator(self, mock_db_class, mock_request):
+        """The box can be moved after creation."""
+        mock_request.json = {
+            "original_name": "Box1",
+            "type": "virtual",
+            "parent": "Big",
+        }
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.side_effect = lambda name, asdict=False: {
+            "Box1": {"id": 2, "name": "Box1", "type": "virtual", "parent": "Room"},
+            "Big": {"id": 1, "name": "Big", "type": "normal"},
+        }.get(name, {})
+        mock_db.getAllIncubators.return_value = {}
+        mock_db.updateIncubator.return_value = 1
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        self.assertEqual(mock_db.updateIncubator.call_args.kwargs["parent"], "Big")
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_renaming_a_host_takes_its_boxes_along(self, mock_db_class, mock_request):
+        """A rename must not orphan the boxes kept inside the incubator."""
+        mock_request.json = {"original_name": "Big", "name": "Big_2"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.getIncubatorByName.return_value = {
+            "id": 1,
+            "name": "Big",
+            "type": "normal",
+        }
+        mock_db.getAllIncubators.return_value = {
+            "Box1": {"name": "Box1", "type": "virtual", "parent": "Big"},
+            "Box2": {"name": "Box2", "type": "virtual", "parent": "Room"},
+        }
+        mock_db.updateIncubator.return_value = 1
+        self.api._devices_running_in_incubator = Mock(return_value=[])
+
+        result = self.api._setup_update_incubator()
+
+        self.assertEqual(result["result"], "success")
+        moved = [
+            call.kwargs
+            for call in mock_db.updateIncubator.call_args_list
+            if call.kwargs.get("name") == "Box1"
+        ]
+        self.assertEqual(moved, [{"name": "Box1", "parent": "Big_2"}])
+
+    @patch("bottle.request")
+    @patch("ethoscope_node.api.setup_api.ExperimentalDB")
+    def test_deleting_a_host_sends_its_boxes_to_the_room(
+        self, mock_db_class, mock_request
+    ):
+        """Deleting the incubator leaves its boxes in the room, not dangling."""
+        mock_request.json = {"name": "Big"}
+        mock_db = Mock()
+        mock_db_class.return_value = mock_db
+        mock_db.deleteIncubator.return_value = 1
+        mock_db.getAllIncubators.return_value = {
+            "Box1": {"name": "Box1", "type": "virtual", "parent": "Big"},
+        }
+        mock_db.updateIncubator.return_value = 1
+        self.api._devices_running_in_incubator = Mock(return_value=[])
+
+        result = self.api._setup_delete_incubator()
+
+        self.assertEqual(result["result"], "success")
+        self.assertIn("Box1", result["message"])
+        mock_db.updateIncubator.assert_called_once_with(name="Box1", parent="Room")
 
     # ---- T-cycle: period + anchor handling ----
 
@@ -1007,6 +1151,7 @@ class TestSetupAPI(unittest.TestCase):
             "light_period_minutes": 1440,
             "light_cycle_anchor": None,
         }
+        mock_db.getAllIncubators.return_value = {}
         mock_db.updateIncubator.return_value = 1
         self.mock_server.device_scanner.get_all_devices_info.return_value = {
             "etho_1": self._running_device("ETHO_001", "Box1"),

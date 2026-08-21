@@ -5,6 +5,10 @@
         // for the purpose of locking incubator edits. Mirrors the API.
         var RUNNING_STATUSES = ['running', 'recording', 'streaming', 'initialising'];
 
+        // Sentinel parent for a virtual "shoe box" that is not inside any
+        // incubator. Mirrors ROOM in ethoscope_node/incubators/hierarchy.py.
+        var ROOM = 'Room';
+
         // Initialize scope variables
         $scope.incubators = {};
         $scope.liveIncubators = {};   // live telemetry of discovered WiFi units, keyed by hostname
@@ -15,6 +19,11 @@
         $scope.incubatorToDelete = null;
         $scope.searchText = '';
         $scope.showAll = false;
+        $scope.showOffline = false;        // offline ethoscopes are placed by memory, not observation
+        $scope.deviceLocations = {};       // device id -> {incubator, source, since, user, status}
+        $scope.occupancyByName = {};       // incubator name -> {devices, boxes}, rebuilt when data lands
+        $scope.unplacedDevices = [];       // devices no source can put anywhere
+        $scope.expanded = {};              // incubator name -> detail row open?
         $scope.sortType = 'type';   // default: group by category, then name
         $scope.sortReverse = false;
 
@@ -63,8 +72,11 @@
             if (searchText) {
                 filtered = filtered.filter(function(inc) {
                     var s = searchText.toLowerCase();
+                    // Not a column any more, but searching for an incubator
+                    // should still turn up the shoe boxes kept inside it.
+                    var where = $scope.locationLabel(inc);
                     return (inc.name && inc.name.toLowerCase().indexOf(s) !== -1) ||
-                           (inc.location && inc.location.toLowerCase().indexOf(s) !== -1) ||
+                           (where && where.toLowerCase().indexOf(s) !== -1) ||
                            (inc.owner && inc.owner.toLowerCase().indexOf(s) !== -1) ||
                            (inc.description && inc.description.toLowerCase().indexOf(s) !== -1);
                 });
@@ -78,6 +90,7 @@
             $http.get('/node/incubators')
                 .then(function(response) {
                     $scope.incubators = response.data;
+                    rebuildOccupancy();
                 })
                 .catch(function(error) {
                     console.error('Error loading incubators:', error);
@@ -115,12 +128,26 @@
 
         // Load device list so the modal can show a "locked while running" banner.
         var loadDevices = function() {
-            $http.get('/node/ethoscopes')
+            $http.get('/devices')
                 .then(function(response) {
                     $scope.devices = response.data || {};
                 })
                 .catch(function(error) {
                     console.error('Error loading ethoscopes:', error);
+                });
+        };
+
+        // Where each ethoscope is: current location while it runs, last known
+        // incubator otherwise (the node's runs table covers devices that are
+        // switched off and report nothing at all).
+        var loadDeviceLocations = function() {
+            $http.get('/devices/locations')
+                .then(function(response) {
+                    $scope.deviceLocations = response.data || {};
+                    rebuildOccupancy();
+                })
+                .catch(function(error) {
+                    console.error('Error loading device locations:', error);
                 });
         };
 
@@ -266,6 +293,17 @@
             return null;
         };
 
+        // What the incubator's own sensor currently reads. The sensor's *name*
+        // is not interesting; its numbers are. Returns null when no sensor
+        // reports from this incubator.
+        $scope.sensorReading = function(incubator) {
+            if (!incubator || !incubator.name) return null;
+            var sensor = $scope.getSensorForIncubator(incubator.name);
+            if (!sensor) return null;
+            if (sensor.temperature === undefined || sensor.temperature === null) return null;
+            return sensor;
+        };
+
         // Confirm delete incubator
         $scope.confirmDeleteIncubator = function(incubator) {
             $scope.incubatorToDelete = incubator;
@@ -298,6 +336,7 @@
             $scope.selectedIncubator = {
                 active: true,
                 type: 'normal',
+                parent: '',
                 set_temp: null,
                 lights_on: null,
                 lights_off: null,
@@ -331,6 +370,218 @@
             if (type === 'smart') return 'Smart: firmware-backed, light and temperature control';
             if (type === 'virtual') return 'Virtual: short-lived "shoe box", light only';
             return 'Normal: manually added, light only';
+        };
+
+        // --- Parenting helpers -------------------------------------------------
+        // A virtual box normally sits inside a physical incubator; when it does
+        // not, its parent is the Room sentinel. Mirrors incubators/hierarchy.py.
+
+        $scope.isVirtual = function(incubator) {
+            return $scope.incubatorType(incubator) === 'virtual';
+        };
+
+        // True when the box is inside a named incubator (i.e. not in the Room).
+        $scope.hasParent = function(incubator) {
+            if (!$scope.isVirtual(incubator)) return false;
+            var parent = (incubator.parent || '').trim();
+            return !!parent && parent.toLowerCase() !== ROOM.toLowerCase();
+        };
+
+        // Physical incubators a shoe box can be placed inside: everything that
+        // is not itself virtual, minus the record being edited.
+        $scope.parentCandidates = function() {
+            var own = $scope.selectedIncubator
+                ? ($scope.selectedIncubator._originalName || $scope.selectedIncubator.name)
+                : null;
+            var out = [];
+            for (var key in $scope.incubators) {
+                var inc = $scope.incubators[key];
+                if ($scope.isVirtual(inc)) continue;
+                if (own && inc.name === own) continue;
+                out.push(inc.name);
+            }
+            return out.sort();
+        };
+
+        // The room the parent incubator is in ('' when unknown or unplaced).
+        $scope.parentLocation = function(incubator) {
+            if (!$scope.hasParent(incubator)) return '';
+            var parent = $scope.incubators ? $scope.incubators[incubator.parent.trim()] : null;
+            return parent ? (parent.location || '').trim() : '';
+        };
+
+        // Where an incubator actually is, in one string: the parent (and the
+        // parent's own location) for a placed shoe box, its own location
+        // otherwise, falling back to the Room for an unplaced box.
+        $scope.locationLabel = function(incubator) {
+            if (!incubator) return '';
+            var own = (incubator.location || '').trim();
+            if (!$scope.isVirtual(incubator)) return own;
+            if (!$scope.hasParent(incubator)) return own || ROOM;
+
+            var parentName = incubator.parent.trim();
+            var parent = $scope.incubators ? $scope.incubators[parentName] : null;
+            var parentLocation = parent ? (parent.location || '').trim() : '';
+            return parentLocation ? parentName + ' (' + parentLocation + ')' : parentName;
+        };
+
+        // --- Occupancy: which ethoscopes sit in which incubator ------------------
+
+        // Devices sort with the live ones on top, then by how recently they
+        // were last in the place.
+        function deviceOrder(a, b) {
+            var liveA = a.source === 'current' ? 1 : 0;
+            var liveB = b.source === 'current' ? 1 : 0;
+            if (liveA !== liveB) return liveB - liveA;
+            return (b.since || 0) - (a.since || 0);
+        }
+
+        // Rebuild the per-incubator occupancy from the incubator records + device
+        // placements. Done on load rather than from the template so the 15 s poll
+        // does not churn the digest with fresh objects.
+        function rebuildOccupancy() {
+            var byIncubator = {};
+            var unplaced = [];
+
+            angular.forEach($scope.deviceLocations, function(device) {
+                if (!device) return;
+                if (!device.incubator) {
+                    unplaced.push(device);
+                    return;
+                }
+                if (!byIncubator[device.incubator]) byIncubator[device.incubator] = [];
+                byIncubator[device.incubator].push(device);
+            });
+
+            var take = function(name) {
+                var devices = byIncubator[name] || [];
+                delete byIncubator[name];
+                return devices.sort(deviceOrder);
+            };
+
+            // Every record gets an entry, so an expanded row always has something
+            // to say — even if that is "nothing has ever run in here".
+            var occupancy = {};
+            angular.forEach($scope.incubators, function(incubator) {
+                if (!incubator || !incubator.name) return;
+                occupancy[incubator.name] = {
+                    devices: take(incubator.name),
+                    boxes: []
+                };
+            });
+
+            // A shoe box hangs off the incubator that holds it, so opening a
+            // physical incubator also shows what is inside its boxes.
+            angular.forEach($scope.incubators, function(box) {
+                if (!$scope.isVirtual(box) || !$scope.hasParent(box)) return;
+                var parent = occupancy[(box.parent || '').trim()];
+                if (!parent) return;
+                parent.boxes.push({
+                    key: 'box:' + box.name,
+                    record: box,
+                    name: box.name,
+                    devices: occupancy[box.name] ? occupancy[box.name].devices : []
+                });
+            });
+
+            // Anything still left in byIncubator points at an incubator that no
+            // longer exists. Nothing to report: the record was deleted on
+            // purpose, and its past runs are history, not a fault.
+            $scope.occupancyByName = occupancy;
+            $scope.unplacedDevices = unplaced.sort(deviceOrder);
+        }
+
+        // --- Detail row ----------------------------------------------------------
+
+        $scope.toggleExpanded = function(incubator) {
+            if (!incubator || !incubator.name) return;
+            $scope.expanded[incubator.name] = !$scope.expanded[incubator.name];
+        };
+
+        $scope.isExpanded = function(incubator) {
+            return !!(incubator && $scope.expanded[incubator.name]);
+        };
+
+        $scope.isDeviceOffline = function(device) {
+            return !!device && (device.status || '').toLowerCase() === 'offline';
+        };
+
+        // Offline ethoscopes are hidden unless asked for: they are placed by the
+        // last run the node recorded, which says where the device was left, not
+        // where it is.
+        $scope.visibleDevices = function(devices) {
+            if (!devices) return [];
+            if ($scope.showOffline) return devices;
+            return devices.filter(function(device) {
+                return !$scope.isDeviceOffline(device);
+            });
+        };
+
+        $scope.devicesIn = function(incubator) {
+            var group = incubator ? $scope.occupancyByName[incubator.name] : null;
+            return group ? $scope.visibleDevices(group.devices) : [];
+        };
+
+        $scope.boxesIn = function(incubator) {
+            var group = incubator ? $scope.occupancyByName[incubator.name] : null;
+            return group ? group.boxes : [];
+        };
+
+        // Ethoscopes shown for this incubator, including the ones in its boxes.
+        $scope.occupancyCount = function(incubator) {
+            var group = incubator ? $scope.occupancyByName[incubator.name] : null;
+            if (!group) return 0;
+            var n = $scope.visibleDevices(group.devices).length;
+            angular.forEach(group.boxes, function(box) {
+                n += $scope.visibleDevices(box.devices).length;
+            });
+            return n;
+        };
+
+        // How many were left out by the offline toggle, so the row can say so.
+        $scope.hiddenOfflineCount = function(incubator) {
+            if ($scope.showOffline) return 0;
+            var group = incubator ? $scope.occupancyByName[incubator.name] : null;
+            if (!group) return 0;
+            var count = function(devices) {
+                return (devices || []).filter($scope.isDeviceOffline).length;
+            };
+            var n = count(group.devices);
+            angular.forEach(group.boxes, function(box) { n += count(box.devices); });
+            return n;
+        };
+
+        $scope.isDeviceRunning = function(device) {
+            return !!device && RUNNING_STATUSES.indexOf((device.status || '').toLowerCase()) !== -1;
+        };
+
+        // One line saying how sure we are that the device is still there.
+        $scope.placementLabel = function(device) {
+            if (!device) return '';
+            if (device.source === 'current') return 'running here now';
+            var when = $scope.formatDate(device.since);
+            if (device.source === 'previous') {
+                return when ? 'last ran here ' + when : 'last ran here';
+            }
+            return when ? 'last recorded here ' + when : 'last recorded here';
+        };
+
+        // Short absolute date from a unix timestamp; '' when unknown.
+        $scope.formatDate = function(ts) {
+            if (ts === null || ts === undefined || ts === '') return '';
+            var d = new Date(Number(ts) * 1000);
+            if (isNaN(d.getTime())) return '';
+            return d.toLocaleDateString(undefined, {
+                day: 'numeric', month: 'short', year: 'numeric'
+            });
+        };
+
+        // Switching category in the modal: a box needs a parent (Room by
+        // default), anything else has none.
+        $scope.onTypeChanged = function() {
+            if (!$scope.selectedIncubator) return;
+            $scope.selectedIncubator.parent =
+                $scope.selectedIncubator.type === 'virtual' ? ($scope.selectedIncubator.parent || ROOM) : '';
         };
 
         // Convert firmware minutes-of-day (0–1440) to an HH:MM display string.
@@ -418,6 +669,11 @@
             // Category + temperature setpoint. Default legacy/unset records to
             // 'normal'; a bound record reads as 'smart' via isSmart().
             $scope.selectedIncubator.type = incubator.type || 'normal';
+            // Parent: only meaningful for a virtual box, which always declares
+            // one — the Room when it is not inside another incubator.
+            $scope.selectedIncubator.parent =
+                ($scope.selectedIncubator.type === 'virtual')
+                    ? (incubator.parent || ROOM) : '';
             $scope.selectedIncubator.set_temp =
                 (incubator.set_temp !== undefined && incubator.set_temp !== null)
                     ? Number(incubator.set_temp)
@@ -495,7 +751,8 @@
                     fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
                     max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100)),
                     crepuscular: data.crepuscular ? 1 : 0,
-                    type: data.type || 'normal'
+                    type: data.type || 'normal',
+                    parent: data.type === 'virtual' ? (data.parent || ROOM) : ''
                 };
                 // Temperature setpoint — smart units only. Empty clears it.
                 if ($scope.isSmart(data)) {
@@ -537,7 +794,8 @@
                     fade_out_seconds: parseInt(data.fade_out_seconds, 10) || 0,
                     max_light: Math.max(0, Math.min(100, parseInt(data.max_light, 10) || 100)),
                     crepuscular: data.crepuscular ? 1 : 0,
-                    type: data.type || 'normal'
+                    type: data.type || 'normal',
+                    parent: data.type === 'virtual' ? (data.parent || ROOM) : ''
                 };
                 if ($scope.isSmart(data) && data.set_temp !== null && data.set_temp !== undefined && data.set_temp !== '') {
                     addPayload.set_temp = Number(data.set_temp);
@@ -619,6 +877,7 @@
         var livePoll = null;
         var startLivePolling = function() {
             loadLive();
+            loadDeviceLocations();
             livePoll = $timeout(startLivePolling, 15000);
         };
         $scope.$on('$destroy', function() {
