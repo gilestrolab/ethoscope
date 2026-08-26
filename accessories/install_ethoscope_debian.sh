@@ -521,7 +521,12 @@ step_configure_system_identity() {
     echo "en_GB.UTF-8 UTF-8" >> /etc/locale.gen
     locale-gen
 
-    echo $(date +%Y%m%d)_ethoscope000_${PI_MODEL}.img > /etc/sdimagename
+    # One image now serves multiple models (identical KMS camera config, no
+    # start_file override), so name it for the SUPPORTED SET, not the build host.
+    # Trixie 64-bit rules out the ARMv7 Pi 2, and the Pi 5 has no pigpio (light
+    # degrades to on/off) — so the real targets are Pi 3 and Pi 4. publish-image.sh
+    # derives the public name from this file, so it must reflect that.
+    echo "$(date +%Y%m%d)_ethoscope000_pi3_pi4.img" > /etc/sdimagename
 
     print_success "System identity configured as ETHOSCOPE_000"
 }
