@@ -449,8 +449,8 @@ EOF
     pip3 install picamera2 --break-system-packages 2>/dev/null || true
 
     print_info "Installing systemd service files..."
-    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update,ethoscope_camera_firstboot}.service 2>/dev/null
-    ln -sf /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update,ethoscope_camera_firstboot}.service /usr/lib/systemd/system/
+    rm -rf /usr/lib/systemd/system/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update,ethoscope_ssh_hostkeys}.service 2>/dev/null
+    ln -sf /opt/ethoscope/services/{ethoscope_device,ethoscope_listener,ethoscope_GPIO_listener,ethoscope_light,ethoscope_update,ethoscope_ssh_hostkeys}.service /usr/lib/systemd/system/
 
     # Camera-config helper (shared by step 12 and the first-boot service).
     chmod +x /opt/ethoscope/accessories/configure_pi_camera.sh 2>/dev/null || true
@@ -559,7 +559,7 @@ step_enable_system_services() {
     print_info "Enabling ethoscope services..."
     systemctl enable ethoscope_device.service ethoscope_listener.service \
         ethoscope_update.service ethoscope_GPIO_listener.service \
-        ethoscope_light.service ethoscope_camera_firstboot.service
+        ethoscope_light.service ethoscope_ssh_hostkeys.service
 
     # pigpiod drives the PWM light backend where it exists. From Trixie onwards
     # it is absent and the daemon uses gpiozero/lgpio instead, which needs no
@@ -808,11 +808,11 @@ step_configure_raspberry_pi_hardware() {
     grep -qxF 'i2c-dev' /etc/modules-load.d/raspberrypi.conf 2>/dev/null || \
         echo 'i2c-dev' >> /etc/modules-load.d/raspberrypi.conf
 
-    # Camera config is model-specific (legacy firmware camera on Pi 2/3 vs
-    # KMS/libcamera on Pi 4/5) and is written into a managed block by
-    # configure_pi_camera.sh — the SAME script ethoscope_camera_firstboot.service
-    # runs on every boot. So this image auto-corrects its camera the first time
-    # it is flashed onto a different Pi model, and one image serves 2/3/4/5.
+    # Camera config is written into a managed block by configure_pi_camera.sh.
+    # On Trixie the block is identical for every model (KMS + camera_auto_detect,
+    # no start_file override) so ONE image boots and runs the camera on Pi 3 and
+    # Pi 4 alike — no per-model first-boot reconfiguration needed. See the header
+    # of configure_pi_camera.sh for why the old start_x.elf split was fatal on Pi4.
     print_info "Writing camera config for $PI_MODEL (managed block)..."
     bash /opt/ethoscope/accessories/configure_pi_camera.sh \
         --model "$PI_MODEL" --config "$BOOTCFG" || true
@@ -935,9 +935,17 @@ do_reset() {
 #
 #  * SSH host keys are per-device. Baked into an image, every flashed device
 #    would share them — a security hole and an endless stream of host-key
-#    mismatch warnings. Delete them; sshd-keygen.service and
-#    regenerate_ssh_host_keys.service (both enabled on the RPi/Trixie image)
-#    mint fresh, unique keys on first boot.
+#    mismatch warnings. Delete them here; ethoscope_ssh_hostkeys.service
+#    (installed in step 3, enabled in step 7) mints fresh, unique keys on the
+#    first boot after flashing.
+#
+#    NB: do NOT rely on Raspberry Pi OS's own regenerate_ssh_host_keys.service
+#    for this — it is gated on ConditionFirstBoot=yes, which fires only when
+#    /etc/machine-id is uninitialised. We keep a valid machine-id on purpose
+#    (see below), so that condition is never true and the stock unit never runs.
+#    Without keys, "sshd -t" fails and ssh.service refuses to start (connection
+#    refused). ethoscope_ssh_hostkeys.service triggers on the real condition
+#    (keys absent) instead, so it is immune to that interaction.
 #
 #  * DO **NOT** blank /etc/machine-id. systemd reads an empty machine-id as
 #    ConditionFirstBoot=yes, which can fire first-boot units that block on a

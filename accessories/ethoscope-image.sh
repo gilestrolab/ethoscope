@@ -16,11 +16,6 @@
 #               (typically 30-60% smaller once zipped). Runs after --shrink.
 #   --all       Equivalent to --update --shrink --rename --zerofree
 #               (not --info / --fsck).
-#   --universal-camera
-#               Retrofit an existing image so ONE card serves Pi 2/3/4/5:
-#               fast-forward /opt/ethoscope, enable the first-boot camera
-#               service, and migrate config.txt into the managed camera block.
-#               Implies --update; mounts the boot partition too.
 #
 # Usage: sudo ./ethoscope-image.sh [flags] [path/to/image.img]
 # If no path is given, the script picks the single .img in its dir.
@@ -47,10 +42,9 @@ DO_UPDATE=0
 DO_SHRINK=0
 DO_RENAME=0
 DO_ZEROFREE=0
-DO_UNIVERSAL=0
 IMG=""
 
-usage() { sed -n '2,26p' "$0"; exit "${1:-0}"; }
+usage() { sed -n '2,21p' "$0"; exit "${1:-0}"; }
 
 for arg in "$@"; do
   case "$arg" in
@@ -61,17 +55,16 @@ for arg in "$@"; do
     --rename) DO_RENAME=1 ;;
     --zerofree) DO_ZEROFREE=1 ;;
     --all)    DO_UPDATE=1; DO_SHRINK=1; DO_RENAME=1; DO_ZEROFREE=1 ;;
-    --universal-camera) DO_UNIVERSAL=1; DO_UPDATE=1 ;;  # implies --update
     -h|--help) usage 0 ;;
     -*) echo "Unknown flag: $arg" >&2; usage 1 ;;
     *)  IMG="$arg" ;;
   esac
 done
 
-(( DO_INFO || DO_FSCK || DO_UPDATE || DO_SHRINK || DO_RENAME || DO_ZEROFREE || DO_UNIVERSAL )) || { echo "No operation requested." >&2; usage 1; }
+(( DO_INFO || DO_FSCK || DO_UPDATE || DO_SHRINK || DO_RENAME || DO_ZEROFREE )) || { echo "No operation requested." >&2; usage 1; }
 
 # Write ops require rw mount; --info alone gets ro mount.
-NEEDS_WRITE=$(( DO_UPDATE | DO_RENAME | DO_UNIVERSAL ))
+NEEDS_WRITE=$(( DO_UPDATE | DO_RENAME ))
 
 # Locate image if not given
 if [[ -z "$IMG" ]]; then
@@ -99,14 +92,9 @@ fi
 # --- state + cleanup --------------------------------------------------------
 LOOP=""
 MNT_ROOT=""
-MNT_BOOT=""
 
 cleanup() {
   set +e
-  [[ -n "$MNT_BOOT" && -d "$MNT_BOOT" ]] && {
-    mountpoint -q "$MNT_BOOT" && umount "$MNT_BOOT"
-    rmdir "$MNT_BOOT" 2>/dev/null
-  }
   [[ -n "$MNT_ROOT" && -d "$MNT_ROOT" ]] && {
     mountpoint -q "$MNT_ROOT" && umount "$MNT_ROOT"
     rmdir "$MNT_ROOT" 2>/dev/null
@@ -138,18 +126,6 @@ unmount_root() {
   umount "$MNT_ROOT"
   rmdir "$MNT_ROOT"
   MNT_ROOT=""
-}
-
-mount_boot() {
-  MNT_BOOT=$(mktemp -d /tmp/ethoscope-boot.XXXXXX)
-  mount "${LOOP}p1" "$MNT_BOOT"
-}
-
-unmount_boot() {
-  sync
-  umount "$MNT_BOOT"
-  rmdir "$MNT_BOOT"
-  MNT_BOOT=""
 }
 
 detach_loop() {
@@ -189,57 +165,6 @@ op_update() {
   git -c safe.directory="$repo" -C "$repo" reset --hard FETCH_HEAD
   git -c safe.directory="$repo" -C "$repo" clean -fd
   echo "    After:  $(git -c safe.directory="$repo" -C "$repo" log --oneline -1)"
-}
-
-op_universalize() {
-  # Retrofit an already-built (per-model) image into a universal one. Runs after
-  # op_update, so /opt/ethoscope already carries configure_pi_camera.sh and the
-  # first-boot service. We then enable that service offline and migrate the
-  # image's config.txt into the managed camera block. On first boot on a Pi 4/5
-  # the service swaps the block and reboots once; on a Pi 3 it is a no-op.
-  local root="$MNT_ROOT" boot="$MNT_BOOT"
-  local repo="$root/opt/ethoscope"
-  local helper="$repo/accessories/configure_pi_camera.sh"
-  local unit="ethoscope_camera_firstboot.service"
-
-  echo "==> Universalising camera config (one image for Pi 2/3/4/5)"
-  [[ -f "$helper" ]]            || { echo "ERROR: $helper missing (did --update run?)" >&2; exit 2; }
-  [[ -f "$repo/services/$unit" ]] || { echo "ERROR: services/$unit missing after update" >&2; exit 2; }
-  chmod +x "$helper"
-
-  # Enable the first-boot service the same way the installer does: a unit
-  # symlink into /usr/lib and a multi-user.target.wants symlink. Targets are
-  # written as they resolve on the device (absolute /opt, /usr/lib paths).
-  ln -sf "/opt/ethoscope/services/$unit" "$root/usr/lib/systemd/system/$unit"
-  mkdir -p "$root/etc/systemd/system/multi-user.target.wants"
-  ln -sf "/usr/lib/systemd/system/$unit" \
-         "$root/etc/systemd/system/multi-user.target.wants/$unit"
-  echo "    enabled $unit"
-
-  # Migrate config.txt (this image was built on a Pi 3). The helper strips the
-  # old direct camera lines and writes the managed block; redirect the module
-  # file into the image's rootfs rather than the host's.
-  local cfg="$boot/config.txt"
-  [[ -f "$cfg" ]] || { echo "ERROR: config.txt not found on boot partition ($cfg)" >&2; exit 2; }
-  ETHOSCOPE_CAMERA_MODULES_FILE="$root/etc/modules-load.d/picamera.conf" \
-    bash "$helper" --model pi3 --config "$cfg" || true
-  echo "    config.txt migrated to the managed camera block (model=pi3)"
-  echo "    first boot on a Pi 4/5 will auto-swap the block and reboot once"
-
-  # Retag the name with the models this image actually supports: Pi 3 and Pi 4.
-  # The 64-bit Trixie image won't boot the common ARMv7 Pi 2, and the Pi 5 has no
-  # pigpio so its light degrades to on/off — the camera auto-configures on both,
-  # but they aren't full targets. Collapse any trailing _piN chain to _pi3_pi4 so
-  # re-running is idempotent rather than stacking tokens.
-  local namef="$root/etc/sdimagename" cur new
-  if [[ -f "$namef" ]]; then
-    cur=$(<"$namef"); cur=${cur//$'\n'/}
-    new=$(printf '%s' "$cur" | sed -E 's/(_[Pp][Ii][0-9]+)+(\.img)?$/_pi3_pi4\2/')
-    if [[ "$new" != "$cur" ]]; then
-      printf '%s\n' "$new" > "$namef"
-      echo "    /etc/sdimagename: '$cur' -> '$new'"
-    fi
-  fi
 }
 
 op_rename() {
@@ -305,16 +230,13 @@ op_zerofree() {
 }
 
 # --- orchestration ----------------------------------------------------------
-# 1. Mount-required ops first (info, update, universalize, rename).
-if (( DO_INFO || DO_UPDATE || DO_RENAME || DO_UNIVERSAL )); then
+# 1. Mount-required ops first (info, update, rename).
+if (( DO_INFO || DO_UPDATE || DO_RENAME )); then
   attach_loop
   mount_root
-  (( DO_UNIVERSAL )) && mount_boot          # config.txt lives on the boot partition
   (( DO_INFO ))      && op_info
   (( DO_UPDATE ))    && op_update
-  (( DO_UNIVERSAL )) && op_universalize      # after op_update: repo is current
   (( DO_RENAME ))    && op_rename
-  (( DO_UNIVERSAL )) && unmount_boot
   unmount_root
   # Keep loop for fsck/shrink, otherwise drop it.
   (( DO_FSCK || DO_SHRINK )) || detach_loop

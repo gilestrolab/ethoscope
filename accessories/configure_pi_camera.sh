@@ -1,22 +1,37 @@
 #!/usr/bin/env bash
-# configure_pi_camera.sh — write the camera section of config.txt for the
-# Raspberry Pi model this is actually running on, idempotently.
+# configure_pi_camera.sh — write the ethoscope camera section of config.txt,
+# idempotently. ONE block, identical on every Pi model.
 #
-# This is the SINGLE SOURCE OF TRUTH for the model→camera mapping, shared by:
-#   * install_ethoscope_debian.sh step 12  (build time)
-#   * ethoscope_camera_firstboot.service   (every boot)
+# Used by install_ethoscope_debian.sh step 12 (build time). It used to also run
+# on every boot from ethoscope_camera_firstboot.service, to swap the camera block
+# per model — but that service has been RETIRED: the block is now model-independent
+# (below), and a first-boot service could never fix the boot-fatal case anyway (a
+# firmware setting is read before userspace; see below).
 #
-# Why it exists: the camera stack differs fundamentally by Pi model —
-#   Pi 2/3 → legacy firmware camera (start_x.elf + the bcm2835-v4l2 V4L2 shim)
-#   Pi 4/5 → KMS / libcamera         (vc4-kms-v3d + imx219 overlay)
-# so a card configured for one model has a DEAD camera on another. Because the
-# first-boot service runs this on every boot, ONE image auto-corrects its camera
-# the first time it is booted on a different model (rewriting the block and
-# rebooting once), and is a no-op forever after. That lets a single ethoscope
-# image serve Pi 2/3/4/5 instead of shipping one image per model.
+# On Debian Trixie the camera is libcamera everywhere: `camera_auto_detect=1`
+# auto-loads the right sensor overlay (ov5647/imx219/imx477/…), and picamera2 —
+# which the ethoscope uses — talks to libcamera. So there is no per-model camera
+# mapping to make; every model gets the SAME block.
 #
-# We own exactly one delimited block in config.txt and rewrite it only when the
-# model changes; everything outside the block is left untouched.
+# Crucially, the block must also BOOT on every model. The old per-model split set
+#   start_file=start_x.elf / fixup_file=fixup_x.dat
+# for Pi 2/3 (legacy firmware camera). That is Pi 0–3-only firmware: on a Pi 4 it
+# is unsupported and the board dies at the bootloader (green LED: 4 long + 4 short
+# = "unsupported board type", no boot at all). A first-boot service can NEVER fix
+# this — the firmware reads config.txt before userspace exists, so a Pi 4 never
+# gets far enough to rewrite it. The only config that boots on Pi 3 AND Pi 4 is
+# one that does NOT override start_file and lets the firmware auto-pick (start.elf
+# on Pi 0–3, start4.elf on Pi 4). Hence the single KMS/libcamera block below, with
+# no start_file. Proven to boot + capture on both.
+#
+# Notes from the 2026-08 debugging that got us here:
+#   * `vcgencmd get_camera` → detected=0 is the DEAD legacy MMAL probe; cosmetic
+#     on Trixie. Check `rpicam-hello --list-cameras` / picamera2 instead.
+#   * AWB (incl. greyworld for NoIR) is a libcamera runtime/tuning concern now,
+#     not a config.txt firmware param — so dropping awb_auto_is_greyworld is fine.
+#
+# We own exactly one delimited block in config.txt; everything outside it is left
+# untouched, and we rewrite it only when it differs from what we want.
 #
 # Usage:
 #   sudo configure_pi_camera.sh              # apply for this model; exit 10 if changed
@@ -66,44 +81,20 @@ find_config() {
   return 1
 }
 
-# The camera lines for a model — WITHOUT the markers. Legacy models also need
-# the bcm2835-v4l2 module loaded (WANT_MODULE), which the caller handles.
+# The camera lines — WITHOUT the markers. Identical for every model: KMS driver
+# + libcamera auto-detect, and NO start_file override (that is what lets the same
+# card boot on Pi 3 and Pi 4). `camera_auto_detect=1` loads the correct sensor
+# overlay itself, so no explicit dtoverlay=imx219/ov5647 (an explicit one would
+# fight auto-detect on a different sensor). $1 (model) is accepted but ignored —
+# kept so a future model that genuinely needs a different block can branch here
+# without changing callers.
 desired_block() {
-  case "$1" in
-    pi2|pi3)
-      cat <<'BLK'
-# Legacy firmware camera (Pi 2/3)
-start_file=start_x.elf
-fixup_file=fixup_x.dat
-gpu_mem=256
-cma_lwm=
-cma_hwm=
-cma_offline_start=
-awb_auto_is_greyworld=1
-camera_auto_detect=1
-dtparam=camera=on
-BLK
-      ;;
-    pi4|pi5)
-      cat <<'BLK'
-# KMS / libcamera camera (Pi 4/5)
+  cat <<'BLK'
+# KMS / libcamera camera (Trixie — all Pi models, boots on Pi 3 & Pi 4)
 dtoverlay=vc4-kms-v3d
-gpu_mem=256
-dtoverlay=imx219
-camera_auto_detect=1
-dtparam=camera=on
-BLK
-      ;;
-    *)
-      cat <<'BLK'
-# Generic camera fallback (unknown model)
 gpu_mem=128
-dtoverlay=imx219
 camera_auto_detect=1
-dtparam=camera=on
 BLK
-      ;;
-  esac
 }
 
 # --- resolve inputs ---------------------------------------------------------
@@ -111,7 +102,9 @@ BLK
 [[ -n "$CONFIG" ]] || CONFIG=$(find_config) || { log "no config.txt found — nothing to do"; exit 0; }
 [[ -f "$CONFIG" ]] || { log "config.txt not found at $CONFIG"; exit 2; }
 
-case "$MODEL" in pi2|pi3) WANT_MODULE=1 ;; *) WANT_MODULE=0 ;; esac
+# No model uses the legacy bcm2835-v4l2 MMAL shim on Trixie (libcamera replaces
+# it). Always 0 — which also removes the module file if an older image left one.
+WANT_MODULE=0
 
 # Desired managed block (markers included). $(...) trims trailing newlines so
 # this matches what awk extracts from the file byte-for-byte.

@@ -1,0 +1,30 @@
+[Unit]
+Description=Generate SSH host keys when missing (image-safe, first boot after flashing)
+Documentation=man:ssh-keygen(1)
+# Why this exists: the public ethoscope image ships with NO SSH host keys — they
+# are per-device and baking them in would make every flashed card share the same
+# keys (a security hole + endless host-key-mismatch warnings), so the imaging
+# step deletes them. Raspberry Pi OS's own regenerate_ssh_host_keys.service is
+# gated on ConditionFirstBoot=yes, which only fires when /etc/machine-id is
+# UNINITIALISED. The ethoscope image deliberately keeps a valid, non-empty
+# machine-id (an empty one makes systemd treat every boot as a first boot and can
+# hang a headless console), so that trigger never fires and sshd would start with
+# no keys — "sshd -t" fails and ssh.service never listens. This unit closes that
+# gap: it regenerates the keys whenever they are absent, independent of the
+# first-boot condition, and self-satisfies once they exist.
+After=systemd-remount-fs.service
+Before=ssh.service ssh.socket sshd.service sshd-keygen.service
+ConditionPathExists=!/etc/ssh/ssh_host_rsa_key
+ConditionFileIsExecutable=/usr/bin/ssh-keygen
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# -A generates any host key type that is missing; a no-op once all exist.
+ExecStart=/usr/bin/ssh-keygen -A
+
+[Install]
+WantedBy=sysinit.target
