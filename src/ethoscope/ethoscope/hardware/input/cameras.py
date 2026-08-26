@@ -681,6 +681,10 @@ class PiFrameGrabber2(PiFrameGrabber):
         # Set in run(), i.e. in the child process: the tuning file actually
         # loaded, or None if the camera fell back to the default tuning.
         self._tuning_file = None
+        # Set in run() when libcamera reports no attached camera at all. The
+        # grabber is a thread, so the parent reads it directly to tell "nothing
+        # is plugged in" from "the camera stalled".
+        self.no_camera_detected = False
         # Throttles the live gain poll in the capture loop.
         self._last_gain_poll = 0.0
         super().__init__(*args, **kwargs)
@@ -779,6 +783,36 @@ class PiFrameGrabber2(PiFrameGrabber):
         )
 
         Picamera2.set_logging(logging.ERROR)
+
+        # Ask libcamera what it can see before touching anything else. A camera
+        # that is absent from the CSI bus used to surface as "IndexError: list
+        # index out of range" thrown from inside picamera2 (global_camera_info()
+        # [camera_num]), preceded by a complaint about the NoIR tuning file that
+        # sent people looking for a tuning bug - two symptoms of the same
+        # missing sensor, neither of them naming it. Worse, "list index out of
+        # range" matches none of the keywords in the except branch below, so the
+        # grabber never signalled the parent and startup burned the full 30 s
+        # frame timeout before reporting an unrelated cause.
+        try:
+            attached = Picamera2.global_camera_info()
+        except Exception as e:
+            # Never let the diagnostic itself stop the run: if something is
+            # genuinely wrong, constructing the camera below will say so.
+            logging.warning(f"Could not query the list of attached cameras: {e}")
+        else:
+            if not attached:
+                self.no_camera_detected = True
+                logging.error(
+                    "No camera detected on the CSI bus: libcamera reports zero "
+                    "attached cameras. This is a hardware or wiring fault, not "
+                    "a software one - check the ribbon cable is seated at both "
+                    "ends and the right way round, then confirm with "
+                    "'vcgencmd get_camera' (a healthy device reports "
+                    "detected=1, libcamera interfaces=1)."
+                )
+                # Signals "no camera" to the parent, as in PiFrameGrabber.run().
+                self._queue.put(None)
+                return
 
         try:
             # NoIR tuning is unconditional: an ethoscope cannot work without an IR
@@ -1181,6 +1215,20 @@ class OurPiCameraAsync(BaseCamera):
 
                     # Check if camera hardware is not available
                     if first_frame is None:
+                        # A grabber that found no camera at all will find none
+                        # on the next attempt either. Fail now, naming the
+                        # cause, instead of spending a second attempt to report
+                        # it as a frame timeout.
+                        if getattr(self._p, "no_camera_detected", False):
+                            # Reason: phrasing must include "Camera hardware not
+                            # available" so ControlThread._run() routes this to
+                            # the gentle stopped-with-error path.
+                            raise EthoscopeException(
+                                "Camera hardware not available: no camera is "
+                                "attached to the CSI bus (libcamera sees none). "
+                                "Check the ribbon cable is seated at both ends "
+                                "and the right way round."
+                            )
                         logging.error(
                             "Camera hardware not available - no video capabilities"
                         )
@@ -1222,6 +1270,13 @@ class OurPiCameraAsync(BaseCamera):
                 )
                 if hasattr(self, "_p"):
                     self._cleanup_frame_grabber(force_global_cleanup=True)
+
+                # No camera on the bus is terminal: another attempt cannot
+                # attach one, and it would end up reported as a frame timeout
+                # with the real cause lost. Let it out now.
+                if getattr(getattr(self, "_p", None), "no_camera_detected", False):
+                    raise
+
                 time.sleep(2.0)
 
                 # Check if this is a picamera2-specific error that should trigger fallback
