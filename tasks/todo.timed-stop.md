@@ -438,6 +438,26 @@ span sitting just before a control therefore vanishes the moment anyone touches 
 is exactly what happened: the icon rendered, then disappeared on the first change event,
 with `visibility: hidden` set inline by a plugin nobody was thinking about.
 
+### Stage 10 — the scheduling offer moves onto the Stop button  ✅ done 2026-08-26
+
+The running and recording panels carried a permanent line of prose —
+"No automatic stop set — schedule one" — advertising a feature most runs do not
+use, on every poll, to every reader. Removed. What is left of that block is the
+line that appears only when a stop *is* scheduled, which is information rather
+than an offer.
+
+- [x] The Stop button became a split button: a narrow caret toggles a menu holding
+      "Schedule a stop" / "Change the scheduled stop", and "Cancel the scheduled
+      stop" when one is set (`ethoscope.html`, `.stop-group` in `main.css`). Same
+      checkbox-driven dropdown as Track/Video/Options, so picking an item closes
+      the menu; menu right-aligned (`.dd-menu-right`) so it stays on the page.
+- [x] `set_autostop()` now reports failures with an alert when the modal is not on
+      screen. Cancelling straight from the menu had no other way to be heard: the
+      error text is written into the modal body.
+
+Verified in the browser against the dev node with a device forced to `running`,
+with and without `autostop_at`.
+
 ### Remaining
 - [ ] Restore ETHOSCOPE_900 to `fix/222-decouple-exposure-from-maxfps` (`a2c27452`) and drop
       the `test-timed-stop` branch, once the bench work is finished.

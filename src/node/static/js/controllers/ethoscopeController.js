@@ -1463,12 +1463,23 @@
         $scope.ethoscope.set_autostop = function(timestamp) {
             var payload = timestamp ? {stop_at: String(timestamp)} : {};
 
+            // The modal is not the only way in any more: the menu on the Stop
+            // button cancels a scheduled stop directly. A failure written only into
+            // the modal would then go unseen, so say it out loud when the modal is
+            // not on screen.
+            var report = function(message) {
+                $scope.autostop_form.error = message;
+                if (!$("#autostopModal").is(':visible')) {
+                    $scope.ethoscope.alert(message);
+                }
+            };
+
             $http.post('/device/' + device_id + '/controls/set_autostop', payload)
                 .then(function(response) {
                     // The device reports the refusal in the body rather than as an
                     // HTTP error, so a rejected stop time lands here, not in catch.
                     if (response.data && response.data.error) {
-                        $scope.autostop_form.error = response.data.error;
+                        report(response.data.error);
                         return;
                     }
                     $("#autostopModal").modal('hide');
@@ -1476,8 +1487,7 @@
                 })
                 .catch(function(error) {
                     console.error('Failed to change the automatic stop:', error);
-                    $scope.autostop_form.error =
-                        'Could not reach the ethoscope to change its automatic stop.';
+                    report('Could not reach the ethoscope to change its automatic stop.');
                 });
         };
 

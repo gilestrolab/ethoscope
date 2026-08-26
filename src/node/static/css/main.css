@@ -608,6 +608,46 @@ label.dropdown {
     border-bottom: 1px solid #cccccc;
 }
 
+/* Menu hanging off the right-hand end of a button: keep it inside the page
+   instead of spilling out past a narrow toggle. */
+.dd-menu.dd-menu-right {
+    right: 0;
+}
+
+/* Stop button with its own little toggle for the stopping options (the
+   automatic stop lives there). Built as one split button so the caret reads as
+   part of Stop rather than as a second control next to it. */
+.stop-button .stop-group {
+    display: inline-flex;
+    align-items: stretch;
+    vertical-align: middle;
+}
+
+.stop-button .stop-group .stop-main {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.stop-button .stop-more {
+    /* The page gives labels a top padding; here it would drop the toggle below
+       the button it belongs to. */
+    display: flex;
+    margin: 0;
+    padding: 0;
+}
+
+.stop-button .stop-caret {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-left: 9px;
+    padding-right: 9px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-left: 1px solid rgba(0, 0, 0, 0.18);
+    color: #ffffff;
+}
+
 /*
  * Adapted from: https://codepen.io/nazarelen/pen/rLgLrA
  *

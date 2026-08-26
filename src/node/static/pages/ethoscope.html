@@ -114,12 +114,6 @@
                     <a href="" ng-click="ethoscope.open_autostop()" title="Change or cancel the automatic stop">change</a>
                     <br>
                 </span>
-                <span ng-if="!device.autostop_at" class="fa fa-hourglass-o"></span>
-                <span ng-if="!device.autostop_at">
-                    No automatic stop set
-                    <a href="" ng-click="ethoscope.open_autostop()" title="Stop this experiment automatically at a chosen time">schedule one</a>
-                    <br>
-                </span>
                 <span ng-if="device.status == 'running'" class="fas fa-camera"></span> {{device.monitor_info.fps}} FPS
                 <br>
                 <!-- Acquisition quality, sampled once a minute during tracking.
@@ -178,12 +172,6 @@
                     Stopping automatically on {{ethoscope.start_date_time(device.autostop_at)}}
                     (in {{ethoscope.remainingtime(device.autostop_at)}})
                     <a href="" ng-click="ethoscope.open_autostop()" title="Change or cancel the automatic stop">change</a>
-                    <br>
-                </span>
-                <span ng-if="!device.autostop_at" class="fa fa-hourglass-o"></span>
-                <span ng-if="!device.autostop_at">
-                    No automatic stop set
-                    <a href="" ng-click="ethoscope.open_autostop()" title="Stop this experiment automatically at a chosen time">schedule one</a>
                     <br>
                 </span>
                 <span class="fa fa-user"></span> User: {{device.experimental_info.current.name || 'not specified'}}
@@ -595,9 +583,29 @@
             </ul>
         </label>
 
-        <!-- Stop Buttons / visible only when device is active -->
+        <!-- Stop Buttons / visible only when device is active.
+
+             The Stop button carries a small toggle that opens the stopping
+             options, the automatic stop among them. It used to be advertised as a
+             line of running text under the experiment details ("No automatic stop
+             set - schedule one"), which put a permanent notice on screen for the
+             common case of not wanting one. Hanging it off the button keeps it
+             where a user goes to stop a run, and costs nothing when unused. -->
         <div class="stop-button">
-            <button class="btn btn-danger" ng-if="device.status == 'running' || device.status == 'recording' || device.status == 'streaming'" data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
+            <span class="stop-group" ng-if="device.status == 'running' || device.status == 'recording' || device.status == 'streaming'">
+                <button class="btn btn-danger stop-main" data-toggle="modal" data-target="#stopTrackingModal">Stop</button>
+                <!-- Same checkbox-driven dropdown as the Track/Video/Options buttons:
+                     the menu sits inside the label, so picking an item unticks the
+                     box and closes the menu. -->
+                <label class="dropdown stop-more">
+                    <div class="btn btn-danger stop-caret" title="Stopping options"><span class="fa fa-caret-down"></span></div>
+                    <input type="checkbox" class="dd-input" id="stop-drop">
+                    <ul class="dd-menu dd-menu-right">
+                        <li ng-click="ethoscope.open_autostop()">{{device.autostop_at ? 'Change the scheduled stop' : 'Schedule a stop'}}</li>
+                        <li ng-if="device.autostop_at" ng-click="ethoscope.set_autostop(null)">Cancel the scheduled stop</li>
+                    </ul>
+                </label>
+            </span>
             <button class="btn btn-info disable" ng-if="device.status == 'stopping'" ng-click="ethoscope.alert('Please wait, system is stopping')">Stopping</button>
             <button class="btn btn-danger disable" ng-if="device.status == 'initialising'" ng-click="ethoscope.alert('Please wait, system is starting')">Starting</button>
         </div>
