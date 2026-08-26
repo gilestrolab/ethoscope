@@ -8,7 +8,6 @@ rsync integration, and device backup information extraction.
 
 import json
 import os
-import pickle
 import shutil
 import sys
 import tempfile
@@ -50,7 +49,7 @@ class TestVideoCacheSystem(unittest.TestCase):
         """Test cache path generation."""
         cache_path = _get_video_cache_path(self.device_id, self.video_directory)
         expected_path = os.path.join(
-            self.video_directory, ".cache", f"video_cache_{self.device_id}.pkl"
+            self.video_directory, ".cache", f"video_cache_{self.device_id}.json"
         )
 
         self.assertEqual(cache_path, expected_path)

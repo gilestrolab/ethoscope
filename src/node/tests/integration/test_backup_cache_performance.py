@@ -22,6 +22,7 @@ sys.path.insert(
 from ethoscope_node.backup.helpers import (
     _enhance_databases_with_rsync_info,
     _format_bytes_simple,
+    _get_video_cache_path,
     _load_video_cache,
     _save_video_cache,
 )
@@ -326,9 +327,7 @@ class TestCachePerformanceRealistic(unittest.TestCase):
         _save_video_cache(self.device_id, simulated_files, self.video_directory)
 
         # Measure cache file size
-        cache_path = os.path.join(
-            self.video_directory, ".cache", f"video_cache_{self.device_id}.pkl"
-        )
+        cache_path = _get_video_cache_path(self.device_id, self.video_directory)
         cache_size = os.path.getsize(cache_path)
 
         # Calculate compression ratio
@@ -433,14 +432,12 @@ class TestCacheRobustness(unittest.TestCase):
 
     def test_cache_corruption_recovery(self):
         """Test recovery from corrupted cache files."""
-        cache_path = os.path.join(
-            self.video_directory, ".cache", f"video_cache_{self.device_id}.pkl"
-        )
+        cache_path = _get_video_cache_path(self.device_id, self.video_directory)
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
 
         # Create corrupted cache file
-        with open(cache_path, "wb") as f:
-            f.write(b"corrupted data that is not valid pickle")
+        with open(cache_path, "w") as f:
+            f.write("corrupted data that is not valid JSON")
 
         # Should handle corruption gracefully
         cache_data = _load_video_cache(self.device_id, self.video_directory)

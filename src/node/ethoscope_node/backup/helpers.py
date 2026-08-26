@@ -61,6 +61,7 @@ import fcntl
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -76,17 +77,57 @@ from ethoscope_node.backup.mysql import DBNotReadyError, MySQLdbToSQLite
 from ethoscope_node.utils.configuration import ensure_ssh_keys
 from ethoscope_node.utils.video_helpers import list_local_video_files
 
+# A table name is the one part of a query that cannot be bound as a parameter,
+# so counting rows per table means interpolating an identifier read back out of
+# the database file. The files are written by ethoscopes, but they arrive over
+# the network and are opened here without ever being validated, so accept only
+# the shape a real table name has and skip anything else.
+_SAFE_TABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-def get_sqlite_table_counts(backup_path: str) -> dict[str, int]:
+
+def _urlopen_http(target, timeout):
+    """
+    Open an http(s) URL, refusing every other scheme.
+
+    ``urlopen`` honours ``file://`` and any other scheme urllib knows, which
+    turns a URL assembled from configuration - a device address, a node address
+    - into a way to read local files or reach unintended services. Everything
+    fetched in this module is plain HTTP, so anything else is a bug or an
+    attack, and is refused rather than followed.
+
+    Args:
+        target (str | urllib.request.Request): URL or prepared request to open.
+        timeout (float): Socket timeout in seconds.
+
+    Returns:
+        http.client.HTTPResponse: The open response, as ``urlopen`` returns.
+
+    Raises:
+        ValueError: If the URL scheme is not http or https.
+    """
+    url = target.full_url if isinstance(target, urllib.request.Request) else target
+    scheme = urllib.parse.urlparse(url).scheme
+    if scheme not in ("http", "https"):
+        raise ValueError(f"Refusing to open a non-HTTP URL: {url!r}")
+
+    return urllib.request.urlopen(target, timeout=timeout)  # nosec B310
+
+
+def get_sqlite_table_counts(
+    backup_path: str, logger: logging.Logger | None = None, prefix: str = ""
+) -> dict[str, int]:
     """
     Utility function to get row counts for all tables in a SQLite database file.
 
     Args:
         backup_path: Path to the SQLite database file
+        logger: Logger for warnings. Defaults to the root logger.
+        prefix: String prepended to warnings, used by callers that log per device.
 
     Returns:
         Dictionary mapping table names to row counts
     """
+    log = logger or logging.getLogger()
     table_counts = {}
     try:
         with sqlite3.connect(backup_path) as conn:
@@ -98,16 +139,27 @@ def get_sqlite_table_counts(backup_path: str) -> dict[str, int]:
 
             # Get row count for each table
             for table in tables:
+                if not _SAFE_TABLE_NAME.match(table):
+                    log.warning(
+                        f"{prefix}Skipping table with an unexpected name: {table!r}"
+                    )
+                    continue
                 try:
-                    cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
+                    # Safe to interpolate, so B608 is suppressed below: an
+                    # identifier cannot be bound as a parameter, and `table` is
+                    # matched against _SAFE_TABLE_NAME just above and quoted,
+                    # so nothing but a plain identifier can reach SQLite. The
+                    # suppression is unqualified because naming the test makes
+                    # bandit misattribute it and warn on every run.
+                    cursor.execute(f'SELECT COUNT(*) FROM "{table}"')  # nosec
                     count = cursor.fetchone()[0]
                     table_counts[table] = count
                 except sqlite3.Error as e:
-                    logging.warning(f"Could not get count for table {table}: {e}")
+                    log.warning(f"{prefix}Could not get count for table {table}: {e}")
                     table_counts[table] = 0
 
     except sqlite3.Error as e:
-        logging.warning(f"Failed to read backup database {backup_path}: {e}")
+        log.warning(f"{prefix}Failed to read backup database {backup_path}: {e}")
 
     return table_counts
 
@@ -667,33 +719,13 @@ class BackupClass(BaseBackupClass):
         Returns:
             Dictionary mapping table names to row counts
         """
-        table_counts = {}
-        try:
-            with sqlite3.connect(backup_path) as conn:
-                cursor = conn.cursor()
-
-                # Get all table names
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                tables = [row[0] for row in cursor.fetchall()]
-
-                # Get row count for each table
-                for table in tables:
-                    try:
-                        cursor.execute(f"SELECT COUNT(*) FROM `{table}`")
-                        count = cursor.fetchone()[0]
-                        table_counts[table] = count
-                    except sqlite3.Error as e:
-                        self._logger.warning(
-                            f"[{self._device_id}] Could not get count for table {table}: {e}"
-                        )
-                        table_counts[table] = 0
-
-        except sqlite3.Error as e:
-            self._logger.warning(
-                f"[{self._device_id}] Failed to read backup database {backup_path}: {e}"
-            )
-
-        return table_counts
+        # The module-level function of the same name holds the implementation -
+        # this was a verbatim copy of it, differing only in which logger the
+        # warnings went to. Passing the logger and the device prefix keeps the
+        # log lines identical to what they were.
+        return get_sqlite_table_counts(
+            backup_path, logger=self._logger, prefix=f"[{self._device_id}] "
+        )
 
     def check_sync_status(self) -> dict:
         """Check synchronization status of the database backup."""
@@ -903,7 +935,7 @@ class VideoBackupClass(BaseBackupClass):
                 f"[{self._device_id}] Requesting video list from: {video_list_url}"
             )
 
-            with urllib.request.urlopen(
+            with _urlopen_http(
                 video_list_url, timeout=self.REQUEST_TIMEOUT
             ) as response:
                 video_data = json.load(response)
@@ -1729,7 +1761,7 @@ class GenericBackupWrapper(threading.Thread):
             req = urllib.request.Request(
                 url, headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(
+            with _urlopen_http(
                 req, timeout=self.DEFAULT_DEVICE_SCAN_TIMEOUT
             ) as response:
                 self._logger.info(
@@ -2771,22 +2803,26 @@ def _get_video_cache_path(
 
     cache_dir = os.path.join(video_directory, ".cache")
     os.makedirs(cache_dir, exist_ok=True)
-    return os.path.join(cache_dir, f"video_cache_{device_id}.pkl")
+    # JSON rather than pickle: this file sits in the data directory, which is
+    # writable by the backup user and synced from devices, and unpickling it
+    # executes whatever it contains. Nothing cached here is more than strings,
+    # numbers and booleans, so there was never anything for pickle to buy.
+    return os.path.join(cache_dir, f"video_cache_{device_id}.json")
 
 
 def _load_video_cache(
     device_id: str, video_directory: str = "/ethoscope_data/videos"
 ) -> dict:
     """Load video file cache from disk."""
+    import json
     import logging
     import os
-    import pickle
 
     cache_path = _get_video_cache_path(device_id, video_directory)
     try:
         if os.path.exists(cache_path):
-            with open(cache_path, "rb") as f:
-                cache_data = pickle.load(f)
+            with open(cache_path) as f:
+                cache_data = json.load(f)
                 # Validate cache structure
                 if (
                     isinstance(cache_data, dict)
@@ -2803,15 +2839,15 @@ def _save_video_cache(
     device_id: str, video_files: dict, video_directory: str = "/ethoscope_data/videos"
 ) -> None:
     """Save video file cache to disk."""
+    import json
     import logging
-    import pickle
     import time
 
     cache_path = _get_video_cache_path(device_id, video_directory)
     try:
         cache_data = {"files": video_files, "timestamp": time.time()}
-        with open(cache_path, "wb") as f:
-            pickle.dump(cache_data, f)
+        with open(cache_path, "w") as f:
+            json.dump(cache_data, f)
         logging.info(
             f"Saved video cache for {device_id}: {len(video_files)} files to {cache_path}"
         )
@@ -2840,23 +2876,24 @@ def _get_device_size_cache_path(
 
     cache_dir = os.path.join(base_directory, ".cache")
     os.makedirs(cache_dir, exist_ok=True)
-    return os.path.join(cache_dir, f"device_size_cache_{device_id}.pkl")
+    # JSON rather than pickle - see _get_video_cache_path.
+    return os.path.join(cache_dir, f"device_size_cache_{device_id}.json")
 
 
 def _load_device_size_cache(
     device_id: str, base_directory: str = "/ethoscope_data"
 ) -> dict:
     """Load device size cache from disk."""
+    import json
     import logging
     import os
-    import pickle
     import time
 
     cache_path = _get_device_size_cache_path(device_id, base_directory)
     try:
         if os.path.exists(cache_path):
-            with open(cache_path, "rb") as f:
-                cache_data = pickle.load(f)
+            with open(cache_path) as f:
+                cache_data = json.load(f)
 
                 # Validate cache structure and check TTL
                 if (
@@ -2890,8 +2927,8 @@ def _save_device_size_cache(
     base_directory: str = "/ethoscope_data",
 ) -> None:
     """Save device size cache to disk."""
+    import json
     import logging
-    import pickle
     import time
 
     cache_path = _get_device_size_cache_path(device_id, base_directory)
@@ -2903,8 +2940,8 @@ def _save_device_size_cache(
             "ttl": 3600,  # 1 hour cache TTL
         }
 
-        with open(cache_path, "wb") as f:
-            pickle.dump(cache_data, f)
+        with open(cache_path, "w") as f:
+            json.dump(cache_data, f)
 
         logging.info(
             f"Saved device size cache for {device_id}: videos={_format_bytes_simple(videos_size)}, "
@@ -3039,13 +3076,11 @@ def _enhance_databases_with_rsync_info(
         import json
         import logging
         import os
-        import urllib.error
-        import urllib.request
 
         # Try to get enhanced file info from rsync backup service
         rsync_url = "http://localhost:8093/status"
 
-        with urllib.request.urlopen(rsync_url, timeout=5) as response:
+        with _urlopen_http(rsync_url, timeout=5) as response:
             rsync_data = json.loads(response.read().decode())
 
         # Extract file details for this device
