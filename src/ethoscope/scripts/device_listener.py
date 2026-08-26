@@ -196,7 +196,13 @@ class commandingThread(threading.Thread):
         act on client's instructions
         """
 
-        if not data and action in ["start", "start_record"]:
+        # Reason: this tested `not data`, which rejects an empty config as well
+        # as a missing one. They are not the same thing:
+        # ControlThread._parse_user_options() fills in the default class for
+        # every field it does not find, so {} is a complete, valid request for
+        # a fully defaulted run - which is exactly what --run without --json
+        # asks for. Only None means "the caller sent no configuration at all".
+        if data is None and action in ["start", "start_record"]:
             return "This action requires JSON data"
 
         # Reason: start/start_record/stream used to overwrite self.control while
@@ -230,7 +236,11 @@ class commandingThread(threading.Thread):
         elif action == "status":
             return self.control.info["status"]
 
-        elif action == "start" and data:
+        # `data is not None` rather than `data`, for the reason given at the
+        # guard above: {} is a valid request for a fully defaulted run. The
+        # guard has already turned None into a message, so this only decides
+        # whether an empty config falls through to "action not available".
+        elif action == "start" and data is not None:
             #            if self.control.controltype != "tracking":
             self.control = ControlThread(
                 machine_id=self.ethoscope_info["MACHINE_ID"],
@@ -257,7 +267,7 @@ class commandingThread(threading.Thread):
             self.control.start()
             return "Starting streaming activity"
 
-        elif action == "start_record" and data:
+        elif action == "start_record" and data is not None:
             self.control = ControlThreadVideoRecording(
                 machine_id=self.ethoscope_info["MACHINE_ID"],
                 name=self.ethoscope_info["MACHINE_NAME"],
@@ -410,9 +420,32 @@ if __name__ == "__main__":
     ethoscope.start()
     logging.info("Ethoscope controlling server started and listening")
 
-    if option_dict["run"] or pi.was_interrupted():
+    if pi.was_interrupted():
+        # Reason: this used to auto-restart tracking after an unclean shutdown,
+        # back when ControlThread pickled its state on the way down. That resume
+        # logic has been removed and nothing writes the file any more, so the
+        # settings of the interrupted run are not recoverable - the metadata
+        # cache keeps the user, location and run_id, but not the tracker, ROI
+        # builder or stimulator. Starting anyway would look like a resume while
+        # silently running on default settings, which is worse than not
+        # resuming, so report the leftover file and leave the device alone.
+        logging.warning(
+            f"Found a leftover state file at {pi.PERSISTENT_STATE}. Resuming "
+            "automatically after an unclean shutdown is no longer supported - "
+            "the settings of the interrupted experiment are not recorded "
+            "anywhere - so tracking has NOT been restarted. Start it from the "
+            "node, and send the 'remove' command to clear the file."
+        )
 
-        if option_dict["record_video"]:
-            ethoscope.action("start_record")
+    if option_dict["run"]:
+        # Reason: the JSON config was read into ethoscope_info["DATA"] and then
+        # never passed on, so this always came back "This action requires JSON
+        # data" - and the reply was discarded, so --run silently did nothing at
+        # all. An empty config is legitimate here and means "use the defaults".
+        requested = "start_record" if option_dict["record_video"] else "start"
+        outcome = ethoscope.action(requested, ethoscope_info["DATA"])
+
+        if isinstance(outcome, str) and outcome.startswith("ERROR:"):
+            logging.error(f"Could not {requested}: {outcome}")
         else:
-            ethoscope.action("start")
+            logging.info(f"{requested}: {outcome}")
