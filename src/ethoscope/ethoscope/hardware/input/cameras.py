@@ -764,6 +764,78 @@ class PiFrameGrabber2(PiFrameGrabber):
 
         return controls
 
+    def _select_tuning_file(self):
+        """
+        Resolve the NoIR tuning file and point libcamera at it.
+
+        ``LIBCAMERA_RPI_TUNING_FILE`` has to be set before *anything* creates the
+        libcamera ``CameraManager``, because the Raspberry Pi pipeline handler
+        reads it exactly once, when it registers the sensor. The attached-camera
+        probe in ``run()`` creates that manager, so resolving the tuning here -
+        ahead of the probe - is what makes the setting take effect at all.
+        Setting it afterwards, which is all the constructor's ``tuning=``
+        argument does, is silently ignored and leaves the camera on libcamera's
+        default *colour* tuning: under IR illumination that returns an image
+        roughly three times too dark, with the ROI targets no longer detectable.
+
+        The path is exported as a string rather than handed to ``Picamera2`` as
+        a parsed dict. Given a dict, picamera2 dumps it to a NamedTemporaryFile
+        and points the variable at that instead; the temp file is unlinked when
+        the camera closes, so the *next* acquisition in the same process starts
+        a ``CameraManager`` aimed at a path that no longer exists. libcamera
+        then fails to register the sensor at all, and every later attempt
+        reports "no camera number 0" until the process restarts - which is why
+        one failed tracking run used to wedge the camera until reboot.
+
+        Nothing here is reported at error level. Resolving has to happen before
+        the attached-camera probe, but complaining has to happen after it: when
+        no sensor is plugged in there is no tuning file to resolve either, and a
+        tuning error printed first is what used to send people looking for a
+        tuning bug instead of a ribbon cable. The caller logs the returned
+        diagnostic once it knows the hardware is really there.
+
+        Returns:
+            tuple: ``(path, diagnostic)``. ``path`` is the absolute path to the
+                tuning file, or None when none could be resolved or it is not
+                loadable; ``diagnostic`` is then the message the caller must log
+                loudly - silently running on the default tuning changes
+                auto-exposure with no trace in the data (see issue #222).
+        """
+        degraded = (
+            "Falling back to the default tuning - auto-exposure will behave "
+            "differently and this run is NOT comparable with correctly tuned ones."
+        )
+        tuning_path = pi.get_camera_tuning_file()
+        diagnostic = None
+
+        if tuning_path:
+            try:
+                # Parsed purely to validate. A malformed file has to fail here,
+                # where we can still name it, rather than inside libcamera,
+                # where an unloadable tuning stops the sensor registering and so
+                # masquerades as absent hardware.
+                Picamera2.load_tuning_file(
+                    os.path.basename(tuning_path), dir=os.path.dirname(tuning_path)
+                )
+            except Exception as e:
+                diagnostic = (
+                    f"Failed to load NoIR tuning file {tuning_path}: {e}. {degraded}"
+                )
+                tuning_path = None
+        else:
+            diagnostic = (
+                f"No NoIR tuning file could be resolved for this camera. {degraded}"
+            )
+
+        if tuning_path:
+            os.environ["LIBCAMERA_RPI_TUNING_FILE"] = tuning_path
+        else:
+            # Reason: a value left over from an earlier acquisition in this
+            # process would otherwise still be in force here.
+            os.environ.pop("LIBCAMERA_RPI_TUNING_FILE", None)
+
+        return tuning_path, diagnostic
+
     def run(self):
         """
         Initialise pi camera, get frames, convert them fo greyscale, and make them available in a queue.
@@ -783,6 +855,19 @@ class PiFrameGrabber2(PiFrameGrabber):
         )
 
         Picamera2.set_logging(logging.ERROR)
+
+        # NoIR tuning is unconditional: an ethoscope cannot work without an IR
+        # pass-through camera, so this was never a meaningful user choice. The
+        # tuning *file* does vary by sensor and by Pi generation, which the
+        # resolver handles; it used to be hardcoded to imx219 on the vc4 path,
+        # so every other sensor silently fell back to the default colour tuning
+        # and got different auto-exposure behaviour (issue #222).
+        #
+        # Reason: this has to come before the probe below, which starts the
+        # libcamera CameraManager and with it freezes the tuning choice for the
+        # rest of the process. See _select_tuning_file(), which stays silent so
+        # that the probe below still gets to name the real fault first.
+        self._tuning_file, tuning_problem = self._select_tuning_file()
 
         # Ask libcamera what it can see before touching anything else. A camera
         # that is absent from the CSI bus used to surface as "IndexError: list
@@ -814,46 +899,19 @@ class PiFrameGrabber2(PiFrameGrabber):
                 self._queue.put(None)
                 return
 
+        # A camera really is attached, so a tuning complaint now points at the
+        # tuning rather than away from a missing sensor.
+        if tuning_problem:
+            logging.error(tuning_problem)
+        else:
+            logging.info(f"Using NoIR tuning file: {self._tuning_file}")
+
         try:
-            # NoIR tuning is unconditional: an ethoscope cannot work without an IR
-            # pass-through camera, so this was never a meaningful user choice. The
-            # tuning *file* does vary by sensor and by Pi generation, which the
-            # resolver handles; it used to be hardcoded to imx219 on the vc4 path,
-            # so every other sensor silently fell back to the default colour tuning
-            # and got different auto-exposure behaviour (issue #222).
-            from ethoscope.utils import pi
-
-            tuning_path = pi.get_camera_tuning_file()
-            self._tuning_file = tuning_path
-
-            if tuning_path:
-                try:
-                    # Pass the directory explicitly: picamera2's own search path
-                    # covers only the vc4 directory, so a Pi 5 (pisp) would miss.
-                    capture = Picamera2(
-                        tuning=Picamera2.load_tuning_file(
-                            os.path.basename(tuning_path),
-                            dir=os.path.dirname(tuning_path),
-                        )
-                    )
-                    logging.info(f"Loaded NoIR tuning file: {tuning_path}")
-                except Exception as e:
-                    self._tuning_file = None
-                    logging.error(
-                        f"Failed to load NoIR tuning file {tuning_path}: {e}. "
-                        "Falling back to the default tuning - auto-exposure will "
-                        "behave differently and this run is NOT comparable with "
-                        "correctly tuned ones."
-                    )
-                    capture = Picamera2()
-            else:
-                logging.error(
-                    "No NoIR tuning file could be resolved for this camera. Falling "
-                    "back to the default tuning - auto-exposure will behave "
-                    "differently and this run is NOT comparable with correctly "
-                    "tuned ones."
-                )
-                capture = Picamera2()
+            # tuning=None is exactly Picamera2(), so the degraded case needs no
+            # branch of its own. The environment variable set by
+            # _select_tuning_file() is what libcamera actually honours; passing
+            # the path here keeps the two in step and states the intent.
+            capture = Picamera2(tuning=self._tuning_file)
 
             # Record the outcome where the parent process (and so the node) can
             # see it: a silent fallback to default tuning is exactly the kind of
