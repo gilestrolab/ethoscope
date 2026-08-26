@@ -76,9 +76,8 @@ class TestLiveGain:
     """
 
     def _grabber(self, gain=5.0):
-        from unittest.mock import patch
-
         import queue as _queue
+        from unittest.mock import patch
 
         from ethoscope.hardware.input.cameras import PiFrameGrabber2
 
