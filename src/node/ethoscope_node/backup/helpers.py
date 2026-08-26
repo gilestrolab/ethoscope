@@ -74,7 +74,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from ethoscope_node.backup.mysql import DBNotReadyError, MySQLdbToSQLite
-from ethoscope_node.utils.configuration import ensure_ssh_keys
+from ethoscope_node.utils.configuration import get_ssh_key_paths
 from ethoscope_node.utils.network import open_http_url
 from ethoscope_node.utils.video_helpers import list_local_video_files
 
@@ -786,7 +786,7 @@ class VideoBackupClass(BaseBackupClass):
             os.makedirs(destination_dir, exist_ok=True)
 
             # Get SSH key path for authentication
-            private_key_path, _ = ensure_ssh_keys()
+            private_key_path, _ = get_ssh_key_paths()
 
             rsync_source = f"ethoscope@{device_ip}:{source_dir}/"
             rsync_command = [
@@ -1053,7 +1053,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             )
 
             # Get SSH key path for authentication
-            private_key_path, _ = ensure_ssh_keys()
+            private_key_path, _ = get_ssh_key_paths()
 
             total_operations = len(backup_types)
             completed_operations = 0

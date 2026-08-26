@@ -1,5 +1,6 @@
 import copy
 import datetime
+import grp
 import json
 import logging
 import os
@@ -25,6 +26,31 @@ USERS_KEYS = [
     "created",
 ]
 INCUBATORS_KEYS = ["id", "name", "location", "owner", "description"]
+
+# Permissions applied to the node's SSH key material.
+#
+# The node advertises this key to every user on the machine: it writes an
+# IdentityFile line for it into the system-wide /etc/ssh/ssh_config (see
+# _setup_system_ssh_config). Locking the key to its owner alone contradicts
+# that, and left admins loosening it by hand only for the next backup cycle to
+# clamp it back. Group-readable is the mode that matches the advertised intent.
+#
+# The secrecy of this key is not the security boundary it appears to be: it
+# authenticates to devices that ship with the well-known password "ethoscope",
+# and the node installs it on every device it discovers.
+SSH_KEYS_DIR_MODE = 0o750
+SSH_PRIVATE_KEY_MODE = 0o640
+SSH_PUBLIC_KEY_MODE = 0o644
+
+# Group granted read access to the key material: "node", the group that comes
+# with the node account on a standard install. Sites that run the node under a
+# different account point ETHOSCOPE_SSH_KEY_GROUP at their own group, which
+# systemd picks up from the bootstrap env file like the other path settings.
+#
+# Note this grants nothing on its own - the group has to exist and the accounts
+# that need passwordless ssh have to be members of it. Where it is missing,
+# _apply_ssh_key_permissions says so and names the two commands.
+DEFAULT_SSH_KEY_GROUP = "node"
 
 # Module-level default configuration file path.
 # Resolved from ETHOSCOPE_CONFIG_DIR / {ETHOSCOPE_DATA_DIR}/config at import time
@@ -1427,6 +1453,105 @@ Host {ip_pattern} ethoscope*
         logger.error(f"Failed to setup system SSH config: {e}")
 
 
+def _resolve_ssh_key_group() -> str:
+    """
+    Name of the group that should be able to read the node's SSH key.
+
+    Returns:
+        str: ``$ETHOSCOPE_SSH_KEY_GROUP`` when set, else ``DEFAULT_SSH_KEY_GROUP``.
+    """
+    return os.environ.get("ETHOSCOPE_SSH_KEY_GROUP") or DEFAULT_SSH_KEY_GROUP
+
+
+def _apply_ssh_key_permissions(
+    keys_path: Path, private_key_path: Path, public_key_path: Path
+) -> None:
+    """
+    Apply the group-readable permissions to the key directory and key pair.
+
+    Ownership is only ever changed for the *group*: the user half is left alone
+    because the keys are legitimately owned by whichever account runs the node,
+    which differs between installations.
+
+    Args:
+        keys_path (Path): Directory holding the key pair.
+        private_key_path (Path): The private key.
+        public_key_path (Path): The public key.
+    """
+    logger = logging.getLogger(__name__)
+
+    os.chmod(keys_path, SSH_KEYS_DIR_MODE)
+    if private_key_path.exists():
+        os.chmod(private_key_path, SSH_PRIVATE_KEY_MODE)
+    if public_key_path.exists():
+        os.chmod(public_key_path, SSH_PUBLIC_KEY_MODE)
+
+    group = _resolve_ssh_key_group()
+    try:
+        gid = grp.getgrnam(group).gr_gid
+    except KeyError:
+        # Not fatal: the modes above are still applied, the key simply stays
+        # readable to its owner only. Say what to do about it rather than
+        # leaving the admin to discover it through a failing rsync.
+        logger.warning(
+            f"Group '{group}' does not exist, so {private_key_path} stays "
+            f"readable only by its owner. Create it and add the accounts that "
+            f"need passwordless ssh to the ethoscopes "
+            f"(groupadd {group}; usermod -aG {group} <user>), or point "
+            f"ETHOSCOPE_SSH_KEY_GROUP at an existing group."
+        )
+        return
+
+    for target in (keys_path, private_key_path, public_key_path):
+        if not target.exists():
+            continue
+        try:
+            os.chown(target, -1, gid)
+        except PermissionError:
+            # Changing group needs root, or ownership plus membership of the
+            # target group. Worth saying once, not worth failing over.
+            logger.warning(
+                f"Not permitted to set group '{group}' on {target}; "
+                f"leaving its current group in place."
+            )
+
+
+def get_ssh_key_paths(keys_dir: str | None = None) -> tuple[str, str]:
+    """
+    Return the node's SSH key paths, creating the pair only if it is missing.
+
+    This is the accessor for callers that just need somewhere to point
+    ``ssh -i``. It deliberately does NOT re-assert permissions: the backup loop
+    and the device scanner call it every few minutes, and having them rewrite
+    the modes each time meant any deliberate local change was silently undone
+    within minutes.
+
+    Args:
+        keys_dir: Directory holding the key pair. Defaults to the ``keys``
+            subdirectory of the active configuration directory
+            (``{ETHOSCOPE_DATA}/config/keys``).
+
+    Returns:
+        Tuple of (private_key_path, public_key_path)
+
+    Raises:
+        ConfigurationError: If the keys are absent and cannot be generated.
+    """
+    if keys_dir is None:
+        keys_dir = os.path.join(resolve_config_dir(), "keys")
+
+    keys_path = Path(keys_dir)
+    private_key_path = keys_path / "id_rsa"
+    public_key_path = keys_path / "id_rsa.pub"
+
+    if private_key_path.exists() and public_key_path.exists():
+        return str(private_key_path), str(public_key_path)
+
+    # Nothing to hand out yet - fall through to the full setup, which creates
+    # the pair and sets it up properly.
+    return ensure_ssh_keys(keys_dir)
+
+
 def ensure_ssh_keys(keys_dir: str | None = None) -> tuple[str, str]:
     """
     Ensure SSH keys exist for ethoscope node authentication.
@@ -1458,9 +1583,6 @@ def ensure_ssh_keys(keys_dir: str | None = None) -> tuple[str, str]:
         # Ensure keys directory exists
         keys_path = Path(keys_dir)
         keys_path.mkdir(parents=True, exist_ok=True)
-
-        # Set directory permissions to 700 (drwx------)
-        os.chmod(keys_path, 0o700)
         logger.debug(f"Created/verified SSH keys directory: {keys_path}")
 
         # Define key file paths
@@ -1470,9 +1592,11 @@ def ensure_ssh_keys(keys_dir: str | None = None) -> tuple[str, str]:
         # Check if keys already exist
         if private_key_path.exists() and public_key_path.exists():
             logger.info(f"SSH keys already exist at {keys_dir}")
-            # Verify permissions
-            os.chmod(private_key_path, 0o600)
-            os.chmod(public_key_path, 0o644)
+            # Re-assert the permissions. This is what migrates a node installed
+            # before the keys became group-readable: the modes are corrected the
+            # next time the server starts. Callers that only want the paths use
+            # get_ssh_key_paths(), which leaves them alone.
+            _apply_ssh_key_permissions(keys_path, private_key_path, public_key_path)
             return str(private_key_path), str(public_key_path)
 
         # Generate new SSH key pair
@@ -1509,12 +1633,11 @@ def ensure_ssh_keys(keys_dir: str | None = None) -> tuple[str, str]:
         logger.debug(f"ssh-keygen output: {result.stdout}")
 
         # Set proper permissions
-        os.chmod(private_key_path, 0o600)  # -rw-------
-        os.chmod(public_key_path, 0o644)  # -rw-r--r--
+        _apply_ssh_key_permissions(keys_path, private_key_path, public_key_path)
 
         logger.info("Set proper permissions on SSH keys")
-        logger.info(f"Private key: {private_key_path} (600)")
-        logger.info(f"Public key: {public_key_path} (644)")
+        logger.info(f"Private key: {private_key_path} ({oct(SSH_PRIVATE_KEY_MODE)})")
+        logger.info(f"Public key: {public_key_path} ({oct(SSH_PUBLIC_KEY_MODE)})")
 
         # Set up system-wide SSH configuration for ethoscopes
         _setup_system_ssh_config(str(private_key_path))

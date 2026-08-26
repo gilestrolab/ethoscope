@@ -93,6 +93,44 @@ function enable_services() {
     done
 }
 
+function ensure_node_account() {
+    # The node's SSH key is group-readable by "node" (DEFAULT_SSH_KEY_GROUP in
+    # src/node/ethoscope_node/utils/configuration.py), which is what lets the
+    # accounts on the node use it for passwordless ssh to the devices. That is
+    # only dependable if the group reliably exists, so create it here instead of
+    # leaving every site to invent its own - the group being absent was how
+    # admins ended up loosening the key permissions by hand.
+    echo "Ensuring the node account exists..."
+
+    if ! getent group node >/dev/null; then
+        groupadd node
+        echo "  Created group 'node'"
+    else
+        echo "  Group 'node' already exists"
+    fi
+
+    if ! getent passwd node >/dev/null; then
+        useradd --gid node --create-home --shell /bin/bash \
+                --comment "Ethoscope node" node
+        echo "  Created user 'node'"
+    else
+        echo "  User 'node' already exists"
+    fi
+
+    # Whoever is installing the node is whoever will want to ssh to the devices
+    # from it, so put them in the group as well. This only takes effect at their
+    # next login, hence the reminder.
+    local admin="${SUDO_USER:-}"
+    if [ -n "$admin" ] && [ "$admin" != "root" ]; then
+        if id -nG "$admin" | tr ' ' '\n' | grep -qx node; then
+            echo "  User '$admin' is already in group 'node'"
+        else
+            usermod -aG node "$admin"
+            echo "  Added '$admin' to group 'node' - log out and back in for this to take effect"
+        fi
+    fi
+}
+
 function ensure_system_services() {
     # Ensure critical system services are enabled.
     # These are not ethoscope-specific but ethoscopes depend on them.
@@ -137,6 +175,9 @@ fi
 case "$1" in
     --node)
         echo "Installing node services"
+
+        # Before anything else: the account whose group owns the SSH key.
+        ensure_node_account
 
         # Remove old ethoscope services
         remove_old_services "ethoscope_*"

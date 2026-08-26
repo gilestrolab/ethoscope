@@ -1066,7 +1066,7 @@ class TestEthoscopeSSH:
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
-    @patch("ethoscope_node.scanner.ethoscope_scanner.ensure_ssh_keys")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.get_ssh_key_paths")
     @patch("subprocess.run")
     def test_setup_ssh_authentication_success(
         self, mock_run, mock_ensure_keys, mock_config_class, mock_db_class
@@ -1085,7 +1085,7 @@ class TestEthoscopeSSH:
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
-    @patch("ethoscope_node.scanner.ethoscope_scanner.ensure_ssh_keys")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.get_ssh_key_paths")
     @patch("subprocess.run")
     def test_setup_ssh_authentication_failure(
         self, mock_run, mock_ensure_keys, mock_config_class, mock_db_class
@@ -1105,7 +1105,7 @@ class TestEthoscopeSSH:
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
-    @patch("ethoscope_node.scanner.ethoscope_scanner.ensure_ssh_keys")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.get_ssh_key_paths")
     @patch("subprocess.run")
     def test_setup_ssh_authentication_timeout(
         self, mock_run, mock_ensure_keys, mock_config_class, mock_db_class
@@ -1122,7 +1122,7 @@ class TestEthoscopeSSH:
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
-    @patch("ethoscope_node.scanner.ethoscope_scanner.ensure_ssh_keys")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.get_ssh_key_paths")
     @patch("subprocess.run")
     def test_setup_ssh_authentication_command_not_found(
         self, mock_run, mock_ensure_keys, mock_config_class, mock_db_class

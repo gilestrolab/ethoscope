@@ -7,6 +7,7 @@ setup used for ethoscope device connections.
 
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 from pathlib import Path
@@ -15,9 +16,13 @@ from unittest.mock import Mock, call, mock_open, patch
 import pytest
 
 from ethoscope_node.utils.configuration import (
+    SSH_KEYS_DIR_MODE,
+    SSH_PRIVATE_KEY_MODE,
+    SSH_PUBLIC_KEY_MODE,
     ConfigurationError,
     _setup_system_ssh_config,
     ensure_ssh_keys,
+    get_ssh_key_paths,
 )
 
 
@@ -45,9 +50,10 @@ class TestEnsureSshKeys:
                     ensure_ssh_keys(keys_dir)
 
                 assert os.path.exists(keys_dir)
-                # Check directory permissions are 700 (drwx------)
+                # Group-readable (drwxr-x---): the node advertises this key to
+                # every user on the machine via /etc/ssh/ssh_config.
                 stat_info = os.stat(keys_dir)
-                assert oct(stat_info.st_mode)[-3:] == "700"
+                assert stat.S_IMODE(stat_info.st_mode) == SSH_KEYS_DIR_MODE
 
     def test_returns_existing_keys(self):
         """Test returns paths to existing keys without regenerating."""
@@ -106,29 +112,27 @@ class TestEnsureSshKeys:
 
     @patch("subprocess.run")
     def test_sets_key_permissions(self, mock_run):
-        """Test sets proper permissions on generated keys."""
-        mock_run.return_value = Mock(stdout="Generated key", stderr="")
+        """Test sets group-readable permissions on generated keys."""
+
+        def mock_subprocess_run(cmd, **kwargs):
+            # ssh-keygen is mocked, so stand in for the files it would write:
+            # the permissions are applied to real paths, not to mock calls.
+            if cmd[0] == "ssh-keygen":
+                private_key = cmd[cmd.index("-f") + 1]
+                Path(private_key).touch()
+                Path(private_key + ".pub").touch()
+            return Mock(stdout="Generated key", stderr="")
+
+        mock_run.side_effect = mock_subprocess_run
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            keys_dir = temp_dir
+            with patch("ethoscope_node.utils.configuration._setup_system_ssh_config"):
+                private_path, public_path = ensure_ssh_keys(temp_dir)
 
-            # Mock os.chmod to verify permissions are set
-            with patch("os.chmod") as mock_chmod:
-                ensure_ssh_keys(keys_dir)
-
-                # Check that chmod was called for private key (600) and public key (644)
-                chmod_calls = mock_chmod.call_args_list
-                os.path.join(keys_dir, "id_rsa")
-                os.path.join(keys_dir, "id_rsa.pub")
-
-                # Find the chmod calls for the key files (ignore directory chmod)
-                key_chmod_calls = [
-                    call
-                    for call in chmod_calls
-                    if str(call[0][0]).endswith(("id_rsa", "id_rsa.pub"))
-                ]
-
-                assert len(key_chmod_calls) >= 2
+            assert stat.S_IMODE(os.stat(private_path).st_mode) == SSH_PRIVATE_KEY_MODE
+            assert stat.S_IMODE(os.stat(public_path).st_mode) == SSH_PUBLIC_KEY_MODE
+            # The private key must not be world-readable whatever else changes.
+            assert not stat.S_IMODE(os.stat(private_path).st_mode) & stat.S_IROTH
 
     @patch("subprocess.run")
     def test_calls_ssh_config_setup(self, mock_run):
@@ -319,3 +323,123 @@ class TestSetupSystemSshConfig:
                     assert "ConnectTimeout 10" in written_content
                     assert "ServerAliveInterval 30" in written_content
                     assert "ServerAliveCountMax 3" in written_content
+
+
+class TestGetSshKeyPaths:
+    """The accessor must hand out paths without rewriting permissions."""
+
+    @staticmethod
+    def _make_key_pair(keys_dir):
+        """Create a dummy key pair with deliberately loosened permissions."""
+        private_key = Path(keys_dir) / "id_rsa"
+        public_key = Path(keys_dir) / "id_rsa.pub"
+        private_key.touch()
+        public_key.touch()
+        os.chmod(keys_dir, 0o755)
+        os.chmod(private_key, 0o644)
+        return private_key, public_key
+
+    def test_existing_keys_are_left_exactly_as_they_are(self):
+        """
+        Regression: the backup loop and the scanner call this every few minutes.
+
+        They used to call ensure_ssh_keys(), whose "verify permissions" branch
+        re-applied the modes on every call, so an admin who deliberately
+        loosened the key to share it with other accounts on the node saw it
+        clamped back within minutes.
+        """
+        with tempfile.TemporaryDirectory() as keys_dir:
+            private_key, _ = self._make_key_pair(keys_dir)
+
+            with patch("os.chmod") as mock_chmod:
+                with patch("os.chown") as mock_chown:
+                    returned_private, returned_public = get_ssh_key_paths(keys_dir)
+
+            mock_chmod.assert_not_called()
+            mock_chown.assert_not_called()
+            assert returned_private == str(private_key)
+            assert returned_public == str(private_key) + ".pub"
+            # And the loosened modes really did survive the call.
+            assert stat.S_IMODE(os.stat(private_key).st_mode) == 0o644
+            assert stat.S_IMODE(os.stat(keys_dir).st_mode) == 0o755
+
+    @patch("subprocess.run")
+    def test_missing_keys_are_generated_once(self, mock_run):
+        """With no key pair present, fall through to the full setup."""
+
+        def mock_subprocess_run(cmd, **kwargs):
+            if cmd[0] == "ssh-keygen":
+                private_key = cmd[cmd.index("-f") + 1]
+                Path(private_key).touch()
+                Path(private_key + ".pub").touch()
+            return Mock(stdout="Generated key", stderr="")
+
+        mock_run.side_effect = mock_subprocess_run
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            keys_dir = os.path.join(temp_dir, "keys")
+            with patch("ethoscope_node.utils.configuration._setup_system_ssh_config"):
+                private_path, public_path = get_ssh_key_paths(keys_dir)
+
+            assert os.path.exists(private_path)
+            assert stat.S_IMODE(os.stat(private_path).st_mode) == SSH_PRIVATE_KEY_MODE
+            assert stat.S_IMODE(os.stat(public_path).st_mode) == SSH_PUBLIC_KEY_MODE
+
+
+class TestSshKeyGroup:
+    """Group ownership of the key material."""
+
+    @staticmethod
+    def _existing_pair(keys_dir):
+        """Put a key pair in place so ensure_ssh_keys takes the existing path."""
+        Path(keys_dir, "id_rsa").touch()
+        Path(keys_dir, "id_rsa.pub").touch()
+
+    def test_configured_group_is_applied_to_dir_and_keys(self, monkeypatch):
+        """The group named by ETHOSCOPE_SSH_KEY_GROUP gets read access."""
+        monkeypatch.setenv("ETHOSCOPE_SSH_KEY_GROUP", "labgroup")
+
+        fake_group = Mock(gr_gid=4242)
+        with tempfile.TemporaryDirectory() as keys_dir:
+            self._existing_pair(keys_dir)
+
+            with patch("grp.getgrnam", return_value=fake_group) as mock_getgrnam:
+                with patch("os.chown") as mock_chown:
+                    ensure_ssh_keys(keys_dir)
+
+            mock_getgrnam.assert_called_once_with("labgroup")
+            # Directory and both keys, with the user half left alone (-1).
+            assert mock_chown.call_count == 3
+            for chown_call in mock_chown.call_args_list:
+                assert chown_call[0][1] == -1
+                assert chown_call[0][2] == 4242
+
+    def test_missing_group_warns_but_still_sets_modes(self, caplog, monkeypatch):
+        """An absent group must not break the node, just say what to do."""
+        monkeypatch.setenv("ETHOSCOPE_SSH_KEY_GROUP", "nosuchgroup")
+
+        with tempfile.TemporaryDirectory() as keys_dir:
+            self._existing_pair(keys_dir)
+
+            with patch("grp.getgrnam", side_effect=KeyError("nosuchgroup")):
+                with patch("os.chown") as mock_chown:
+                    private_path, _ = ensure_ssh_keys(keys_dir)
+
+            mock_chown.assert_not_called()
+            assert stat.S_IMODE(os.stat(private_path).st_mode) == SSH_PRIVATE_KEY_MODE
+            assert "nosuchgroup" in caplog.text
+            assert "groupadd" in caplog.text
+
+    def test_unprivileged_group_change_is_not_fatal(self, monkeypatch):
+        """Without root the group cannot be set; the node carries on anyway."""
+        monkeypatch.setenv("ETHOSCOPE_SSH_KEY_GROUP", "labgroup")
+
+        with tempfile.TemporaryDirectory() as keys_dir:
+            self._existing_pair(keys_dir)
+
+            with patch("grp.getgrnam", return_value=Mock(gr_gid=4242)):
+                with patch("os.chown", side_effect=PermissionError("not root")):
+                    private_path, public_path = ensure_ssh_keys(keys_dir)
+
+            assert private_path == os.path.join(keys_dir, "id_rsa")
+            assert stat.S_IMODE(os.stat(public_path).st_mode) == SSH_PUBLIC_KEY_MODE

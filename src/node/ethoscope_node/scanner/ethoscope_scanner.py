@@ -19,7 +19,10 @@ from ethoscope_node.scanner.base_scanner import (
     ScanException,
 )
 from ethoscope_node.scanner.ethoscope_streaming import EthoscopeStreamManager
-from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
+from ethoscope_node.utils.configuration import (
+    EthoscopeConfiguration,
+    get_ssh_key_paths,
+)
 from ethoscope_node.utils.etho_db import ExperimentalDB
 from ethoscope_node.utils.network import open_http_url
 from ethoscope_node.utils.paths import resolve_config_dir
@@ -1344,7 +1347,7 @@ class Ethoscope(BaseDevice):
         try:
             # Get SSH key paths
             keys_dir = os.path.join(self._config_dir, "keys")
-            private_key_path, public_key_path = ensure_ssh_keys(keys_dir)
+            private_key_path, public_key_path = get_ssh_key_paths(keys_dir)
 
             # Use sshpass with ssh-copy-id to setup passwordless authentication
             cmd = [

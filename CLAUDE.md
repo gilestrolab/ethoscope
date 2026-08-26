@@ -199,9 +199,43 @@ The node automatically manages passwordless SSH authentication to ethoscope devi
 ### Overview
 
 - **Purpose**: Enable passwordless rsync backups from ethoscope devices to the node
-- **Key Location**: `/etc/ethoscope/keys/` (RSA 2048-bit key pair)
+- **Key Location**: `{ETHOSCOPE_DATA}/config/keys/` (RSA 2048-bit key pair), resolved
+  by `resolve_config_dir()` — i.e. `$ETHOSCOPE_CONFIG_DIR` if set, else
+  `{data dir}/config`. Typically `/ethoscope_data/config/keys/`.
 - **Target User**: `ethoscope` user on ethoscope devices
 - **Password**: Default password is "ethoscope" (used only for initial key transfer)
+
+### Key Permissions
+
+The node writes an `IdentityFile` line for this key into the system-wide
+`/etc/ssh/ssh_config`, so it advertises the key to *every* account on the machine.
+The permissions match that intent: directory `0750`, private key `0640`, public key
+`0644`, with the group set to `node` by default — the group that comes with the `node`
+account on a standard install.
+
+Point `ETHOSCOPE_SSH_KEY_GROUP` at another group to override the name (systemd picks
+it up from the bootstrap env file alongside the path settings). If the group does not
+exist the node logs a warning naming the `groupadd`/`usermod` commands and carries on,
+leaving the key readable only by its owner.
+
+`install_services.sh --node` creates the `node` user and group, and adds the admin
+running the installer (`$SUDO_USER`) to the group — so on a normal install this is
+already in place. On a node installed before that, or to give another account access:
+
+```bash
+sudo usermod -aG node <user>
+sudo systemctl restart ethoscope_node.service   # re-applies the modes
+```
+
+Group membership only takes effect at the user's next login.
+
+Only `ensure_ssh_keys()` asserts these permissions — at node start, and when the pair
+is first generated. Callers that merely need a path for `ssh -i` use
+`get_ssh_key_paths()`, which never rewrites them: the backup loop and the device
+scanner run every few minutes, and having them re-apply the modes silently undid any
+deliberate local change.
+
+**Location**: `src/node/ethoscope_node/utils/configuration.py:1425`
 
 ### Automatic Key Transfer
 
@@ -241,10 +275,10 @@ If automatic transfer fails, you can manually transfer the key:
 
 ```bash
 # On the node
-sshpass -p "ethoscope" ssh-copy-id -i /etc/ethoscope/keys/id_rsa.pub ethoscope@<device-ip>
+sshpass -p "ethoscope" ssh-copy-id -i /ethoscope_data/config/keys/id_rsa.pub ethoscope@<device-ip>
 
 # Or without sshpass (will prompt for password)
-ssh-copy-id -i /etc/ethoscope/keys/id_rsa.pub ethoscope@<device-ip>
+ssh-copy-id -i /ethoscope_data/config/keys/id_rsa.pub ethoscope@<device-ip>
 ```
 
 ### Troubleshooting
@@ -252,7 +286,7 @@ ssh-copy-id -i /etc/ethoscope/keys/id_rsa.pub ethoscope@<device-ip>
 **SSH key icon shows orange/red:**
 1. Check network connectivity to ethoscope device
 2. Verify ethoscope user password is "ethoscope"
-3. Check `/etc/ethoscope/keys/` exists on node with proper permissions
+3. Check `{ETHOSCOPE_DATA}/config/keys/` exists on node with proper permissions
 4. Review node logs for SSH transfer errors
 5. Try manual SSH key transfer (see above)
 

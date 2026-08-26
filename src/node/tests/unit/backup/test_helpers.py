@@ -1410,7 +1410,7 @@ class TestVideoBackupClass:
         assert result is None
 
     @patch("subprocess.Popen")
-    @patch("ethoscope_node.backup.helpers.ensure_ssh_keys")
+    @patch("ethoscope_node.backup.helpers.get_ssh_key_paths")
     @patch("ethoscope_node.backup.helpers.VideoBackupClass.get_video_list_json")
     def test_backup_success(self, mock_get_videos, mock_ssh_keys, mock_popen, tmp_path):
         """Test successful video backup operation."""
@@ -1504,7 +1504,7 @@ class TestVideoBackupClass:
         )
 
     @patch("subprocess.Popen")
-    @patch("ethoscope_node.backup.helpers.ensure_ssh_keys")
+    @patch("ethoscope_node.backup.helpers.get_ssh_key_paths")
     @patch("ethoscope_node.backup.helpers.VideoBackupClass.get_video_list_json")
     def test_backup_rsync_failure(
         self, mock_get_videos, mock_ssh_keys, mock_popen, tmp_path
