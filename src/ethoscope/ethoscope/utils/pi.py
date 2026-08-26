@@ -1313,6 +1313,78 @@ def manage_disk_space(ethoscope_dir, threshold_percent=85, max_age_days=60):
         return {"status": "error", "details": error_msg}
 
 
+def _unallocated_bytes_after_root():
+    """Unallocated bytes on the disk immediately after the root partition.
+
+    This is the correct signal for whether the root filesystem can still grow.
+    The root partition can already carry gigabytes of *free space* and yet leave
+    most of a large medium unallocated (e.g. a 29 GB image partition flashed onto
+    a 120 GB SSD, or a 64 GB SD card). Measuring free space inside the filesystem
+    misses that entirely, which is why expansion used to be skipped on any medium
+    larger than the image partition.
+
+    Returns:
+        int: unallocated bytes following the root partition, or 0 if the root
+        partition is not the last one on its disk (growing it would be unsafe)
+        or the layout cannot be determined.
+    """
+    try:
+        root_part = subprocess.run(
+            ["findmnt", "/", "-o", "source", "-n"],
+            capture_output=True,
+            text=True,
+            check=False,
+        ).stdout.strip()  # e.g. /dev/sda2 or /dev/mmcblk0p2 or /dev/nvme0n1p2
+        if not root_part:
+            return 0
+
+        part_kname = os.path.basename(root_part)  # sda2 / mmcblk0p2 / nvme0n1p2
+        disk = (
+            subprocess.run(
+                ["lsblk", "-no", "pkname", root_part],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            .stdout.strip()
+            .splitlines()
+        )
+        disk = disk[0].strip() if disk else ""
+        if not disk:
+            return 0
+
+        # Every partition appears as a sub-directory of its disk in sysfs
+        # (/sys/class/block/<disk>/<part>/). These fields are always in 512-byte
+        # sectors, regardless of the physical sector size.
+        diskdir = f"/sys/class/block/{disk}"
+
+        def _read_int(path):
+            with open(path) as fh:
+                return int(fh.read())
+
+        disk_sectors = _read_int(f"{diskdir}/size")
+        part_start = _read_int(f"{diskdir}/{part_kname}/start")
+        part_sectors = _read_int(f"{diskdir}/{part_kname}/size")
+        part_end = part_start + part_sectors
+
+        # Only safe to grow the root partition if it is the LAST one: no sibling
+        # partition may begin or extend beyond its end.
+        for entry in os.listdir(diskdir):
+            if entry == part_kname or not os.path.exists(f"{diskdir}/{entry}/start"):
+                continue
+            if (
+                _read_int(f"{diskdir}/{entry}/start")
+                + _read_int(f"{diskdir}/{entry}/size")
+                > part_end
+            ):
+                return 0  # a partition lies beyond root -> root is not last
+
+        return max(0, disk_sectors - part_end) * 512
+    except Exception as e:
+        logging.error(f"Could not determine unallocated space after root: {e}")
+        return 0
+
+
 def expand_rootfs():
     """
     Execute raspi-config --expand-rootfs if the system supports it and there is room for expansion.
@@ -1344,40 +1416,25 @@ def expand_rootfs():
             result["message"] = "raspi-config not found or not executable"
             return result
 
-        # Check current partition info to see if expansion is needed
-        partition_info = get_partition_info("/")
-        if not partition_info:
-            result["message"] = "Cannot get root partition information"
-            return result
-
-        # Get available space on root partition
-        available_str = partition_info.get("Avail", "0")
-        if available_str.endswith("G"):
-            available_gb = float(available_str[:-1])
-        elif available_str.endswith("M"):
-            available_gb = float(available_str[:-1]) / 1024
-        else:
-            available_gb = 0
-
-        # Check if there's already plenty of space (>1GB available)
-        if available_gb > 1.0:
+        # Expansion is needed only when the root partition does not already fill
+        # its disk — i.e. there is unallocated space AFTER it. Checking free space
+        # *inside* the filesystem (the previous heuristic) is wrong: a large image
+        # partition can carry gigabytes of free space yet still leave most of a big
+        # card/SSD unallocated, so it silently skipped expansion on any medium
+        # larger than the image partition (a big SD card just as much as an SSD).
+        unallocated = _unallocated_bytes_after_root()
+        if unallocated < 1 * 1024**3:  # < 1 GiB unallocated -> already fills disk
             result["message"] = (
-                f"Root partition has {available_gb:.1f}GB available - expansion not needed"
+                f"Root partition already fills its disk "
+                f"({unallocated / 1024**3:.2f}GB unallocated) - expansion not needed"
             )
             result["success"] = True
             return result
 
-        # Check if we can detect an unexpanded partition
-        # This is a simple check - if the root filesystem doesn't fill the SD card
         try:
-            with os.popen('lsblk -ln -o NAME,SIZE,MOUNTPOINT | grep "/$"') as cmd:
-                root_info = cmd.read().strip()
-
-            if not root_info:
-                result["message"] = "Cannot detect root partition layout"
-                return result
-
-            # Execute raspi-config --expand-rootfs
+            # raspi-config re-detects the root device itself (findmnt/lsblk) and
+            # handles SD cards, USB SSDs and NVMe alike; it grows the partition now
+            # and schedules the filesystem resize for the next boot.
             expand_cmd = f"{raspi_config_path} --expand-rootfs"
 
             with os.popen(expand_cmd) as cmd:
