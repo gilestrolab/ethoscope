@@ -75,6 +75,7 @@ from dataclasses import dataclass
 
 from ethoscope_node.backup.mysql import DBNotReadyError, MySQLdbToSQLite
 from ethoscope_node.utils.configuration import ensure_ssh_keys
+from ethoscope_node.utils.network import open_http_url
 from ethoscope_node.utils.video_helpers import list_local_video_files
 
 # A table name is the one part of a query that cannot be bound as a parameter,
@@ -83,34 +84,6 @@ from ethoscope_node.utils.video_helpers import list_local_video_files
 # the network and are opened here without ever being validated, so accept only
 # the shape a real table name has and skip anything else.
 _SAFE_TABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-
-def _urlopen_http(target, timeout):
-    """
-    Open an http(s) URL, refusing every other scheme.
-
-    ``urlopen`` honours ``file://`` and any other scheme urllib knows, which
-    turns a URL assembled from configuration - a device address, a node address
-    - into a way to read local files or reach unintended services. Everything
-    fetched in this module is plain HTTP, so anything else is a bug or an
-    attack, and is refused rather than followed.
-
-    Args:
-        target (str | urllib.request.Request): URL or prepared request to open.
-        timeout (float): Socket timeout in seconds.
-
-    Returns:
-        http.client.HTTPResponse: The open response, as ``urlopen`` returns.
-
-    Raises:
-        ValueError: If the URL scheme is not http or https.
-    """
-    url = target.full_url if isinstance(target, urllib.request.Request) else target
-    scheme = urllib.parse.urlparse(url).scheme
-    if scheme not in ("http", "https"):
-        raise ValueError(f"Refusing to open a non-HTTP URL: {url!r}")
-
-    return urllib.request.urlopen(target, timeout=timeout)  # nosec B310
 
 
 def get_sqlite_table_counts(
@@ -935,7 +908,7 @@ class VideoBackupClass(BaseBackupClass):
                 f"[{self._device_id}] Requesting video list from: {video_list_url}"
             )
 
-            with _urlopen_http(
+            with open_http_url(
                 video_list_url, timeout=self.REQUEST_TIMEOUT
             ) as response:
                 video_data = json.load(response)
@@ -1761,7 +1734,7 @@ class GenericBackupWrapper(threading.Thread):
             req = urllib.request.Request(
                 url, headers={"Content-Type": "application/json"}
             )
-            with _urlopen_http(
+            with open_http_url(
                 req, timeout=self.DEFAULT_DEVICE_SCAN_TIMEOUT
             ) as response:
                 self._logger.info(
@@ -3080,7 +3053,7 @@ def _enhance_databases_with_rsync_info(
         # Try to get enhanced file info from rsync backup service
         rsync_url = "http://localhost:8093/status"
 
-        with _urlopen_http(rsync_url, timeout=5) as response:
+        with open_http_url(rsync_url, timeout=5) as response:
             rsync_data = json.loads(response.read().decode())
 
         # Extract file details for this device

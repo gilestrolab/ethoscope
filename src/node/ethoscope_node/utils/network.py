@@ -7,10 +7,40 @@ and managing network interfaces and IP ranges.
 
 import ipaddress
 import logging
+import urllib.parse
+import urllib.request
 
 import netifaces
 
 logger = logging.getLogger(__name__)
+
+
+def open_http_url(target, timeout):
+    """
+    Open an http(s) URL, refusing every other scheme.
+
+    ``urlopen`` honours ``file://`` and any other scheme urllib knows, which
+    turns a URL assembled from configuration - a device address, a node address
+    - into a way to read local files or reach unintended services. Every URL
+    this node fetches is plain HTTP, so anything else is a bug or an attack,
+    and is refused rather than followed.
+
+    Args:
+        target (str | urllib.request.Request): URL or prepared request to open.
+        timeout (float): Socket timeout in seconds.
+
+    Returns:
+        http.client.HTTPResponse: The open response, as ``urlopen`` returns.
+
+    Raises:
+        ValueError: If the URL scheme is not http or https.
+    """
+    url = target.full_url if isinstance(target, urllib.request.Request) else target
+    scheme = urllib.parse.urlparse(url).scheme
+    if scheme not in ("http", "https"):
+        raise ValueError(f"Refusing to open a non-HTTP URL: {url!r}")
+
+    return urllib.request.urlopen(target, timeout=timeout)  # nosec
 
 
 def get_primary_private_network() -> str | None:

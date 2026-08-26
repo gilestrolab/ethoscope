@@ -6,6 +6,7 @@ import os
 import shutil
 import socket
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -116,7 +117,11 @@ class EthoscopeConfiguration:
                 "description": "Where video chunks (h264) will be saved by the backup daemon",
             },
             "temporary": {
-                "path": "/tmp/ethoscope",
+                # Asking the platform rather than hardcoding /tmp: same
+                # directory in practice, but it honours TMPDIR, so a node that
+                # wants downloads off the root filesystem can say so without
+                # editing the config of every install.
+                "path": os.path.join(tempfile.gettempdir(), "ethoscope"),
                 "description": "A temporary location for downloading data.",
             },
         },

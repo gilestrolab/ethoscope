@@ -21,6 +21,7 @@ from ethoscope_node.scanner.base_scanner import (
 from ethoscope_node.scanner.ethoscope_streaming import EthoscopeStreamManager
 from ethoscope_node.utils.configuration import EthoscopeConfiguration, ensure_ssh_keys
 from ethoscope_node.utils.etho_db import ExperimentalDB
+from ethoscope_node.utils.network import open_http_url
 from ethoscope_node.utils.paths import resolve_config_dir
 
 # Constants
@@ -323,7 +324,7 @@ class Ethoscope(BaseDevice):
         try:
             img_path = self._info["last_drawn_img"]
             img_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['static']}/{img_path}"
-            return urllib.request.urlopen(img_url, timeout=3)
+            return open_http_url(img_url, timeout=3)
         except (KeyError, urllib.error.HTTPError) as e:
             self._logger.error(f"Could not get image for {self._id}: {e}")
             raise
@@ -333,7 +334,7 @@ class Ethoscope(BaseDevice):
         try:
             img_path = self._info["dbg_img"]
             img_url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['static']}/{img_path}"
-            return urllib.request.urlopen(img_url, timeout=3)
+            return open_http_url(img_url, timeout=3)
         except Exception as e:
             self._logger.warning(f"Could not get debug image: {e}")
             return None
