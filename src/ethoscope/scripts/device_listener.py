@@ -143,6 +143,54 @@ class commandingThread(threading.Thread):
         finally:
             client.close()
 
+    # How long to wait for a control thread to wind down before answering the
+    # client anyway. Long enough for a tracking thread to close its database,
+    # short enough that a wedged one does not hang the caller for ever - the
+    # old code joined without a timeout.
+    _STOP_JOIN_TIMEOUT = 30
+
+    def _busy_with(self):
+        """
+        Name the activity currently under way, if any.
+
+        ``is_alive()`` is the authority rather than the reported status: a
+        control thread that is still initialising has already taken, or is
+        about to take, the camera, but does not yet call itself "running".
+
+        Returns:
+            str: The status of the live control thread, or None when the device
+                is idle.
+        """
+        if self.control.is_alive():
+            return self.control.info["status"]
+        return None
+
+    def _stop_current_activity(self):
+        """
+        Stop whatever the device is doing and wait for the thread to finish.
+
+        Returns:
+            bool: True if an activity was stopped, False if there was none.
+        """
+        if not self.control.is_alive():
+            return False
+
+        logging.info("Stopping monitor")
+        self.control.stop()
+        logging.info("Joining monitor")
+        self.control.join(timeout=self._STOP_JOIN_TIMEOUT)
+        if self.control.is_alive():
+            # Reason: say so rather than pretend. The thread still holds the
+            # camera, so the next start will be refused instead of quietly
+            # fighting it for the sensor.
+            logging.error(
+                f"The control thread did not stop within {self._STOP_JOIN_TIMEOUT}s "
+                "and is still holding the camera."
+            )
+        else:
+            logging.info("Monitor stopped")
+        return True
+
     def action(self, action, data=None):
         """
         act on client's instructions
@@ -150,6 +198,23 @@ class commandingThread(threading.Thread):
 
         if not data and action in ["start", "start_record"]:
             return "This action requires JSON data"
+
+        # Reason: start/start_record/stream used to overwrite self.control while
+        # the previous control thread was still alive. That thread kept running,
+        # kept its database open and kept the camera, but nothing referenced it
+        # any more, so it could never be stopped. The new thread then failed to
+        # acquire the camera ("Device or resource busy"), sat in "initialising",
+        # and two minutes later the initialisation watchdog SIGKILLed the whole
+        # listener - taking the healthy experiment with it. Refuse instead: an
+        # experiment already under way is data, and replacing it is not
+        # something to do by accident.
+        if action in ["start", "start_record", "stream"]:
+            busy = self._busy_with()
+            if busy is not None:
+                return (
+                    f"ERROR: this ethoscope is already busy ({busy}). Stop the "
+                    "current activity before starting a new one."
+                )
 
         if action == "help":
             return (
@@ -204,17 +269,15 @@ class commandingThread(threading.Thread):
             self.control.start()
             return "Starting recording or streaming activity"
 
-        elif action == "stop" and self.control.info["status"] in [
-            "running",
-            "recording",
-            "streaming",
-        ]:
-            logging.info("Stopping monitor")
-            self.control.stop()
-            logging.info("Joining monitor")
-            self.control.join()
-            logging.info("Monitor joined")
-            logging.info("Monitor stopped")
+        elif action == "stop":
+            # Reason: this used to be gated on a status of running/recording/
+            # streaming, so a thread stuck in "initialising" - the state a
+            # camera that will not open leaves it in - could not be stopped at
+            # all, and the only way out was to kill the process or reboot the
+            # Pi. ControlThread.stop() already knows which states it can act on,
+            # including "initialising", so let it decide.
+            if not self._stop_current_activity():
+                return "There is no activity to stop."
             return "Stopping ethoscope activity"
 
         elif action == "set_autostop":
@@ -238,11 +301,7 @@ class commandingThread(threading.Thread):
             logging.info(f"Automatic stop changed to {result}")
             return result
 
-        elif action == "remove" and self.control.info["status"] not in [
-            "running",
-            "recording",
-            "streaming",
-        ]:
+        elif action == "remove" and self._busy_with() is None:
             logging.info("Removing persistent file.")
             try:
                 if os.path.exists(pi.PERSISTENT_STATE):
@@ -253,11 +312,7 @@ class commandingThread(threading.Thread):
             except Exception:
                 return "The persistent file exists but could not be removed"
 
-        elif action == "restart" and self.control.info["status"] not in [
-            "running",
-            "recording",
-            "streaming",
-        ]:
+        elif action == "restart" and self._busy_with() is None:
             logging.info("Restarting the ethoscope device service")
             with os.popen("systemctl restart ethoscope_device.service") as df:
                 outcome = df.read()
