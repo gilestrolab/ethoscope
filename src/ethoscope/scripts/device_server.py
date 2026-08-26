@@ -337,6 +337,29 @@ def update_machine_info(id):
     return {"haschanged": haschanged}
 
 
+def _refused_command(id, action, result):
+    """
+    Report a command the listener refused, without inventing a status.
+
+    Args:
+        id (str): The machine id, to read the real state back with.
+        action (str): The command that was refused, for the log.
+        result (str): The listener's "ERROR: ..." reply.
+
+    Returns:
+        dict: The device's actual state, with the refusal attached.
+
+    A status of "stopped" used to be hardcoded here. That was near enough while
+    the only refusals were genuine start failures, but a device that declines a
+    second start *because it is already busy* is the opposite of stopped, and
+    the node would have drawn a running experiment as idle.
+    """
+    logging.error(f"{action} command failed: {result}")
+    response = info(id)
+    response["error"] = result
+    return response
+
+
 @api.post("/controls/<id>/<action>")
 @error_decorator
 def controls(id, action):
@@ -349,8 +372,7 @@ def controls(id, action):
         tracking_json_data.update(data)
         result = send_command(action, tracking_json_data)
         if isinstance(result, str) and result.startswith("ERROR:"):
-            logging.error(f"Start command failed: {result}")
-            return {"error": result, "status": "stopped", "id": _MACHINE_ID}
+            return _refused_command(id, "Start", result)
         return info(id)
 
     elif action in ["stop", "close", "poweroff", "reboot", "restart"]:
@@ -383,8 +405,7 @@ def controls(id, action):
         recording_json_data.update(data)
         result = send_command(action, recording_json_data)
         if isinstance(result, str) and result.startswith("ERROR:"):
-            logging.error(f"{action} command failed: {result}")
-            return {"error": result, "status": "stopped", "id": _MACHINE_ID}
+            return _refused_command(id, action, result)
         return info(id)
 
     elif action == "set_autostop":
