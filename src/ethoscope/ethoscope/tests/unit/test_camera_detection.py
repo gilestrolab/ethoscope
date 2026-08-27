@@ -4,19 +4,25 @@ Unit tests for camera presence and sensor detection.
 
 Both used to dispatch on the Pi model, assuming Pi 2/3 ran the legacy MMAL
 firmware camera and Pi 4 ran libcamera. One image now boots every model on
-KMS + ``camera_auto_detect=1``, so that assumption inverted:
+KMS + ``camera_auto_detect=1``, so the model no longer says which stack is in
+play and the dispatch had stopped meaning anything.
 
-* a Pi 3 on that image has no ``bcm2835-camera`` device and ``vcgencmd`` reports
-  ``detected=0``, so the model-keyed ``hasPiCamera()`` called a working camera
-  missing - and the deployed fleet is Pi 3;
-* ``_get_camera_sensor_info()``'s fallback was gated on ``isMachinePI(4)``,
-  an equality test, so a Pi 3 or Pi 5 had one detection method and no backup;
-* a Pi 5 fell off the end of ``hasPiCamera()`` and got an unconditional False.
+Measured on a Pi 3 Model B on that image (ETHOSCOPE_000), so the tests below
+pin what the hardware actually does rather than what the split predicted:
 
-Separately the fallback named ``libcamera-hello``, which Raspberry Pi OS renamed
-to ``rpicam-hello`` and dropped in Trixie. Shelled out through ``os.popen()``
-that rotted silently: the shell wrote "command not found" to stderr, ``read()``
-returned "", the regex matched nothing, and the caller concluded "no camera".
+* ``hasPiCamera()`` returned True there even before the change, via the bcm2835
+  platform device. There was no fleet-wide false negative to repair;
+* a Pi 5 did fall off the end of ``hasPiCamera()`` and got an unconditional
+  False, which is a real bug;
+* ``_get_camera_sensor_info()``'s fallback was gated on ``isMachinePI(4)``, an
+  equality test, so it never ran on a Pi 3 or Pi 5 - but the I2C probe ahead of
+  it was never gated and answers on every model, so nothing changed in practice.
+
+The fallback was dead code regardless. It named ``libcamera-hello``, which
+Raspberry Pi OS renamed to ``rpicam-hello`` and dropped in Trixie, and shelling
+it out through ``os.popen()`` hid that completely: the shell wrote "command not
+found" to stderr, ``read()`` returned "", the regex matched nothing, and the
+caller concluded "no camera". So no model had a working second method.
 """
 
 from unittest.mock import MagicMock, patch
@@ -83,7 +89,12 @@ class TestCameraCliName:
 class TestSensorInfoIsNotPi4Only:
     @pytest.mark.parametrize("model", [3, 4, 5])
     def test_the_cli_fallback_runs_on_every_model(self, model):
-        """Regression: gated on isMachinePI(4), so Pi 3 and Pi 5 had no backup."""
+        """Gated on isMachinePI(4), so it never ran on a Pi 3 or a Pi 5.
+
+        The I2C probe ahead of it is ungated, so in practice this cost nothing
+        - but it left the gated path as the only backup, and that backup was
+        itself dead (see the module docstring).
+        """
         with _on_pi(model):
             with patch.object(pi, "_detect_camera_via_i2c", return_value=None):
                 with patch.object(pi, "_camera_cli", return_value="rpicam-hello"):
@@ -112,10 +123,13 @@ class TestSensorInfoIsNotPi4Only:
 
 class TestHasPiCameraIsStackNotModel:
     def test_a_pi3_on_the_kms_image_is_detected(self):
-        """The core regression: the whole fleet is Pi 3 and moving to that image.
+        """The I2C binding alone must be enough to call a Pi 3 camera present.
 
-        Under KMS there is no bcm2835-camera device and vcgencmd says
-        detected=0, so the I2C binding is the only positive evidence.
+        On a real Pi 3 on the unified image the bcm2835 platform device also
+        answers, so this held before the change too - but it answers because a
+        kernel module is loaded, not because a sensor is attached (vcgencmd
+        there reports supported=0 detected=0). The I2C binding is the evidence
+        that actually means something, and it must stand on its own.
         """
         with _on_pi(3):
             with patch.object(pi, "_detect_camera_via_i2c", return_value="imx219"):

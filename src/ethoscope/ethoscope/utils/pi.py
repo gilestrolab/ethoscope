@@ -700,19 +700,30 @@ def hasPiCamera():
         return False
 
     # Reason: the probes used to be chosen by Pi model, on the assumption that
-    # Pi 2/3 ran the legacy MMAL firmware camera and Pi 4 ran libcamera. That
-    # stopped being true when one image began booting every model on KMS +
-    # camera_auto_detect: a Pi 3 on that image has no bcm2835-camera device and
-    # vcgencmd reports detected=0, so a model-keyed check calls a perfectly good
-    # camera missing - and the whole fleet is Pi 3. Any model outside 2/3/4 (a
-    # Pi 5) fell off the end and returned False unconditionally.
+    # Pi 2/3 ran the legacy MMAL firmware camera and Pi 4 ran libcamera. One
+    # image now boots every model on KMS + camera_auto_detect, so the model no
+    # longer tells you which stack is in play. Which probe can answer depends
+    # on the stack, not on the board, so run them all and let the first
+    # positive win. Ordered cheapest and most specific first; the CLI probe
+    # starts the camera stack, so it goes last.
     #
-    # Which probe answers depends on the camera *stack*, not on the board, so
-    # run them all and let the first positive win. Ordered cheapest and most
-    # specific first; the CLI one starts the camera stack, so it goes last.
-    # A false negative here is far worse than a false positive: it reports
-    # "No camera hardware detected - video capabilities disabled" for a device
-    # that is tracking happily, and stamps that into every run's METADATA.
+    # Measured on a Pi 3 Model B on the unified image (ETHOSCOPE_000): the
+    # model-keyed version still returned True there, via the bcm2835 platform
+    # device, so this is not repairing a fleet-wide false negative - it is
+    # removing a dispatch that had stopped meaning anything. What it does fix
+    # is a Pi 5, which matched no branch at all and returned False
+    # unconditionally, and a Pi 3/Pi 5 having no fallback behind the I2C probe.
+    #
+    # Note the bcm2835 probe is weak evidence: on that same Pi 3 the sysfs node
+    # exists because the bcm2835_v4l2 module is loaded, while vcgencmd reports
+    # supported=0 detected=0. It would answer True with the ribbon unplugged.
+    # It is kept for genuinely legacy cards and deliberately ordered after the
+    # two probes that need a real sensor, but it is why this function is more
+    # willing to say "yes" than "no". That bias is the right way round: a false
+    # negative reports "No camera hardware detected - video capabilities
+    # disabled" for a device that is tracking happily, and stamps that into
+    # every run's METADATA, whereas a false positive only costs a stale cache
+    # read and a harmless "run tracking once" message.
     probes = (
         ("I2C sensor binding", lambda: bool(_detect_camera_via_i2c())),
         ("V4L2 subdevice", _detect_camera_via_v4l2_subdev),
@@ -751,11 +762,12 @@ def _get_camera_sensor_info():
     if sensor_name:
         return sensor_name
 
-    # Reason: the fallback was gated on isMachinePI(4), which is an equality
-    # test, so it never ran on a Pi 3 or a Pi 5. That was harmless while Pi 3
-    # was on the legacy camera stack; now that one image puts every model on
-    # libcamera, it left the fleet with a single detection method and no
-    # backup at all. Nothing about reading the sensor name is Pi 4 specific.
+    # Reason: the fallback was gated on isMachinePI(4), an equality test, so it
+    # never ran on a Pi 3 or a Pi 5. In practice that changed nothing, because
+    # the I2C probe above was never gated and answers on every model - verified
+    # on a Pi 3 on the unified image. What it did mean is that no model had a
+    # working second method, since this one named libcamera-hello, which does
+    # not exist on Trixie. Nothing about reading a sensor name is Pi 4 specific.
     sensor_name = _detect_camera_via_libcamera_cli()
     if sensor_name:
         return sensor_name
