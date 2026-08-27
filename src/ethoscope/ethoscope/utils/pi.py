@@ -3,6 +3,7 @@ import glob
 import logging
 import os
 import re
+import shutil
 import subprocess
 import time
 from uuid import uuid4
@@ -543,10 +544,70 @@ def cpu_serial():
     return serial
 
 
+def _camera_cli():
+    """
+    Name of the libcamera "list the cameras" tool, or None when absent.
+
+    Raspberry Pi OS renamed the ``libcamera-*`` tools to ``rpicam-*`` in
+    Bookworm and dropped the old names entirely in Trixie, where only
+    ``rpicam-hello`` exists. The name used to be hardcoded to
+    ``libcamera-hello``, and because it was shelled out through ``os.popen()``
+    the breakage was invisible: the shell wrote "command not found" to stderr,
+    ``read()`` returned an empty string, the regex matched nothing, and the
+    caller concluded there was no camera. Look the binary up instead.
+
+    Returns:
+        str: The executable name to call, or None if neither is installed.
+    """
+    for name in ("rpicam-hello", "libcamera-hello"):
+        if shutil.which(name):
+            return name
+
+    logging.debug("Neither rpicam-hello nor libcamera-hello is installed")
+    return None
+
+
+def _detect_camera_via_libcamera_cli(timeout_s=2):
+    """
+    Ask the libcamera CLI which sensor is attached.
+
+    The slowest probe of the set - it starts the camera stack - so it is used
+    only as a fallback, after the filesystem checks.
+
+    Args:
+        timeout_s (int): Seconds to allow the tool before giving up.
+
+    Returns:
+        str: The sensor name (e.g. "imx219"), or None if it could not be read.
+    """
+    cli = _camera_cli()
+    if cli is None:
+        return None
+
+    try:
+        with os.popen(
+            f"timeout {timeout_s} {cli} --list-cameras --timeout 1000"
+        ) as cmd:
+            out_cmd = cmd.read()
+    except Exception as e:
+        logging.debug(f"Could not run {cli}: {e}")
+        return None
+
+    match = re.search(r"\d+ : (\w+)", out_cmd)
+    return match.group(1) if match else None
+
+
 def _detect_camera_via_i2c():
     """
-    Detect camera via I2C bus devices (Pi 4+ method).
-    Returns the sensor name if found, None otherwise.
+    Detect the camera from the sensor driver's I2C binding.
+
+    This is the primary method on any image where libcamera drives the camera:
+    ``camera_auto_detect=1`` loads the sensor overlay, which binds the driver
+    and publishes the sensor name under /sys/bus/i2c. That is now every Pi
+    model, not just Pi 4 - see hasPiCamera().
+
+    Returns:
+        str: The sensor name if found, None otherwise.
     """
     known_sensors = ["imx219", "ov5647", "imx477", "imx708"]
 
@@ -595,37 +656,32 @@ def _detect_camera_via_bcm2835_platform():
 
 def _legacy_camera_detection():
     """
-    Fallback to original camera detection methods when safe to do so.
+    Ask the GPU firmware whether it can see a camera.
+
+    Only ever answers on a legacy (MMAL) image: under KMS ``vcgencmd
+    get_camera`` reports detected=0 even when the camera works perfectly, so a
+    negative here means nothing on its own.
+
+    The model gate this used to carry has gone with the one in hasPiCamera():
+    it sent Pi 4 down a libcamera branch that now lives in
+    _detect_camera_via_libcamera_cli(), and it is the caller's job to decide
+    which probes to run.
+
+    Returns:
+        bool: True only if the firmware reports a supported, detected camera.
     """
     try:
-        if isMachinePI(2) or isMachinePI(3):
-            # Use vcgencmd if available
-            vcgencmd_possible_locations = ["/opt/vc/bin/vcgencmd", "/usr/bin/vcgencmd"]
-            vcgencmd = None
+        vcgencmd_possible_locations = ["/opt/vc/bin/vcgencmd", "/usr/bin/vcgencmd"]
 
-            for loc in vcgencmd_possible_locations:
-                if os.path.isfile(loc):
-                    vcgencmd = f"{loc} get_camera"
-                    break
-
-            if vcgencmd:
-                with os.popen(vcgencmd) as cmd:
+        for loc in vcgencmd_possible_locations:
+            if os.path.isfile(loc):
+                with os.popen(f"{loc} get_camera") as cmd:
                     out_cmd = cmd.read().strip()
-                if "detected=1" in out_cmd and "supported=1" in out_cmd:
-                    return True
+                return "detected=1" in out_cmd and "supported=1" in out_cmd
 
-        elif isMachinePI(4):
-            # Use libcamera-hello as fallback (may fail if camera in use)
-            with os.popen(
-                "timeout 3 libcamera-hello --list-cameras --timeout 2000"
-            ) as cmd:
-                out_cmd = cmd.read()
-            match = re.search(r"\d+ : (\w+)", out_cmd)
-            if match:
-                return True
+    except Exception as e:
+        logging.debug(f"vcgencmd camera probe failed: {e}")
 
-    except Exception:
-        pass
     return False
 
 
@@ -643,52 +699,71 @@ def hasPiCamera():
     if not isMachinePI():
         return False
 
-    if isMachinePI(2) or isMachinePI(3):
-        # Method 1: Check bcm2835-camera platform device (most reliable for Pi 2/3)
-        if _detect_camera_via_bcm2835_platform():
-            return True
+    # Reason: the probes used to be chosen by Pi model, on the assumption that
+    # Pi 2/3 ran the legacy MMAL firmware camera and Pi 4 ran libcamera. That
+    # stopped being true when one image began booting every model on KMS +
+    # camera_auto_detect: a Pi 3 on that image has no bcm2835-camera device and
+    # vcgencmd reports detected=0, so a model-keyed check calls a perfectly good
+    # camera missing - and the whole fleet is Pi 3. Any model outside 2/3/4 (a
+    # Pi 5) fell off the end and returned False unconditionally.
+    #
+    # Which probe answers depends on the camera *stack*, not on the board, so
+    # run them all and let the first positive win. Ordered cheapest and most
+    # specific first; the CLI one starts the camera stack, so it goes last.
+    # A false negative here is far worse than a false positive: it reports
+    # "No camera hardware detected - video capabilities disabled" for a device
+    # that is tracking happily, and stamps that into every run's METADATA.
+    probes = (
+        ("I2C sensor binding", lambda: bool(_detect_camera_via_i2c())),
+        ("V4L2 subdevice", _detect_camera_via_v4l2_subdev),
+        ("bcm2835 platform device", _detect_camera_via_bcm2835_platform),
+        ("GPU firmware (vcgencmd)", _legacy_camera_detection),
+        ("libcamera CLI", lambda: bool(_detect_camera_via_libcamera_cli(timeout_s=3))),
+    )
 
-        # Method 2: Fallback to legacy vcgencmd method
-        return _legacy_camera_detection()
+    for name, probe in probes:
+        try:
+            if probe():
+                logging.debug(f"Camera detected via {name}")
+                return True
+        except Exception as e:
+            # A probe that cannot run is not evidence of absence.
+            logging.debug(f"Camera probe '{name}' could not run: {e}")
 
-    if isMachinePI(4):
-        # Method 1: Check I2C camera sensors (most reliable for Pi 4+)
-        if _detect_camera_via_i2c():
-            return True
-
-        # Method 2: Check V4L2 subdevices
-        if _detect_camera_via_v4l2_subdev():
-            return True
-
-        # Method 3: Fallback to legacy libcamera method
-        return _legacy_camera_detection()
-
+    logging.warning(
+        "No camera detected by any probe (I2C, V4L2, bcm2835, vcgencmd, "
+        "libcamera CLI). Video capabilities will be reported as unavailable."
+    )
     return False
 
 
 def _get_camera_sensor_info():
     """
-    Get camera sensor information from I2C devices (Pi 4+) or other sources.
-    Returns sensor name or None if not available.
+    Name the attached camera sensor.
+
+    Returns:
+        str: The sensor name (e.g. "imx219"), or None when it cannot be
+            determined - which callers must treat as a degraded state, since
+            the NoIR tuning file is chosen from this name and a run without it
+            is not comparable with a correctly tuned one (issue #222).
     """
-    # Try I2C sensor detection (Pi 4+)
     sensor_name = _detect_camera_via_i2c()
     if sensor_name:
         return sensor_name
 
-    # Try libcamera detection as fallback
-    try:
-        if isMachinePI(4):
-            with os.popen(
-                "timeout 2 libcamera-hello --list-cameras --timeout 1000"
-            ) as cmd:
-                out_cmd = cmd.read()
-            match = re.search(r"\d+ : (\w+)", out_cmd)
-            if match:
-                return match.group(1)
-    except Exception:
-        pass
+    # Reason: the fallback was gated on isMachinePI(4), which is an equality
+    # test, so it never ran on a Pi 3 or a Pi 5. That was harmless while Pi 3
+    # was on the legacy camera stack; now that one image puts every model on
+    # libcamera, it left the fleet with a single detection method and no
+    # backup at all. Nothing about reading the sensor name is Pi 4 specific.
+    sensor_name = _detect_camera_via_libcamera_cli()
+    if sensor_name:
+        return sensor_name
 
+    logging.warning(
+        "Could not determine the camera sensor from either the I2C binding or "
+        "the libcamera CLI; the NoIR tuning file cannot be resolved without it."
+    )
     return None
 
 
