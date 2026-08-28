@@ -1235,7 +1235,16 @@ class ControlThread(Thread):
             "experimental_info": str(self._info["experimental_info"]),
             "selected_options": str(self._option_dict),
             "hardware_info": str(self.hw_info),
-            "reference_points": str([(p[0], p[1]) for p in reference_points]),
+            # Reason: reference_points is a float32 array, so p[0] is a numpy
+            # scalar. NumPy 2.0 changed scalar repr from "1205.1133" to
+            # "np.float32(1205.1133)", and str() of the list uses repr on its
+            # elements, so every run since that upgrade wrote coordinates no
+            # consumer can read back without numpy in scope: json.loads fails
+            # and ast.literal_eval fails. Two thirds of the recent archive is
+            # affected. Coercing to plain floats restores the original format.
+            "reference_points": str(
+                [(float(p[0]), float(p[1])) for p in reference_points]
+            ),
             "backup_filename": self._info["backup_filename"],
             "result_writer_type": result_writer_type,
             "sqlite_source_path": sqlite_source_path,
