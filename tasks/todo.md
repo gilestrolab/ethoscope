@@ -748,3 +748,44 @@ would have been invisible.
 - [ ] Bound smart incubators show "offline" in Live when their unit is unreachable, even
       when a sensor of the same name is still reporting readings. Falling back to the
       sensor there too would be consistent with what non-smart incubators now do.
+
+# Platform-wide CLI updater
+
+Date: 2026-08-28
+
+## Goal
+
+Update the whole platform from a terminal: refresh the bare repo, update every
+upgradable ethoscope and the node, restart their services, then confirm and summarise.
+Equivalent to `src/updater/update_server.py`'s web UI, without a browser.
+
+## Tasks
+
+- [x] Drive the existing update server API rather than reimplementing git/systemd logic,
+      so the CLI and the web page cannot disagree about what "out of date" means.
+- [x] Copy the web UI's two safety rules verbatim: the updatable-status allowlist
+      (`stopped`, `NA`, `Software broken`) and the busy states that are never touched.
+- [x] Update the node *after* the devices — restarting it kills the update server the
+      script is talking to.
+- [x] Confirm by re-surveying, not by trusting the group response (successful device
+      replies come back without a device id, so they cannot be attributed).
+- [x] Wait out the node restart window and re-query it before reporting.
+- [x] Tests: state classification, eligibility (busy is immune to `--force`), glob
+      filters, plan building, response parsing, transport failures. 23 tests.
+- [x] Verified `--dry-run` against the production node (30 devices, ETHOSCOPE_073
+      correctly excluded as running) and the full mutation path against a stub server.
+
+## Review
+
+- Split into `accessories/update_platform.py` (CLI, phases, output) and
+  `accessories/update_platform_api.py` (client + rules) to stay under the 500-line rule
+  and to make the rules unit-testable without a server.
+- Errors are de-duplicated: `process_device_update` returns the same error dict twice
+  when the update call raises, so a failing device would otherwise be reported twice.
+
+## Discovered During Work
+
+- [ ] `process_device_update` in `src/updater/update_server.py` returns each device's
+      reply verbatim, and a *successful* reply carries no `device_id`. The web UI's
+      result panel has the same blind spot. Stamping the id onto every response would
+      let both attribute successes, not just failures.

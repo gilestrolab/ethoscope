@@ -296,6 +296,50 @@ ssh-copy-id -i /ethoscope_data/config/keys/id_rsa.pub ethoscope@<device-ip>
 3. Verify SSH daemon is running on ethoscope
 4. Check firewall rules if applicable
 
+## Updating the platform from the command line
+
+`accessories/update_platform.py` is the CLI equivalent of the web updater. It drives
+the same HTTP API that `src/updater/update_server.py` serves, so the two cannot drift
+apart, and it applies the same safety rules: **a device that is running, recording or
+streaming is never updated**, not even with `--force`.
+
+```bash
+# from the node itself
+./accessories/update_platform.py
+
+# from a workstation, look before you leap
+./accessories/update_platform.py --host node --dry-run
+```
+
+What it does, in order:
+
+1. `GET /bare/update` — refreshes the node's bare repository from its remote.
+2. `GET /devices` + `GET /device/check_update/node` — surveys the fleet and the node.
+3. `POST /group/update` for every ethoscope that is out of date *and* idle; the node
+   updates each device and restarts its services.
+4. Re-surveys the fleet and confirms what actually landed on disk.
+5. Updates and restarts the node **last**, then waits for it to come back.
+6. Prints a summary and exits non-zero if anything failed or could not be confirmed.
+
+The node goes last on purpose: restarting it also restarts `ethoscope_update_node`,
+which is the server the script is talking to, so doing it first would cut the
+connection while the devices were still being worked on.
+
+Useful flags: `--dry-run`, `--yes` (required when stdin is not a tty), `--only GLOB` /
+`--skip GLOB` (match name or id), `--devices-only` / `--node-only`, `--restart-node`
+(restart the node even when its checkout is current), `--force` (also update machines
+that look up to date — still never the busy ones), `--batch-size N`, `--json`.
+
+Exit codes: `0` all good, `1` something failed or stayed unconfirmed, `2` the update
+server could not be reached at all.
+
+**Location**: `accessories/update_platform.py`, with the API client and the
+state/eligibility rules in `accessories/update_platform_api.py` and tests in
+`src/updater/tests/test_update_platform_cli.py`.
+
+The older `accessories/update-node-cli.sh` predates this and only updates the node it
+runs on, by shelling out to git and systemctl directly.
+
 ## Development Workflow
 
 1. **Device Development**: Work in `src/ethoscope/` for tracking algorithms, hardware interfaces, and device-specific features
