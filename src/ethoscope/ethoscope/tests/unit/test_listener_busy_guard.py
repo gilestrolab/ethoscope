@@ -142,6 +142,54 @@ class TestStopIsAlwaysAvailable:
         assert thread.action("start", {"roi_builder": {}}).startswith("ERROR:")
 
 
+class TestVideoActivitiesAreStoppable:
+    """Regression: the Stop button did nothing at all for video.
+
+    ``ControlThreadVideoRecording.run()`` builds the recorder, hands the camera
+    to its own capture thread and returns, so the control thread is dead within
+    a second of the start while the device records or streams for hours. A
+    liveness check that trusted ``is_alive()`` alone read that as an idle
+    device: ``stop`` answered "There is no activity to stop", the camera kept
+    going, and the node went on showing "streaming" for ever.
+    """
+
+    @pytest.mark.parametrize("status", ["recording", "streaming"])
+    def test_a_dead_thread_still_reporting_video_is_busy(self, listener, status):
+        control = FakeControl(status=status, alive=False)
+        thread = listener(control)
+
+        assert thread._busy_with() == status
+
+    @pytest.mark.parametrize("status", ["recording", "streaming"])
+    def test_it_can_be_stopped(self, listener, status):
+        control = FakeControl(status=status, alive=False)
+        thread = listener(control)
+
+        result = thread.action("stop")
+
+        assert control.stop_calls == 1
+        assert result == "Stopping ethoscope activity"
+
+    @pytest.mark.parametrize("status", ["recording", "streaming"])
+    def test_a_dead_thread_is_not_joined(self, listener, status):
+        """join() on a thread that was never started raises, and there is
+        nothing to wait for on one that has already returned."""
+        control = FakeControl(status=status, alive=False)
+        thread = listener(control)
+
+        thread.action("stop")
+
+        assert control.join_calls == []
+
+    @pytest.mark.parametrize("action", BUSY_ACTIONS)
+    @pytest.mark.parametrize("status", ["recording", "streaming"])
+    def test_it_still_blocks_a_new_activity(self, listener, action, status):
+        control = FakeControl(status=status, alive=False)
+        thread = listener(control)
+
+        assert thread.action(action, {"roi_builder": {}}).startswith("ERROR:")
+
+
 class TestMaintenanceActionsRespectABusyDevice:
     @pytest.mark.parametrize("action", ["remove", "restart"])
     def test_they_are_refused_while_an_experiment_is_alive(self, listener, action):

@@ -149,20 +149,34 @@ class commandingThread(threading.Thread):
     # old code joined without a timeout.
     _STOP_JOIN_TIMEOUT = 30
 
+    # Statuses that mean the device is doing something, whichever kind of control
+    # thread reported them. See _busy_with() for why the thread alone will not do.
+    _ACTIVE_STATUSES = ("initialising", "running", "recording", "streaming", "stopping")
+
     def _busy_with(self):
         """
         Name the activity currently under way, if any.
 
-        ``is_alive()`` is the authority rather than the reported status: a
-        control thread that is still initialising has already taken, or is
-        about to take, the camera, but does not yet call itself "running".
+        Two things have to agree here, and neither alone is enough:
+
+        ``is_alive()`` catches a tracking thread that has already taken, or is
+        about to take, the camera but does not yet call itself "running" - a
+        status check would read that as idle.
+
+        The reported status catches video recording and streaming, where
+        ``ControlThreadVideoRecording.run()`` sets the recorder up, hands the
+        camera to its own capture thread and returns. The control thread is dead
+        within a second of the start while the device goes on recording for
+        hours, so ``is_alive()`` reads *that* as idle - which left the Stop
+        button doing nothing at all for recordings and streams.
 
         Returns:
-            str: The status of the live control thread, or None when the device
+            str: The status of the activity under way, or None when the device
                 is idle.
         """
-        if self.control.is_alive():
-            return self.control.info["status"]
+        status = self.control.info.get("status")
+        if self.control.is_alive() or status in self._ACTIVE_STATUSES:
+            return status
         return None
 
     def _stop_current_activity(self):
@@ -172,13 +186,20 @@ class commandingThread(threading.Thread):
         Returns:
             bool: True if an activity was stopped, False if there was none.
         """
-        if not self.control.is_alive():
+        if self._busy_with() is None:
             return False
+
+        # A recording or streaming control thread returned the moment it handed
+        # the camera over, so there is nothing left to join - and joining a
+        # thread that was never started raises. Decided before stop() rather
+        # than after, since a tracking thread only unwinds once stopped.
+        joinable = self.control.is_alive()
 
         logging.info("Stopping monitor")
         self.control.stop()
-        logging.info("Joining monitor")
-        self.control.join(timeout=self._STOP_JOIN_TIMEOUT)
+        if joinable:
+            logging.info("Joining monitor")
+            self.control.join(timeout=self._STOP_JOIN_TIMEOUT)
         if self.control.is_alive():
             # Reason: say so rather than pretend. The thread still holds the
             # camera, so the next start will be refused instead of quietly
