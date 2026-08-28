@@ -492,6 +492,30 @@ class Ethoscope(BaseDevice):
         # update comprehensive list of databases - this should not be served here
         self._info.update({"databases": self.databases_info()})
 
+    @staticmethod
+    def _names_an_experiment(experimental_info) -> bool:
+        """
+        Whether an experimental_info block describes a run worth remembering.
+
+        Args:
+            experimental_info: The flat "current" block as a device reports it.
+
+        Returns:
+            bool: True if it names a user or a place.
+
+        Truthiness will not answer this. Streaming is started with a fully
+        defaulted ExperimentalInformation - no user, no location, but
+        light-schedule defaults (period 1440, max_light 100) that leave the dict
+        itself non-empty. Promoting that when the stream stopped overwrote the
+        last real run's user and incubator with blanks on the home page, which
+        is a lot to pay for a minute of looking through the camera. Tracking and
+        recording both demand a user and a location before the interface will
+        start them, so either being present is what separates a run from a look.
+        """
+        if not isinstance(experimental_info, dict):
+            return False
+        return bool(experimental_info.get("name") or experimental_info.get("location"))
+
     def _reorganize_experimental_info(self, new_info: dict):
         """
         Reorganize experimental_info into nested structure with current and previous.
@@ -614,7 +638,7 @@ class Ethoscope(BaseDevice):
                 "streaming",
             ]:
                 # Device just stopped - move current to previous, clear current
-                if nested_experimental_info["current"]:
+                if self._names_an_experiment(nested_experimental_info["current"]):
                     nested_experimental_info["previous"] = nested_experimental_info[
                         "current"
                     ].copy()
@@ -638,7 +662,7 @@ class Ethoscope(BaseDevice):
                 "streaming",
             ]:
                 # Device stopped and lost experimental_info - move current to previous
-                if nested_experimental_info["current"]:
+                if self._names_an_experiment(nested_experimental_info["current"]):
                     nested_experimental_info["previous"] = nested_experimental_info[
                         "current"
                     ].copy()
