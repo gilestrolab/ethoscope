@@ -789,3 +789,26 @@ Equivalent to `src/updater/update_server.py`'s web UI, without a browser.
       reply verbatim, and a *successful* reply carries no `device_id`. The web UI's
       result panel has the same blind spot. Stamping the id onto every response would
       let both attribute successes, not just failures.
+
+# Stop button does nothing for recording and streaming (2026-08-28)
+
+- [x] Reproduce: ETHOSCOPE_025 stuck in `streaming`; `POST /device/<id>/controls/stop`
+      returns 200 but the status never changes.
+- [x] Root cause: `commandingThread._busy_with()` trusted `ControlThread.is_alive()`
+      alone (introduced in 1fdced7d). `ControlThreadVideoRecording.run()` hands the
+      camera to its own `cameraCaptureThread` and returns, so the control thread is
+      dead seconds after a recording or stream starts. The listener therefore read a
+      busy device as idle and answered "There is no activity to stop."
+- [x] Fix: liveness is now `is_alive()` **or** a reported status in
+      `_ACTIVE_STATUSES`; the join is skipped when the thread already returned.
+- [x] Tests: `TestVideoActivitiesAreStoppable` in `test_listener_busy_guard.py`
+      (busy detection, stop, no join, start still refused). 105 tests pass.
+- [x] Unstuck 025 in production via `POST node:8888/group/restart`.
+
+## Discovered During Work
+
+- [x] `updates_api_wrapper()` ran `urlparse(ip).hostname`, so a bare IP silently
+      resolved to the host "None" and failed as "Name or service not known". Split
+      out `helpers.hostname_of()`, which accepts a bare address, a host:port pair or
+      a full URL and refuses an empty one by name. Tests in
+      `src/updater/tests/test_updates_api_address.py`.

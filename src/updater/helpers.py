@@ -500,12 +500,44 @@ def generate_new_device_map():
     return devices_map
 
 
+def hostname_of(address):
+    """
+    The host part of ``address``, however it happens to be written.
+
+    Args:
+        address (str): A bare address or hostname ("192.168.1.22", "node"), or a
+            URL carrying either ("http://192.168.1.22:9000").
+
+    Returns:
+        str: The host on its own, with any scheme, port and path removed.
+
+    Raises:
+        ValueError: If no host can be read out of ``address``.
+
+    ``urlparse`` only fills in ``hostname`` when the string has a scheme or
+    starts with "//", so a bare address used to come back as ``None`` and the
+    caller went on to request ``http://None:8888/...``. That surfaced as
+    "Name or service not known", which points at the network rather than at the
+    address the caller passed - so prepend the "//" that makes urlparse read a
+    bare address as a host, and say so plainly when there is nothing to read.
+    """
+    address = (address or "").strip()
+    if "//" not in address:
+        address = f"//{address}"
+
+    hostname = urllib.parse.urlparse(address).hostname
+    if not hostname:
+        raise ValueError(f"No host in address {address!r}")
+
+    return hostname
+
+
 def updates_api_wrapper(
     ip, id, what="check_update", type=None, port=8888, data=None, timeout=10
 ):
     response = ""
 
-    hn = urllib.parse.urlparse(ip).hostname
+    hn = hostname_of(ip)
 
     request_url = f"http://{hn}:{port}/{what}/{id}"
 
