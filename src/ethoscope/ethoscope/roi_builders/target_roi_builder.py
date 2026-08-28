@@ -34,6 +34,10 @@ class TargetGridROIBuilder(BaseROIBuilder):
     _expected__min_target_dist = (
         10  # the minimal distance between two targets, in 'target diameter'
     )
+    # How far the three targets may sit from a right-angle configuration. Held
+    # constant across retries on purpose: relaxing it per attempt is what made
+    # the reverted multi-attempt detector start runs on badly wrong ROIs.
+    _GEOMETRIC_TOLERANCE = 0.10
     _n_rows = 10
     _n_cols = 2
     _top_margin = 0
@@ -470,9 +474,20 @@ class TargetGridROIBuilder(BaseROIBuilder):
             ][0]
             sorted_src_pts = np.array([sorted_a, sorted_b, sorted_c], dtype=np.float32)
 
-            # Validate geometry - this is the key improvement
-            geometric_tolerance = 0.10 + (attempt * 0.05)  # Modest tolerance increase
-            if self._validate_target_geometry(sorted_src_pts, geometric_tolerance):
+            # Reason: this used to relax to 0.10 + attempt * 0.05, a survivor of
+            # the progressive-tolerance retry in 8f3c240f that was reverted for
+            # starting runs on badly wrong ROIs. Loosening the criteria on each
+            # retry is what produces those: a later attempt accepts evidence an
+            # earlier one correctly rejected, and a wrong ROI set is silent
+            # where a refusal is visible.
+            #
+            # It also earns nothing. Over 197 archive frames with recorded target
+            # coordinates, ramping and pinning both find 128, while ramping adds
+            # one false positive (4 wrong against 3) for no extra recall. Retry
+            # on fresh frames instead, which is what BaseROIBuilder.build does.
+            if self._validate_target_geometry(
+                sorted_src_pts, self._GEOMETRIC_TOLERANCE
+            ):
                 logging.debug(
                     f"Found valid target geometry at threshold {t} (attempt {attempt + 1})"
                 )

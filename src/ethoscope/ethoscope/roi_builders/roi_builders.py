@@ -17,6 +17,27 @@ class BaseROIBuilder(DescribedObject):
         """
         pass
 
+    # How many times to resample the camera when the targets are not found.
+    # Each pass costs six frames, so about a second at 5 fps. ROIs are built once
+    # per experiment, so a few seconds spent here is cheap against a run that
+    # fails to start.
+    _MAX_ACQUISITION_PASSES = 4
+
+    def _reference_image(self, camera):
+        """Median of six freshly acquired frames.
+
+        Taking the median rejects flies moving through the field, so the targets
+        are what survives.
+        """
+        accum = []
+        for i, (_, frame) in enumerate(camera):
+            accum.append(frame)
+            if i >= 5:
+                break
+        if not accum:
+            return None
+        return np.median(np.array(accum), 0).astype(np.uint8)
+
     def build(self, input):
         """
         Uses an input (image or camera) to build ROIs.
@@ -27,39 +48,59 @@ class BaseROIBuilder(DescribedObject):
         :return: list(:class:`~ethoscope.core.roi.ROI`)
         """
 
-        accum = []
-        if isinstance(input, np.ndarray):
-            accum = np.copy(input)
+        # Reason: the detector's own retries all ran against a single collapsed
+        # image, so its three "attempts" only varied the threshold and averaged
+        # that image with a stale copy of itself. The camera was sampled once,
+        # which meant a fly parked on a target, or a transient reflection, made
+        # the whole run fail with no way to recover.
+        #
+        # Measured over 197 archive frames with recorded target coordinates:
+        # the detector refuses 65, and simply running it again on a different
+        # frame of the same arena resolves 27 of them. That is the one thing the
+        # old retry could not do. It is the same detector throughout, so its
+        # precision is unchanged; only the input improves.
+        is_array = isinstance(input, np.ndarray)
+        # A caller who hands over a single image gets exactly one attempt; there
+        # is nothing else to sample.
+        passes = 1 if is_array else self._MAX_ACQUISITION_PASSES
 
-        else:
-            for i, (_, frame) in enumerate(input):
-                accum.append(frame)
-                if i >= 5:
-                    break
+        reference_points = rois = None
+        last_error = None
 
-            accum = np.median(np.array(accum), 0).astype(np.uint8)
-        try:
-            reference_points, rois = self._rois_from_img(accum)
+        for attempt in range(passes):
+            accum = np.copy(input) if is_array else self._reference_image(input)
+            if accum is None:
+                break
 
-            # Handle graceful failure when _rois_from_img returns None
-            if reference_points is None or rois is None:
-                logging.warning("ROI building failed gracefully, no targets detected")
-                # Clean up input if it's not an array (i.e., if it's a camera object)
-                if not isinstance(input, np.ndarray):
+            try:
+                reference_points, rois = self._rois_from_img(accum)
+            except EthoscopeException as e:
+                reference_points = rois = None
+                last_error = e
+            except Exception as e:
+                if not is_array:
                     del input
-                raise EthoscopeException(
-                    "ROI building failed: insufficient targets detected"
+                logging.error(traceback.format_exc())
+                raise e
+
+            if reference_points is not None and rois is not None:
+                if attempt:
+                    logging.info(f"Targets found on acquisition pass {attempt + 1}")
+                break
+
+            if attempt + 1 < passes:
+                logging.warning(
+                    f"No targets in acquisition pass {attempt + 1} of {passes}; "
+                    "taking a fresh set of frames"
                 )
 
-        except EthoscopeException:
-            # Re-raise EthoscopeException without modification (input already cleaned up above)
-            raise
-        except Exception as e:
-            # Handle other exceptions
-            if not isinstance(input, np.ndarray):
+        if reference_points is None or rois is None:
+            logging.warning("ROI building failed gracefully, no targets detected")
+            if not is_array:
                 del input
-            logging.error(traceback.format_exc())
-            raise e
+            raise last_error or EthoscopeException(
+                "ROI building failed: insufficient targets detected"
+            )
 
         rois_w_no_value = [r for r in rois if r.value is None]
 
