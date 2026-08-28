@@ -504,9 +504,24 @@ class PiFrameGrabber(threading.Thread):
             camera_info["IFD0.Model"] = camera_info["Model"]
 
         logging.info(f"Detected camera {camera_info}")
-        pi.ensure_dir_exists(save_path)
-        with open(save_path, "w") as outfile:
-            print(camera_info, file=outfile)
+
+        # Reason: this is a cache of what was detected, not part of acquiring
+        # frames, so it must never be able to stop the camera. It used to write
+        # unguarded from inside the grabber's try block, so an unwritable path -
+        # running unprivileged, a read-only filesystem, a full disk - raised
+        # PermissionError, which the handler below matched on "camera" (the path
+        # contains "picamera-version") and reported as "Camera hardware not
+        # available ... Check the camera ribbon cable and sensor." A failed
+        # cache write should not send anyone looking at a ribbon cable.
+        try:
+            pi.ensure_dir_exists(save_path)
+            with open(save_path, "w") as outfile:
+                print(camera_info, file=outfile)
+        except OSError as e:
+            logging.warning(
+                f"Could not cache the detected camera to {save_path}: {e}. "
+                "Acquisition is unaffected; only the cached camera model is stale."
+            )
 
     def _get_video_chunk_filename(self, fps=None, ext="h264", current=False):
         if current:
