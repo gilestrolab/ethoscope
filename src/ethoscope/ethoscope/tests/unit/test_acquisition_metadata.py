@@ -151,4 +151,9 @@ def test_camera_version_file_is_read_from_where_it_is_written():
     ]
 
     assert default.default == pi.PICAMERA_VERSION_FILE
-    assert pi.PICAMERA_VERSION_FILE == "/etc/ethoscope/picamera-version"
+    # The cache describes the camera attached to this boot, so it belongs with
+    # the other runtime state under /run rather than in the retired
+    # /etc/ethoscope. Asserted as a property, not a literal, so moving the
+    # runtime directory does not need this test edited again.
+    assert pi.PICAMERA_VERSION_FILE.startswith(pi.RUNTIME_DIR)
+    assert not pi.PICAMERA_VERSION_FILE.startswith(pi.LEGACY_CONFIG_DIR)

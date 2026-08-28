@@ -21,7 +21,7 @@ class NoValidPortError(Exception):
     pass
 
 
-def connectedUSB(optional_file="/etc/ethoscope/modules.json"):
+def connectedUSB(optional_file=None):
     """
     Returns a dictionary of connected USB devices from a known selection
 
@@ -89,6 +89,11 @@ def connectedUSB(optional_file="/etc/ethoscope/modules.json"):
     }
 
     # potential user-specified interactors
+    if optional_file is None:
+        from ethoscope.utils.pi import readable_config_path
+
+        optional_file = readable_config_path("modules.json")
+
     if os.path.exists(optional_file):
         with open(optional_file) as optional_modules_file:
             known.update(json.load(optional_modules_file))

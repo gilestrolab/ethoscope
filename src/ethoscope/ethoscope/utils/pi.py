@@ -15,11 +15,65 @@ from ethoscope.utils.rpi_bad_power import powerChecker
 
 PERSISTENT_STATE = "/var/cache/ethoscope/persistent_state.pkl"
 
+# /etc/ethoscope is being retired. Settings a user can change live in the
+# configuration directory, and state that only describes the current boot lives
+# under /run, which is cleared on reboot and is where the light daemon already
+# keeps its socket and schedule.
+#
+# The node package resolves its config directory the same way, but the two
+# packages are deliberately independent, so this is duplicated rather than
+# imported. See "Package Independence Policy" in CLAUDE.md.
+LEGACY_CONFIG_DIR = "/etc/ethoscope"
+DEFAULT_DATA_DIR = "/ethoscope_data"
+RUNTIME_DIR = "/run/ethoscope"
+
+
+def resolve_data_dir(explicit=None):
+    """Root data directory: explicit -> $ETHOSCOPE_DATA_DIR -> the default."""
+    return explicit or os.environ.get("ETHOSCOPE_DATA_DIR") or DEFAULT_DATA_DIR
+
+
+def resolve_config_dir(explicit=None, data_dir=None):
+    """Configuration directory: explicit -> $ETHOSCOPE_CONFIG_DIR -> {data}/config."""
+    if explicit:
+        return explicit
+    return os.environ.get("ETHOSCOPE_CONFIG_DIR") or os.path.join(
+        resolve_data_dir(data_dir), "config"
+    )
+
+
+def config_path(name):
+    """Where a settings file should be written."""
+    return os.path.join(resolve_config_dir(), name)
+
+
+def readable_config_path(name):
+    """Where a settings file should be read from.
+
+    Prefers the configuration directory and falls back to /etc/ethoscope, so a
+    device that has not been migrated keeps its gain and frame-rate settings
+    instead of silently reverting to defaults.
+    """
+    current = config_path(name)
+    if os.path.exists(current):
+        return current
+    legacy = os.path.join(LEGACY_CONFIG_DIR, name)
+    if os.path.exists(legacy):
+        return legacy
+    return current
+
+
+def runtime_path(name):
+    """Where state describing only the current boot belongs."""
+    return os.path.join(RUNTIME_DIR, name)
+
+
 # Where the detected camera model is cached. Defined here, and imported by the
 # camera code that writes it, because the two used to disagree: the writer used
 # /etc/picamera-version while the reader looked in /etc/ethoscope/, so the cache
 # was never read and detection always fell through to probing the filesystem.
-PICAMERA_VERSION_FILE = "/etc/ethoscope/picamera-version"
+# It describes the camera attached to this boot, so it is runtime state.
+PICAMERA_VERSION_FILE = runtime_path("picamera-version")
 
 # Analogue gain applied when no gain file is present.
 #
@@ -875,7 +929,7 @@ def isExperimental(new_value=None):
     if new_value is None and not isMachinePI():
         return True
 
-    filename = "/etc/ethoscope/isexperimental"
+    filename = readable_config_path("isexperimental")
     current_value = os.path.exists(filename)
 
     if new_value is None:
@@ -1646,7 +1700,9 @@ def get_camera_tuning_file(sensor=None, model_number=None):
 # The frame grabber runs in its own process, so what it actually loaded cannot be
 # read back through the object. It records the outcome here, following the same
 # file-on-disk convention already used for the detected camera model.
-CAMERA_TUNING_STATUS_FILE = "/etc/ethoscope/camera-tuning"
+# Records which tuning libcamera loaded for the run in progress, so it is
+# runtime state rather than configuration.
+CAMERA_TUNING_STATUS_FILE = runtime_path("camera-tuning")
 
 
 def set_camera_tuning_status(tuning_file, path=CAMERA_TUNING_STATUS_FILE):
@@ -1685,7 +1741,7 @@ def get_camera_tuning_status(path=CAMERA_TUNING_STATUS_FILE):
     return None
 
 
-def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
+def get_maxfps_setting(path=None):
     """
     Reads the maximum FPS setting for camera operation.
 
@@ -1696,6 +1752,7 @@ def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
         int: Maximum FPS value, defaults to DEFAULT_MAXFPS if the file is
             missing or invalid
     """
+    path = path or readable_config_path("maxfps_setting")
     try:
         if os.path.exists(path):
             with open(path) as f:
@@ -1719,7 +1776,7 @@ def get_maxfps_setting(path="/etc/ethoscope/maxfps_setting"):
         return DEFAULT_MAXFPS
 
 
-def set_maxfps_setting(max_fps, path="/etc/ethoscope/maxfps_setting"):
+def set_maxfps_setting(max_fps, path=None):
     """
     Sets the maximum FPS preference for camera operation.
 
@@ -1727,6 +1784,7 @@ def set_maxfps_setting(max_fps, path="/etc/ethoscope/maxfps_setting"):
         max_fps (int): Maximum FPS value (1-30)
         path (str): Path to the configuration file
     """
+    path = path or config_path("maxfps_setting")
     try:
         # Validate input
         if not isinstance(max_fps, int) or not (1 <= max_fps <= 30):
@@ -1745,7 +1803,7 @@ def set_maxfps_setting(max_fps, path="/etc/ethoscope/maxfps_setting"):
         raise
 
 
-def get_gain_setting(path="/etc/ethoscope/gain_setting"):
+def get_gain_setting(path=None):
     """
     Reads the camera gain setting for optimal tracking performance.
 
@@ -1756,6 +1814,7 @@ def get_gain_setting(path="/etc/ethoscope/gain_setting"):
         float: Camera gain value, defaults to DEFAULT_CAMERA_GAIN if the file is
             missing or invalid.
     """
+    path = path or readable_config_path("gain_setting")
     try:
         if os.path.exists(path):
             with open(path) as f:
@@ -1779,7 +1838,7 @@ def get_gain_setting(path="/etc/ethoscope/gain_setting"):
         return DEFAULT_CAMERA_GAIN
 
 
-def set_gain_setting(gain, path="/etc/ethoscope/gain_setting"):
+def set_gain_setting(gain, path=None):
     """
     Sets the camera gain preference for optimal tracking performance.
 
@@ -1787,6 +1846,7 @@ def set_gain_setting(gain, path="/etc/ethoscope/gain_setting"):
         gain (float): Camera gain value (1.0-16.0, lower values reduce noise artifacts)
         path (str): Path to the configuration file
     """
+    path = path or config_path("gain_setting")
     try:
         # Validate input
         if not isinstance(gain, (int, float)) or not (1.0 <= gain <= 16.0):
