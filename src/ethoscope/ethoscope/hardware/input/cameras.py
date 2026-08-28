@@ -58,6 +58,15 @@ else:
         "No camera library available (neither picamera2 nor picamera found). Camera functionality will be disabled."
     )
 
+# The AGC exposure-mode enum, used to reach libcamera's "long" shutter table.
+# Imported separately from picamera2 because it lives in libcamera, and named
+# apart from the local `controls` dicts built below. None off a Pi, where the
+# control is simply omitted.
+try:
+    from libcamera import controls as libcamera_controls
+except ImportError:
+    libcamera_controls = None
+
 
 class BaseCamera:
     capture = None
@@ -748,6 +757,37 @@ class PiFrameGrabber2(PiFrameGrabber):
             "AnalogueGain": self._gain,  # Fixed gain to avoid tracking artifacts
             "AwbEnable": False,  # Disable auto-white balance (NoIR cameras)
         }
+
+        if libcamera_controls is not None:
+            # Reason: FrameDurationLimits alone does not buy the long exposures
+            # it looks like it does. libcamera's AGC will only ask for shutter
+            # values from its tuning file's exposure-mode table, and the
+            # "normal" table used by default stops at 66.7 ms on every Raspberry
+            # Pi tuning file (NoIR or not). So _MAX_EXPOSURE_US is unreachable,
+            # and in the dark phase, where the IR backlight alone gives about a
+            # tenth of the light the daylight LED does, the camera sits pinned
+            # at that ceiling and underexposed.
+            #
+            # The "long" table in the same file runs to 120 ms and is selected
+            # at runtime, which avoids shipping a forked tuning file per sensor.
+            # Its first four entries are identical to "normal", so it changes
+            # nothing whenever there is enough light to stay off the tail.
+            #
+            # Measured on a Pi 3, imx219, IR backlight only, gain pinned at 3.0:
+            #
+            #   normal  mean 57.4  exposure  66.7 ms  noise 1.98  SNR 29.0
+            #   long    mean 79.5  exposure 120.0 ms  noise 1.84  SNR 43.3
+            #
+            # and with the daylight LED on, normal and long are indistinguishable
+            # (SNR 81.0 against 81.9), which is the property that makes this safe
+            # to set unconditionally. Extending the table by hand to 200 ms was
+            # also tried and reached only SNR 46.7, so the forked file is not
+            # worth its maintenance.
+            #
+            # This also partly restores the legacy stack: on the firmware camera
+            # the exposure ceiling was the frame period, so a Pi 3 at 5 fps could
+            # integrate for 200 ms. Moving to libcamera cut that to 66.7 ms.
+            controls["AeExposureMode"] = libcamera_controls.AeExposureModeEnum.Long
 
         if self._exposure_decoupled and not self._record_video:
             # Reason: decouple the exposure ceiling from the tracking FPS cap.
