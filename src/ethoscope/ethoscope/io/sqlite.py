@@ -150,7 +150,13 @@ class SQLiteResultWriter(BaseResultWriter):
         rois,
         metadata=None,
         make_dam_like_table=False,
-        take_frame_shots=False,
+        # Reason: the _description above advertises this as default True, and the
+        # node's form sends True when the user leaves it alone. This signature
+        # said False, so the two disagreed and any caller that simply omitted the
+        # option - the API, scripts, device_listener --run - silently recorded no
+        # snapshots at all. The snapshots are the only images of the arena kept
+        # with a run, so losing them costs the record permanently.
+        take_frame_shots=True,
         erase_old_db=True,
         sensor=None,
         *args,

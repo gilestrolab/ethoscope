@@ -274,7 +274,9 @@ class MySQLResultWriter(BaseResultWriter):
         rois,
         metadata=None,
         make_dam_like_table=True,
-        take_frame_shots=False,
+        # Reason: matches the default advertised in _description above, which the
+        # signature contradicted. See SQLiteResultWriter for the full note.
+        take_frame_shots=True,
         erase_old_db=True,
         sensor=None,
         db_host="localhost",
