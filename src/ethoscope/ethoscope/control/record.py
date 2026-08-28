@@ -84,6 +84,10 @@ class cameraCaptureThread(threading.Thread):
 
     _VIDEO_CHUNCK_DURATION = 30 * 10
 
+    # Frames acquired before the local (non-Pi) video writer is opened, so that
+    # the measured camera FPS it is built with has had time to settle.
+    _FRAMES_BEFORE_RECORDING = 150
+
     def __init__(
         self,
         cameraClass,
@@ -213,29 +217,40 @@ class cameraCaptureThread(threading.Thread):
                     break
 
                 if self._local_recording:
-                    if writer and writer.isOpened():
-                        writer.write(frame)
-
-                    # Wait for the first 150 frames before opening the video writer object - this is done to calcualate a decent approximation of actual FPS
-                    if (
-                        (time.time() - self.start_time >= self._VIDEO_CHUNCK_DURATION)
-                        or ix == 150
-                        and writer
-                    ):
-                        writer.release()
-
-                    writer = cv2.VideoWriter(
-                        self._get_video_chunk_filename(ext="h264"),
-                        cv2.VideoWriter_fourcc(*"H264"),
-                        self.camera.fps,
-                        (self.camera.width, self.camera.height),
+                    # cv2.VideoWriter is fixed at construction to one frame rate and
+                    # cannot be retimed afterwards, so the first frames are spent
+                    # letting self.camera.fps settle into a usable estimate. The
+                    # writer is then opened once and rotated only when a chunk is
+                    # full. Reason: the construction used to sit outside this test,
+                    # so a new writer was built for every single frame - each file
+                    # got at most one frame, none of them were ever released, and
+                    # the chunk index climbed with the frame counter.
+                    chunk_full = (
+                        writer is not None
+                        and time.time() - self.start_time >= self._VIDEO_CHUNCK_DURATION
                     )
-                    if not writer.isOpened():
-                        logging.error(
-                            "Error: failed to open Video writer destination. The Video file cannot be saved."
-                        )
 
-                    self.start_time = time.time()
+                    if (
+                        writer is None and ix >= self._FRAMES_BEFORE_RECORDING
+                    ) or chunk_full:
+                        if writer is not None:
+                            writer.release()
+
+                        writer = cv2.VideoWriter(
+                            self._get_video_chunk_filename(ext="h264"),
+                            cv2.VideoWriter_fourcc(*"H264"),
+                            self.camera.fps,
+                            (self.camera.width, self.camera.height),
+                        )
+                        if not writer.isOpened():
+                            logging.error(
+                                "Error: failed to open Video writer destination. The Video file cannot be saved."
+                            )
+
+                        self.start_time = time.time()
+
+                    if writer is not None and writer.isOpened():
+                        writer.write(frame)
 
                 if self._stream:
 
