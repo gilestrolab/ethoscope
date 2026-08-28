@@ -94,12 +94,12 @@ function enable_services() {
 }
 
 function ensure_node_account() {
-    # The node's SSH key is group-readable by "node" (DEFAULT_SSH_KEY_GROUP in
-    # src/node/ethoscope_node/utils/configuration.py), which is what lets the
-    # accounts on the node use it for passwordless ssh to the devices. That is
+    # The node's key directory and public key are owned by the group "node"
+    # (DEFAULT_SSH_KEY_GROUP in src/node/ethoscope_node/utils/configuration.py).
+    # The private key itself is 0600 - ssh refuses to load it otherwise - so the
+    # group is about reaching the directory, not about sharing the key. That is
     # only dependable if the group reliably exists, so create it here instead of
-    # leaving every site to invent its own - the group being absent was how
-    # admins ended up loosening the key permissions by hand.
+    # leaving every site to invent its own.
     echo "Ensuring the node account exists..."
 
     if ! getent group node >/dev/null; then

@@ -207,33 +207,50 @@ The node automatically manages passwordless SSH authentication to ethoscope devi
 
 ### Key Permissions
 
-The node writes an `IdentityFile` line for this key into the system-wide
-`/etc/ssh/ssh_config`, so it advertises the key to *every* account on the machine.
-The permissions match that intent: directory `0750`, private key `0640`, public key
-`0644`, with the group set to `node` by default — the group that comes with the `node`
-account on a standard install.
+Directory `0750`, private key `0600`, public key `0644`, with the group set to `node`
+by default — the group that comes with the `node` account on a standard install.
+
+**The private key must stay `0600`.** OpenSSH's `sshkey_perm_ok()` refuses to load a
+private key with any group or other bit set *when the caller owns it*, so a
+group-readable key is not a shared key — it is a key its own owner cannot use:
+
+```
+Permissions 0640 for '/ethoscope_data/config/keys/id_rsa' are too open.
+Load key ".../id_rsa": bad permissions
+```
+
+An earlier release set `0640` to match the system-wide `IdentityFile` the node
+advertises; that broke `ssh` for the account owning the key, which on a normal install
+is the admin's own. The group still owns the directory and the public key — the half
+of the sharing ssh does allow (traversing the directory, `ssh-copy-id`, fingerprints).
+Accounts that need to reach the devices as themselves want their own key on the
+devices, not a copy of this one.
 
 Point `ETHOSCOPE_SSH_KEY_GROUP` at another group to override the name (systemd picks
 it up from the bootstrap env file alongside the path settings). If the group does not
-exist the node logs a warning naming the `groupadd`/`usermod` commands and carries on,
-leaving the key readable only by its owner.
+exist the node logs a warning naming the `groupadd`/`usermod` commands and carries on.
 
 `install_services.sh --node` creates the `node` user and group, and adds the admin
-running the installer (`$SUDO_USER`) to the group — so on a normal install this is
-already in place. On a node installed before that, or to give another account access:
-
-```bash
-sudo usermod -aG node <user>
-sudo systemctl restart ethoscope_node.service   # re-applies the modes
-```
-
-Group membership only takes effect at the user's next login.
+running the installer (`$SUDO_USER`) to the group. Group membership only takes effect
+at the user's next login.
 
 Only `ensure_ssh_keys()` asserts these permissions — at node start, and when the pair
-is first generated. Callers that merely need a path for `ssh -i` use
-`get_ssh_key_paths()`, which never rewrites them: the backup loop and the device
-scanner run every few minutes, and having them re-apply the modes silently undid any
-deliberate local change.
+is first generated; that is also what repairs a node left at `0640` by the earlier
+release. Callers that merely need a path for `ssh -i` use `get_ssh_key_paths()`, which
+never rewrites them: the backup loop and the device scanner run every few minutes, and
+having them re-apply the modes silently undid any deliberate local change.
+
+### The `/etc/ssh/ssh_config` stanza
+
+`_setup_system_ssh_config()` owns a block in `/etc/ssh/ssh_config` between
+`# Ethoscope SSH configuration` and `# End of Ethoscope SSH configuration`. It is
+rewritten whenever it no longer matches, so a key path that moves between releases
+follows. It used to be written once and never revisited, which left nodes advertising
+`/etc/ethoscope/keys/id_rsa` after the config-dir move and every `ssh` to a device
+failing with `no such identity`.
+
+Note this only covers the system-wide file. A hand-written `~/.ssh/config` naming the
+old path is invisible to the node and has to be fixed by hand.
 
 **Location**: `src/node/ethoscope_node/utils/configuration.py:1425`
 

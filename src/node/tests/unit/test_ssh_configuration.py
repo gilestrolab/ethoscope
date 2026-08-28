@@ -241,12 +241,25 @@ class TestSetupSystemSshConfig:
                     assert "# Ethoscope SSH configuration" in written_content
                     assert "Host 10.0.*.* ethoscope*" in written_content
 
+    @staticmethod
+    def _rendered_block(ip_pattern, key_path):
+        """The stanza _setup_system_ssh_config writes, as a string."""
+        with patch(
+            "ethoscope_node.utils.network.get_private_ip_pattern",
+            return_value=ip_pattern,
+        ):
+            with patch("os.path.exists", return_value=False):
+                with patch("builtins.open", mock_open()) as mock_file:
+                    with patch("os.chmod"):
+                        _setup_system_ssh_config(key_path)
+        return mock_file().write.call_args[0][0]
+
     @patch("ethoscope_node.utils.network.get_private_ip_pattern")
-    def test_skips_if_config_exists(self, mock_get_pattern):
-        """Test skips configuration if ethoscope config already exists."""
+    def test_skips_if_config_is_current(self, mock_get_pattern):
+        """An identical stanza is left alone."""
         mock_get_pattern.return_value = "192.168.1.*"
-        existing_content = (
-            "# Ethoscope SSH configuration\nHost 192.168.1.*\n    User ethoscope\n"
+        existing_content = "# Existing\nHost example.com\n\n" + self._rendered_block(
+            "192.168.1.*", "/test/key/path"
         )
 
         with patch("builtins.open", mock_open(read_data=existing_content)) as mock_file:
@@ -262,6 +275,36 @@ class TestSetupSystemSshConfig:
                     call for call in mock_file().method_calls if "write" in str(call)
                 ]
                 assert len(write_calls) == 0
+
+    @patch("ethoscope_node.utils.network.get_private_ip_pattern")
+    def test_refreshes_stale_key_path(self, mock_get_pattern):
+        """A stanza naming a key path that has since moved is rewritten."""
+        mock_get_pattern.return_value = "192.168.1.*"
+        # The shape written before the end marker existed, naming the old
+        # pre-config-move key location.
+        existing_content = (
+            "Host example.com\n    User test\n"
+            "\n# Ethoscope SSH configuration\n"
+            "Host 192.168.1.* ethoscope*\n"
+            "     User ethoscope\n"
+            "     IdentityFile /etc/ethoscope/keys/id_rsa\n"
+            "     ConnectTimeout 10\n"
+            "\nHost after.example.com\n    User later\n"
+        )
+
+        with patch("builtins.open", mock_open(read_data=existing_content)) as mock_file:
+            with patch("os.path.exists") as mock_exists:
+                mock_exists.return_value = True
+                with patch("os.chmod"):
+                    _setup_system_ssh_config("/ethoscope_data/config/keys/id_rsa")
+
+        written = mock_file().write.call_args[0][0]
+        assert "IdentityFile /ethoscope_data/config/keys/id_rsa" in written
+        assert "/etc/ethoscope/keys/id_rsa" not in written
+        # Exactly one stanza left, and the neighbouring hosts survive.
+        assert written.count("# Ethoscope SSH configuration") == 1
+        assert "Host example.com" in written
+        assert "Host after.example.com" in written
 
     @patch("ethoscope_node.utils.network.get_private_ip_pattern")
     def test_uses_detected_ip_pattern(self, mock_get_pattern):
@@ -384,6 +427,19 @@ class TestGetSshKeyPaths:
             assert os.path.exists(private_path)
             assert stat.S_IMODE(os.stat(private_path).st_mode) == SSH_PRIVATE_KEY_MODE
             assert stat.S_IMODE(os.stat(public_path).st_mode) == SSH_PUBLIC_KEY_MODE
+
+
+class TestSshKeyModes:
+    """The modes themselves, independently of any filesystem."""
+
+    def test_private_key_is_not_readable_beyond_its_owner(self):
+        """OpenSSH refuses to load a key with any group or other bit set."""
+        assert SSH_PRIVATE_KEY_MODE & 0o077 == 0
+
+    def test_group_can_reach_the_directory_and_public_key(self):
+        """The half of the sharing that ssh does allow stays in place."""
+        assert SSH_KEYS_DIR_MODE & 0o050 == 0o050
+        assert SSH_PUBLIC_KEY_MODE & 0o040 == 0o040
 
 
 class TestSshKeyGroup:

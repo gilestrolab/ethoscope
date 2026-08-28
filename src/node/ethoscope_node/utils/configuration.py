@@ -29,28 +29,37 @@ INCUBATORS_KEYS = ["id", "name", "location", "owner", "description"]
 
 # Permissions applied to the node's SSH key material.
 #
-# The node advertises this key to every user on the machine: it writes an
-# IdentityFile line for it into the system-wide /etc/ssh/ssh_config (see
-# _setup_system_ssh_config). Locking the key to its owner alone contradicts
-# that, and left admins loosening it by hand only for the next backup cycle to
-# clamp it back. Group-readable is the mode that matches the advertised intent.
+# The private key is 0600 because OpenSSH gives us no choice: sshkey_perm_ok()
+# refuses to load a private key whose mode has any group or other bit set, so a
+# group-readable key is not a shared key, it is a key that its own owner cannot
+# use ("Permissions 0640 ... are too open ... This private key will be
+# ignored"). Making it group-readable to match the system-wide IdentityFile the
+# node advertises simply broke ssh for whichever account owns the key - which
+# on a normal install is the account the admin logs in as.
 #
-# The secrecy of this key is not the security boundary it appears to be: it
-# authenticates to devices that ship with the well-known password "ethoscope",
-# and the node installs it on every device it discovers.
+# The directory and the public key stay group-accessible: that is the half of
+# the sharing that does work, and it is what lets another account run
+# ssh-copy-id or read the pair's fingerprint.
 SSH_KEYS_DIR_MODE = 0o750
-SSH_PRIVATE_KEY_MODE = 0o640
+SSH_PRIVATE_KEY_MODE = 0o600
 SSH_PUBLIC_KEY_MODE = 0o644
 
-# Group granted read access to the key material: "node", the group that comes
-# with the node account on a standard install. Sites that run the node under a
-# different account point ETHOSCOPE_SSH_KEY_GROUP at their own group, which
-# systemd picks up from the bootstrap env file like the other path settings.
+# Group that owns the key material: "node", the group that comes with the node
+# account on a standard install. Sites that run the node under a different
+# account point ETHOSCOPE_SSH_KEY_GROUP at their own group, which systemd picks
+# up from the bootstrap env file like the other path settings.
 #
 # Note this grants nothing on its own - the group has to exist and the accounts
-# that need passwordless ssh have to be members of it. Where it is missing,
+# that need it have to be members of it. Where it is missing,
 # _apply_ssh_key_permissions says so and names the two commands.
 DEFAULT_SSH_KEY_GROUP = "node"
+
+# Delimiters of the stanza the node owns in /etc/ssh/ssh_config. The end marker
+# is what lets a later run find the whole block and replace it; blocks written
+# before it existed are recognised by their shape (see
+# _replace_ssh_config_block).
+SSH_CONFIG_MARKER = "# Ethoscope SSH configuration"
+SSH_CONFIG_END_MARKER = "# End of Ethoscope SSH configuration"
 
 # Module-level default configuration file path.
 # Resolved from ETHOSCOPE_CONFIG_DIR / {ETHOSCOPE_DATA_DIR}/config at import time
@@ -1389,12 +1398,53 @@ class EthoscopeConfiguration:
         return self.get_temperature_alert_config()
 
 
+def _replace_ssh_config_block(content: str, block: str) -> str:
+    """
+    Swap the ethoscope stanza in an ssh_config for a freshly generated one.
+
+    Blocks written before SSH_CONFIG_END_MARKER existed have no terminator, so
+    such a stanza is taken to run from the marker through its ``Host`` line and
+    the indented keywords under it - the shape this function has always
+    written. Whatever follows, blank line included, is left untouched.
+
+    Args:
+        content (str): Current contents of the ssh_config file.
+        block (str): The replacement stanza, markers included.
+
+    Returns:
+        str: The file contents with the stanza replaced.
+    """
+    lines = content.splitlines(keepends=True)
+    start = next(
+        (i for i, line in enumerate(lines) if line.strip() == SSH_CONFIG_MARKER), None
+    )
+    if start is None:
+        return content
+
+    end = start + 1
+    while end < len(lines):
+        line = lines[end]
+        if line.strip() == SSH_CONFIG_END_MARKER:
+            end += 1
+            break
+        # The Host line right after the marker, then its indented body.
+        if end == start + 1 or line[0] in " \t":
+            end += 1
+            continue
+        break
+
+    return "".join(lines[:start]) + block.lstrip("\n") + "".join(lines[end:])
+
+
 def _setup_system_ssh_config(private_key_path: str) -> None:
     """
     Set up system-wide SSH configuration for ethoscope connections.
 
     Creates or updates /etc/ssh/ssh_config with ethoscope-specific settings
-    that apply to all users on the system.
+    that apply to all users on the system. An existing ethoscope stanza is
+    rewritten whenever it no longer matches: leaving a stale one alone is how a
+    node kept advertising a key path that a later release had moved, and every
+    ssh to a device then failed with "no such identity".
 
     Args:
         private_key_path: Path to the private key file
@@ -1410,7 +1460,7 @@ def _setup_system_ssh_config(private_key_path: str) -> None:
 
     # Configuration block to add
     config_block = f"""
-# Ethoscope SSH configuration
+{SSH_CONFIG_MARKER}
 Host {ip_pattern} ethoscope*
      User ethoscope
      StrictHostKeyChecking no
@@ -1419,19 +1469,24 @@ Host {ip_pattern} ethoscope*
      ConnectTimeout 10
      ServerAliveInterval 30
      ServerAliveCountMax 3
+{SSH_CONFIG_END_MARKER}
 """
 
     try:
-        # Check if configuration already exists
+        content = ""
         if os.path.exists(ssh_config_path):
             with open(ssh_config_path) as f:
                 content = f.read()
 
-            # If ethoscope config already exists, skip
-            if "# Ethoscope SSH configuration" in content:
-                logger.info("System SSH config for ethoscopes already exists")
+        if SSH_CONFIG_MARKER in content:
+            updated = _replace_ssh_config_block(content, config_block)
+            if updated == content:
+                logger.info("System SSH config for ethoscopes is up to date")
                 return
-
+            with open(ssh_config_path, "w") as f:
+                f.write(updated)
+            logger.info(f"Refreshed ethoscope SSH config in {ssh_config_path}")
+        elif content:
             # Append to existing config
             with open(ssh_config_path, "a") as f:
                 f.write(config_block)
@@ -1455,7 +1510,7 @@ Host {ip_pattern} ethoscope*
 
 def _resolve_ssh_key_group() -> str:
     """
-    Name of the group that should be able to read the node's SSH key.
+    Name of the group that owns the node's SSH key material.
 
     Returns:
         str: ``$ETHOSCOPE_SSH_KEY_GROUP`` when set, else ``DEFAULT_SSH_KEY_GROUP``.
@@ -1467,11 +1522,13 @@ def _apply_ssh_key_permissions(
     keys_path: Path, private_key_path: Path, public_key_path: Path
 ) -> None:
     """
-    Apply the group-readable permissions to the key directory and key pair.
+    Apply the standard permissions to the key directory and key pair.
 
-    Ownership is only ever changed for the *group*: the user half is left alone
-    because the keys are legitimately owned by whichever account runs the node,
-    which differs between installations.
+    The private key is owner-only (OpenSSH refuses to load it otherwise); the
+    directory and public key are group-accessible. Ownership is only ever
+    changed for the *group*: the user half is left alone because the keys are
+    legitimately owned by whichever account runs the node, which differs
+    between installations.
 
     Args:
         keys_path (Path): Directory holding the key pair.
@@ -1490,13 +1547,13 @@ def _apply_ssh_key_permissions(
     try:
         gid = grp.getgrnam(group).gr_gid
     except KeyError:
-        # Not fatal: the modes above are still applied, the key simply stays
-        # readable to its owner only. Say what to do about it rather than
-        # leaving the admin to discover it through a failing rsync.
+        # Not fatal: the modes above are still applied, the directory and the
+        # public key simply stay owner-only. Say what to do about it rather
+        # than leaving the admin to work it out from a permission denied.
         logger.warning(
-            f"Group '{group}' does not exist, so {private_key_path} stays "
-            f"readable only by its owner. Create it and add the accounts that "
-            f"need passwordless ssh to the ethoscopes "
+            f"Group '{group}' does not exist, so {keys_path} and "
+            f"{public_key_path} stay accessible to their owner only. Create it "
+            f"and add the accounts that need them "
             f"(groupadd {group}; usermod -aG {group} <user>), or point "
             f"ETHOSCOPE_SSH_KEY_GROUP at an existing group."
         )
@@ -1592,10 +1649,11 @@ def ensure_ssh_keys(keys_dir: str | None = None) -> tuple[str, str]:
         # Check if keys already exist
         if private_key_path.exists() and public_key_path.exists():
             logger.info(f"SSH keys already exist at {keys_dir}")
-            # Re-assert the permissions. This is what migrates a node installed
-            # before the keys became group-readable: the modes are corrected the
-            # next time the server starts. Callers that only want the paths use
-            # get_ssh_key_paths(), which leaves them alone.
+            # Re-assert the permissions. This is what repairs a node whose key
+            # was left group-readable by an earlier release - ssh rejects such a
+            # key outright - the modes being corrected the next time the server
+            # starts. Callers that only want the paths use get_ssh_key_paths(),
+            # which leaves them alone.
             _apply_ssh_key_permissions(keys_path, private_key_path, public_key_path)
             return str(private_key_path), str(public_key_path)
 
