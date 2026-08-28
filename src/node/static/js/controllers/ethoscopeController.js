@@ -1614,21 +1614,6 @@
                 });
         };
 
-        /**
-         * Convert H264 video chunks to MP4 format
-         */
-        $scope.ethoscope.convertvideos = function() {
-            console.log("Converting H264 chunks to MP4");
-            $http.post('/device/' + device_id + '/controls/convertvideos')
-                .then(function(response) {
-                    $scope.device.status = response.data.status;
-                    window.location.reload();
-                })
-                .catch(function(error) {
-                    console.error('Failed to convert videos:', error);
-                });
-        };
-
         // ===========================
         // MAINTENANCE FUNCTIONS
         // ===========================

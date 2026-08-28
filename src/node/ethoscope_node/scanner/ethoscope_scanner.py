@@ -66,7 +66,6 @@ class Ethoscope(BaseDevice):
         "restart": ["stopped"],
         "dumpdb": ["stopped"],
         "offline": [],
-        "convertvideos": ["stopped"],
         "test_module": ["stopped"],
     }
 

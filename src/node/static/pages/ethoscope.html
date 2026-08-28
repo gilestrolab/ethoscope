@@ -550,7 +550,6 @@
             <ul class="dd-menu">
                 <li ng-class="{'disabled':!isActive || (machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0)}" data-toggle="{{isActive && machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') !== 0 ? 'modal' : ''}}" data-target="#recordModal" title="{{machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0 ? 'Camera hardware required for video recording' : ''}}">Record Video</li>
                 <li ng-class="{'disabled':!can_stream || !isActive || (machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0)}" ng-click="!can_stream || !isActive || (machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0) || ethoscope.stream()" title="{{machine_info.camera && machine_info.camera.indexOf('No camera hardware detected') === 0 ? 'Camera hardware required for video streaming' : ''}}">Start Streaming</li>
-                <li ng-class="{'disabled':!machine_info.isExperimental}" ng-click="ethoscope.convertvideos()" style="{{machine_info.isExperimental ? '' :'display:none'}}">Convert Videos</li>
             </ul>
         </label>
 
