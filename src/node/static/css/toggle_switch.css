@@ -50,6 +50,20 @@
   margin-left: -1.4em;
 }
 
+/* Compact On/Off variant for feature switches (light regime, crepuscular). */
+.toggle-check-onoff .toggle-check-text {
+  min-width: 60px;
+  float: none;
+}
+
+.toggle-check-onoff .toggle-check-text:before {
+  content: 'Off';
+}
+
+.toggle-check-onoff .toggle-check-input:checked ~ .toggle-check-text:before {
+  content: 'On';
+}
+
 
 /* https://codepen.io/Monredo/pen/QWQowZa */
 

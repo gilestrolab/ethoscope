@@ -433,20 +433,37 @@
                         </div>
                     </div>
 
-                    <!-- Light Regime Section -->
+                    <!-- Light Regime Section. The On/Off toggle is a UI-only flag
+                         (selectedIncubator.light_regime): OFF means constant
+                         darkness (DD) and the save sends empty lights on/off,
+                         which is how the node and firmware express "no light
+                         control". The schedule fields are hidden while OFF. -->
                     <div class="row" style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
-                        <div class="col-12">
-                            <label class="form-label" style="font-weight: bold;">
+                        <div class="col-12" style="display: flex; align-items: center; justify-content: space-between;">
+                            <label class="form-label" style="font-weight: bold; margin: 0;">
                                 <i class="fa fa-sun"></i> Light Regime (LD Cycle)
                             </label>
-                            <small class="form-text text-muted" style="margin-top: -5px; margin-bottom: 10px;">
-                                <span ng-if="selectedIncubator.light_period_hours == 24 || !selectedIncubator.light_period_hours">
+                            <label class="toggle-check toggle-check-onoff" style="margin: 0;">
+                                <input type="checkbox"
+                                       class="toggle-check-input"
+                                       name="light_regime"
+                                       ng-model="selectedIncubator.light_regime"
+                                       ng-change="onLightRegimeToggled()"
+                                       ng-disabled="isIncubatorLocked()">
+                                <span class="toggle-check-text"></span>
+                            </label>
+                        </div>
+                        <div class="col-12">
+                            <small class="form-text text-muted" style="margin-bottom: 10px;">
+                                <span ng-if="!selectedIncubator.light_regime">
+                                    No light regime: the incubator stays in constant darkness (DD).
+                                </span>
+                                <span ng-if="selectedIncubator.light_regime && (selectedIncubator.light_period_hours == 24 || !selectedIncubator.light_period_hours)">
                                     24 h cycle: lights on/off are wall-clock times (UTC). Experiments will not start if the device clock is out of sync.
                                 </span>
-                                <span ng-if="selectedIncubator.light_period_hours && selectedIncubator.light_period_hours != 24">
+                                <span ng-if="selectedIncubator.light_regime && selectedIncubator.light_period_hours && selectedIncubator.light_period_hours != 24">
                                     T-cycle: lights on/off are offsets from the cycle anchor (ZT0). All devices in this incubator share the same anchor so they stay phase-locked.
                                 </span>
-                                Leave times empty for no light control.
                             </small>
                         </div>
 
@@ -462,6 +479,9 @@
                             </div>
                         </div>
 
+                        <!-- Schedule body: only meaningful while a light regime is set. -->
+                        <div class="col-12" ng-if="selectedIncubator.light_regime">
+                        <div class="row">
                         <div class="col-md-3">
                             <div class="form-group">
                                 <label class="form-label">Period (hours)</label>
@@ -500,20 +520,16 @@
                         </div>
                         <div class="col-md-3">
                             <div class="form-group">
-                                <label class="form-label">Preview</label>
-                                <div class="form-control-plaintext" style="padding-top: 7px;">
-                                    <span ng-if="selectedIncubator.lights_on && selectedIncubator.lights_off">
-                                        <i class="fa fa-sun" style="color: #f0ad4e;"></i>
-                                        {{formatTime(selectedIncubator.lights_on)}} &ndash; {{formatTime(selectedIncubator.lights_off)}}
-                                        <span ng-if="selectedIncubator.light_period_hours && selectedIncubator.light_period_hours != 24"
-                                              style="font-size: 0.85em; color: #888;">
-                                            T{{selectedIncubator.light_period_hours}}h
-                                        </span>
-                                    </span>
-                                    <span ng-if="!selectedIncubator.lights_on || !selectedIncubator.lights_off" style="color: grey;">
-                                        No light regime set
-                                    </span>
-                                </div>
+                                <label class="form-label" for="maxLight">Max brightness (%)</label>
+                                <input type="number"
+                                       class="form-control"
+                                       id="maxLight"
+                                       name="max_light"
+                                       ng-model="selectedIncubator.max_light"
+                                       min="0"
+                                       max="100"
+                                       ng-disabled="isIncubatorLocked()"
+                                       title="Peak panel-LED level (0-100%)">
                             </div>
                         </div>
 
@@ -547,26 +563,28 @@
                              ramp brightness along a sunset-like curve over the
                              configured fade-in/fade-out durations. -->
                         <div class="col-12" style="margin-top: 10px;">
-                            <div class="form-check">
-                                <input type="checkbox"
-                                       class="form-check-input"
-                                       id="crepuscular"
-                                       name="crepuscular"
-                                       ng-model="selectedIncubator.crepuscular"
-                                       ng-disabled="isIncubatorLocked()">
-                                <label class="form-check-label" for="crepuscular">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="form-label" style="margin: 0;">
                                     <i class="fa fa-sun"></i>
                                     <strong>Crepuscular lighting</strong>
                                 </label>
-                                <small class="form-text text-muted" style="margin-left: 1.5em;">
-                                    Smooth sunset-/sunrise-like ramps along an S-curve. When off,
-                                    transitions are instant on/off and the fade timings below are ignored.
-                                </small>
+                                <label class="toggle-check toggle-check-onoff" style="margin: 0;">
+                                    <input type="checkbox"
+                                           class="toggle-check-input"
+                                           name="crepuscular"
+                                           ng-model="selectedIncubator.crepuscular"
+                                           ng-disabled="isIncubatorLocked()">
+                                    <span class="toggle-check-text"></span>
+                                </label>
                             </div>
+                            <small class="form-text text-muted">
+                                Smooth sunset-/sunrise-like ramps along an S-curve.
+                                <span ng-if="!selectedIncubator.crepuscular">When off, transitions are instant on/off.</span>
+                            </small>
                         </div>
 
-                        <!-- Smart-incubator panel LED: fade timing + peak brightness -->
-                        <div class="col-md-4" style="margin-top: 10px;">
+                        <!-- Smart-incubator panel LED fade timing (crepuscular only) -->
+                        <div class="col-md-6" style="margin-top: 10px;" ng-if="selectedIncubator.crepuscular">
                             <div class="form-group">
                                 <label class="form-label" for="fadeInSeconds">Fade-in (s)</label>
                                 <input type="number"
@@ -576,13 +594,13 @@
                                        ng-model="selectedIncubator.fade_in_seconds"
                                        min="0"
                                        max="3600"
-                                       ng-disabled="isIncubatorLocked() || !selectedIncubator.crepuscular">
+                                       ng-disabled="isIncubatorLocked()">
                                 <small class="form-text text-muted">
                                     Time to ramp the panel LED from 0% to max at sunrise.
                                 </small>
                             </div>
                         </div>
-                        <div class="col-md-4" style="margin-top: 10px;">
+                        <div class="col-md-6" style="margin-top: 10px;" ng-if="selectedIncubator.crepuscular">
                             <div class="form-group">
                                 <label class="form-label" for="fadeOutSeconds">Fade-out (s)</label>
                                 <input type="number"
@@ -592,28 +610,14 @@
                                        ng-model="selectedIncubator.fade_out_seconds"
                                        min="0"
                                        max="3600"
-                                       ng-disabled="isIncubatorLocked() || !selectedIncubator.crepuscular">
+                                       ng-disabled="isIncubatorLocked()">
                                 <small class="form-text text-muted">
                                     Time to ramp the panel LED back to 0% at sunset.
                                 </small>
                             </div>
                         </div>
-                        <div class="col-md-4" style="margin-top: 10px;">
-                            <div class="form-group">
-                                <label class="form-label" for="maxLight">Max brightness (%)</label>
-                                <input type="number"
-                                       class="form-control"
-                                       id="maxLight"
-                                       name="max_light"
-                                       ng-model="selectedIncubator.max_light"
-                                       min="0"
-                                       max="100"
-                                       ng-disabled="isIncubatorLocked()">
-                                <small class="form-text text-muted">
-                                    Peak panel-LED level (0&ndash;100%).
-                                </small>
-                            </div>
-                        </div>
+                        </div><!-- /.row schedule body -->
+                        </div><!-- /.col-12 light_regime -->
                     </div>
 
                     <!-- Temperature control — smart units only (Peltier-backed). -->
@@ -662,9 +666,10 @@
                         </div>
                     </div>
 
-                    <!-- Physical unit (WiFi). Hidden for virtual (shoe-box)
-                         incubators, which have no hardware. -->
-                    <div class="row" ng-if="selectedIncubator.type !== 'virtual'"
+                    <!-- Physical unit (WiFi). Smart incubators only: normal and
+                         virtual (shoe-box) records have no firmware to link. A
+                         smart record is created by adopting a discovered unit. -->
+                    <div class="row" ng-if="isSmart(selectedIncubator)"
                          style="border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px;">
                         <div class="col-12">
                             <label class="form-label" style="font-weight: bold;">

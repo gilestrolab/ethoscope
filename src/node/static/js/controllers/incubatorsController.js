@@ -338,6 +338,7 @@
                 type: 'normal',
                 parent: '',
                 set_temp: null,
+                light_regime: false,   // UI-only: OFF = constant darkness (DD)
                 lights_on: null,
                 lights_off: null,
                 light_period_hours: 24,
@@ -576,6 +577,19 @@
             });
         };
 
+        // Light-regime toggle switched ON with no times yet: seed a 12:12 LD
+        // so the switch has an immediate, visible effect. Switching OFF keeps
+        // the times in the model (they are simply not sent) so toggling back
+        // ON restores them.
+        $scope.onLightRegimeToggled = function() {
+            var inc = $scope.selectedIncubator;
+            if (!inc || !inc.light_regime) return;
+            if (!inc.lights_on && !inc.lights_off) {
+                inc.lights_on = timeStringToDate('09:00');
+                inc.lights_off = timeStringToDate('21:00');
+            }
+        };
+
         // Switching category in the modal: a box needs a parent (Room by
         // default), anything else has none.
         $scope.onTypeChanged = function() {
@@ -641,6 +655,9 @@
             // Convert time strings ("HH:MM") to Date objects for input[type=time]
             $scope.selectedIncubator.lights_on = timeStringToDate(incubator.lights_on);
             $scope.selectedIncubator.lights_off = timeStringToDate(incubator.lights_off);
+            // A regime exists iff both times are set; otherwise the box is in DD.
+            $scope.selectedIncubator.light_regime =
+                !!($scope.selectedIncubator.lights_on && $scope.selectedIncubator.lights_off);
 
             // Period: stored in minutes, edited in whole hours.
             var periodMin = parseInt(incubator.light_period_minutes, 10);
@@ -716,9 +733,11 @@
         $scope.saveIncubator = function() {
             var data = $scope.selectedIncubator;
 
-            // Convert Date objects back to HH:MM strings for the API
-            var lightsOn = dateToTimeString(data.lights_on);
-            var lightsOff = dateToTimeString(data.lights_off);
+            // Convert Date objects back to HH:MM strings for the API. With the
+            // light-regime toggle OFF send empty times: that is "no light
+            // control" (DD) for both the node and the firmware.
+            var lightsOn = data.light_regime ? dateToTimeString(data.lights_on) : '';
+            var lightsOff = data.light_regime ? dateToTimeString(data.lights_off) : '';
 
             // Period in hours → minutes. Reject NaN/non-finite back to 24h.
             var hours = parseInt(data.light_period_hours, 10);
