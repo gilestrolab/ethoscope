@@ -214,8 +214,22 @@
                     // Find the selected option
                     for (var i = 0; i < data[name].length; i++) {
                         if (data[name][i].name === targetOptionName) {
-                            // Reset and populate arguments for the selected option
-                            $scope.selected_options[optionType][name].arguments = {};
+                            // Re-seed the argument map *in place*. The tracking and
+                            // recording forms hand this object to the shared
+                            // option-argument partial once, with ng-init, and the
+                            // widgets then write to that reference for as long as they
+                            // are on screen. Assigning a new object here left them
+                            // writing to an orphan while the payload carried these
+                            // freshly seeded defaults - so a 2x8 TargetGridROIBuilder
+                            // grid reached the device as n_rows=1, n_cols=1 and the
+                            // run started on a single full-arena ROI.
+                            if (!$scope.selected_options[optionType][name].arguments) {
+                                $scope.selected_options[optionType][name].arguments = {};
+                            }
+                            var argModel = $scope.selected_options[optionType][name].arguments;
+                            Object.keys(argModel).forEach(function(key) {
+                                delete argModel[key];
+                            });
 
                             var args = data[name][i].arguments || [];
                             for (var j = 0; j < args.length; j++) {
@@ -223,16 +237,15 @@
 
                                 if (argument.type === 'datetime') {
                                     // See momentOrNull: the picker round-trips moments.
-                                    $scope.selected_options[optionType][name].arguments[argument.name] =
-                                        self.momentOrNull(argument.default);
+                                    argModel[argument.name] = self.momentOrNull(argument.default);
                                 } else if (argument.type === 'duration') {
                                     // A fresh object per option, so two forms cannot
                                     // end up sharing one duration.
-                                    $scope.selected_options[optionType][name].arguments[argument.name] =
+                                    argModel[argument.name] =
                                         angular.extend({days: 0, hours: 0, minutes: 0}, argument.default);
                                 } else {
                                     // Set default for other argument types
-                                    $scope.selected_options[optionType][name].arguments[argument.name] = argument.default;
+                                    argModel[argument.name] = argument.default;
                                 }
                             }
                             break;

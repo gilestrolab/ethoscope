@@ -812,3 +812,123 @@ Equivalent to `src/updater/update_server.py`'s web UI, without a browser.
       out `helpers.hostname_of()`, which accepts a bare address, a host:port pair or
       a full URL and refuses an empty one by name. Tests in
       `src/updater/tests/test_updates_api_address.py`.
+
+# Update an SD image's checkout from the command line (2026-08-28)
+
+- [x] `accessories/ethoscope-image-update.sh`: loop-mount an image, bind-mount
+      `/dev`, `/proc`, `/sys` and `/run` into it, and move `/opt/ethoscope` to the
+      tip of a branch (default `dev`).
+- [x] Fetch from `https://github.com/gilestrolab/ethoscope.git` by way of whichever
+      named remote in the image already points there (`github`), so the image's
+      remote-tracking refs move too. The device's own `origin` is its node's bare
+      repo and is not reachable from a workstation.
+- [x] Where the host can execute the image's binaries (matching arch, or qemu-user
+      with a registered binfmt handler), re-run the editable installs the way
+      `updater.create_python_egg()` does. Otherwise say so, and warn when the set of
+      Python packages changed — a stale editable finder mapping means new
+      sub-packages will not import on the device.
+- [x] Verified: `--help`, `--list-branches`, `--dry-run`, an unknown branch (exit 2),
+      a `dev` bump and a `dev` -> `main` switch, all against a rootfs built from a
+      clone of the image's repo.
+
+## Discovered During Work
+
+- [ ] `ethoscope-image.sh --update` does the same git update with the branch
+      hardcoded. It could delegate to the new script (`--root "$MNT_ROOT"`) instead
+      of keeping its own copy of the logic.
+
+---
+
+# Incubator edit modal: toggles + smart-only WiFi section (2026-09-03)
+
+Frontend only (`src/node/static/pages/incubators.html`, `js/controllers/incubatorsController.js`,
+`css/toggle_switch.css`). No backend change: empty `lights_on`/`lights_off` already means
+"no light control" for both the node and the firmware payload (`00:00`–`00:00`).
+
+- [x] Light regime On/Off toggle (`selectedIncubator.light_regime`, UI-only). OFF = DD: the
+      schedule body is hidden and the save sends empty on/off times. Switching ON with no
+      times seeds 09:00–21:00 so the switch has a visible effect.
+- [x] Crepuscular checkbox -> On/Off toggle; fade-in/out fields hidden while OFF.
+- [x] Max brightness moved into the light-regime row in place of the Preview column.
+- [x] Physical unit (WiFi) section shown only for smart incubators (`isSmart()`), not just
+      non-virtual ones.
+- [x] `.toggle-check-onoff` CSS variant (On/Off labels, compact, no float).
+
+Verified in the browser on a local node (:8080): smart record (incubator-50), normal record
+without regime (Incubator_6A), and the update payload captured with regime OFF
+(`lights_on: ""`, `lights_off: ""`).
+
+Note: with the WiFi section hidden for normal records, the only way to make a record smart
+is "Add & bind" on a discovered unit — the Category select still offers normal/virtual only.
+
+# Manual lights on/off for smart incubators (2026-09-03)
+
+Finding: `POST /command {"set_light": N}` is dead in practice. `LightControl::update()` runs
+every 200 ms and `evaluateSchedule()` rewrites `light_target` from the schedule first, so a
+manual level survives one tick. A real control needs the firmware to hold it.
+
+Decision (user): the override holds **until the schedule next flips on/off**, then the
+schedule takes back control; an explicit "resume schedule" clears it earlier. Not persisted:
+a reboot returns to the schedule.
+
+- [x] Firmware 3.3.0-wifi: `state.light_manual` (-1 = schedule) + scheduled state at the
+      time of the override; `evaluateSchedule()` honours it and releases on transition;
+      `set_light` < 0 or `{"light_auto": true}` clears; `/telemetry` reports `light_manual`.
+- [x] Node: `set_light_override(ip, None)` clears; routes/bottle/CLI accept "auto";
+      `POST /incubator/light-override {name, pct|null}` on the main node API; merged view
+      carries `light_manual`.
+- [x] UI: bulb button in the list row for online smart units (toggles on/off at
+      `max_light`), a "resume schedule" button + "manual" marker while an override is active.
+      Live snapshot refreshed from the proxied `/incubator/<name>/telemetry` after a command
+      because the scanner only polls every 60 s.
+- [x] Tests: firmware client (None → light_auto), routes (clear), bottle (null pct),
+      incubator_api (route + delegation).
+
+Verified: 248 incubator/API tests green; firmware compiles for `d1_mini` (arduino-cli,
+staged copy, build number untouched); list row exercised in the browser with the live
+endpoints stubbed at `$http` level (bulb posts `pct=max_light`, resume posts `pct=null`,
+"manual" marker follows `light_manual`). Not tested on real hardware: the units need
+flashing with 3.3.0 before the button does anything lasting.
+
+---
+
+# Custom ROI grid submitted as a single ROI (Alice's bug report)
+
+Date: 2026-09-10
+
+## Symptom
+
+A 2 cols x 8 rows TargetGridROIBuilder, with parameters that "usually work well",
+produced one ROI covering the whole arena on updated ethoscopes.
+
+## Diagnosis
+
+The ROI builder is correct. Measured against the targets in the screenshot, the single
+ROI is 0.9 x 0.9 of the reference frame, centred — exactly `TargetGridROIBuilder(n_rows=1,
+n_cols=1, horizontal_fill=0.9, vertical_fill=0.9)`, i.e. the constructor defaults. The
+device was started with an empty-of-user-values argument map.
+
+The shared `option-argument.html` partial takes its arguments map through
+`ng-init="argModel = selected_options.tracking[name]['arguments']"`, evaluated once when
+the fields are rendered. `updateUserOptions()` re-seeded the group by *assigning a new*
+object, so the widgets kept writing to the previous (FileBasedROIBuilder-seeded) object
+while `start_tracking` POSTed the new one holding only the grid builder's defaults.
+Regression from d8d4b274, which factored the per-input full-path bindings into the partial.
+
+## Tasks
+
+- [x] Re-seed the argument map in place in `updateUserOptions()` (clear keys, refill).
+- [x] Regression test driving the real service file through node:
+      `src/node/tests/unit/test_form_service_arguments.py` (skips if node is absent).
+- [x] Confirm the test reproduces the bug on the pre-fix file — it fails with
+      `(n_cols, n_rows) == (1, 1)`, Alice's exact symptom — and passes after.
+- [x] Lesson recorded in `tasks/lessons.md`.
+
+Scope note: affects every option group where the user picks a non-default class in the
+Start Tracking and Record Video modals (result writer, tracker, camera, time control), not
+just the ROI builder. The Machine Information modal was never affected — it still binds
+the full path. The stimulator sequence binds `stimulator.arguments[...]`, also a path, so
+it was safe too.
+
+Not verified on hardware: needs a device to confirm a 16-ROI grid now builds; the fix is
+in served static JS, so a browser refresh on the node is enough to pick it up.
