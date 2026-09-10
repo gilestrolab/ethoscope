@@ -68,12 +68,16 @@ def make_app(routes: IncubatorRoutes, *, serve_static: bool = True) -> bottle.Bo
 
     @app.post("/api/incubators/<name>/light-override")
     def _light_override(name):
+        # pct 0-100 holds that level until the next scheduled transition;
+        # a null/absent pct hands control back to the schedule.
         body = _json_body()
-        try:
-            pct = int(body.get("pct", 0))
-        except (TypeError, ValueError):
-            bottle.response.status = 400
-            return {"result": "error", "message": "pct must be an integer 0-100"}
+        pct = body.get("pct")
+        if pct is not None:
+            try:
+                pct = int(pct)
+            except (TypeError, ValueError):
+                bottle.response.status = 400
+                return {"result": "error", "message": "pct must be an integer 0-100"}
         return routes.light_override(name, pct)
 
     if serve_static and os.path.isdir(_WEB_DIR):

@@ -70,6 +70,7 @@ class TestIncubatorAPI(unittest.TestCase):
         self.assertIn("/incubator/bind", paths)
         self.assertIn("/incubator/push-schedule", paths)
         self.assertIn("/incubator/<name>/telemetry", paths)
+        self.assertIn("/incubator/light-override", paths)
 
     def test_get_live_returns_scanner_info(self):
         self.api.incubator_scanner.get_all_devices_info.return_value = {
@@ -226,6 +227,52 @@ class TestIncubatorAPI(unittest.TestCase):
         api.get_request_json = Mock(return_value={})
         result = api._push_schedule()
         self.assertEqual(result["result"], "error")
+
+    def _light_override_api(self, body):
+        scanner = self.mock_server.incubator_scanner
+        device = Mock()
+        device.ip.return_value = "10.0.0.1"
+        device._port = 80
+        scanner.get_device_by_hostname.return_value = device
+        self.mock_server.database.getIncubatorByName.return_value = {
+            "id": 1,
+            "name": "Incubator 1",
+            "hostname": "incubator-1",
+        }
+        api = IncubatorAPI(self.mock_server)
+        api._client = Mock()
+        api._routes._client = api._client
+        api.get_request_json = Mock(return_value=body)
+        return api
+
+    def test_light_override_holds_level(self):
+        """``POST /incubator/light-override`` with pct forwards set_light to the unit."""
+        api = self._light_override_api({"name": "Incubator 1", "pct": 100})
+        result = api._light_override()
+        self.assertEqual(result["result"], "success")
+        self.assertEqual(result["pct"], 100)
+        api._client.set_light_override.assert_called_once_with("10.0.0.1", 100, port=80)
+
+    def test_light_override_null_resumes_schedule(self):
+        """A null pct clears the override (light_auto) rather than setting 0."""
+        api = self._light_override_api({"name": "Incubator 1", "pct": None})
+        result = api._light_override()
+        self.assertEqual(result["result"], "success")
+        api._client.set_light_override.assert_called_once_with(
+            "10.0.0.1", None, port=80
+        )
+
+    def test_light_override_rejects_bad_pct(self):
+        for bad in ("bright", 250, -1):
+            api = self._light_override_api({"name": "Incubator 1", "pct": bad})
+            result = api._light_override()
+            self.assertEqual(result["result"], "error", msg=repr(bad))
+            api._client.set_light_override.assert_not_called()
+
+    def test_light_override_requires_name(self):
+        api = IncubatorAPI(self.mock_server)
+        api.get_request_json = Mock(return_value={"pct": 0})
+        self.assertEqual(api._light_override()["result"], "error")
 
     def test_push_schedule_to_unit_helper(self):
         """The helper consumed by setup_api delegates to _maybe_push."""

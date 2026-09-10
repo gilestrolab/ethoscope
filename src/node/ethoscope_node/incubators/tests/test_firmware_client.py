@@ -70,6 +70,15 @@ def test_set_light_override(client):
     )
 
 
+def test_set_light_override_none_resumes_schedule(client):
+    """pct=None must send light_auto, not set_light."""
+    with patch("requests.post", return_value=_ok_response({"result": "ok"})) as m:
+        client.set_light_override("10.0.0.5", None)
+    m.assert_called_once_with(
+        "http://10.0.0.5:80/command", json={"light_auto": True}, timeout=1.0
+    )
+
+
 def test_non_200_raises_incubator_http_error(client):
     with patch(
         "requests.get",

@@ -157,6 +157,10 @@
                     <span ng-if="liveForIncubator(incubator).light_level !== undefined && liveForIncubator(incubator).light_level !== null"
                           style="font-size:0.85em; color:#888;" title="Light level">
                         · <i class="fa fa-lightbulb"></i> {{liveForIncubator(incubator).light_level}}%
+                        <span ng-if="lightIsManual(incubator)" style="color:#f0ad4e;"
+                              title="Manual override: the schedule resumes at its next on/off transition">
+                            manual
+                        </span>
                     </span>
                 </span>
                 <span ng-if="incubator.hostname && !isLiveOnline(liveForIncubator(incubator))"
@@ -191,6 +195,21 @@
                 <span ng-if="!incubator.active" class="fa fa-times-circle" title="Inactive"></span>
             </td>
             <td>
+                <!-- Manual light control, smart units only. Holds until the
+                     schedule next flips on/off; the undo arrow resumes earlier. -->
+                <a href="" ng-if="isSmart(incubator) && isLiveOnline(liveForIncubator(incubator))"
+                   ng-click="toggleIncubatorLight(incubator)"
+                   title="{{lightIsOn(incubator) ? 'Lights off now' : 'Lights on now'}} — held until the next scheduled transition"
+                   style="margin-right: 10px;">
+                    <span class="fa fa-lightbulb"
+                          ng-style="{'color': lightIsOn(incubator) ? '#f0ad4e' : '#aaa'}"></span>
+                </a>
+                <a href="" ng-if="lightIsManual(incubator)"
+                   ng-click="setIncubatorLight(incubator, null)"
+                   title="Manual override active — resume the light schedule now"
+                   style="margin-right: 10px;">
+                    <span class="fa fa-clock-rotate-left"></span>
+                </a>
                 <a data-toggle="modal" data-target="#incubatorModal" ng-click="editIncubator(incubator)" href="" title="Edit Incubator">
                     <span class="fa fa-edit"></span>
                 </a>

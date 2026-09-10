@@ -18,6 +18,8 @@ Added in Phase 2:
 
 * ``POST /incubator/push-schedule`` — manual re-push for the "Push now" UI
 * ``GET  /incubator/<name>/telemetry`` — proxied firmware ``/telemetry``
+* ``POST /incubator/light-override`` — hold the lights on/off until the next
+  scheduled transition (``pct`` 0-100), or ``pct: null`` to resume the schedule
 """
 
 from __future__ import annotations
@@ -53,6 +55,7 @@ class IncubatorAPI(BaseAPI):
         self.app.route("/incubator/bind", method="POST")(self._bind_incubator)
         self.app.route("/incubator/push-schedule", method="POST")(self._push_schedule)
         self.app.route("/incubator/<name>/telemetry", method="GET")(self._get_telemetry)
+        self.app.route("/incubator/light-override", method="POST")(self._light_override)
 
     # --- read endpoints ----------------------------------------------------------
 
@@ -101,6 +104,25 @@ class IncubatorAPI(BaseAPI):
         if not name:
             return {"result": "error", "message": "Incubator name is required"}
         return self._routes.push_schedule(name)
+
+    def _light_override(self):
+        """Manual lights on/off on a bound unit; ``pct`` null resumes the schedule."""
+        if self._routes is None:
+            return {"result": "error", "message": "Database unavailable"}
+
+        data = self.get_request_json()
+        name = (data.get("name") or "").strip()
+        if not name:
+            return {"result": "error", "message": "Incubator name is required"}
+        pct = data.get("pct")
+        if pct is not None:
+            try:
+                pct = int(pct)
+            except (TypeError, ValueError):
+                return {"result": "error", "message": "pct must be an integer 0-100"}
+            if not 0 <= pct <= 100:
+                return {"result": "error", "message": "pct must be an integer 0-100"}
+        return self._routes.light_override(name, pct)
 
     # --- helper exposed for setup_api auto-push ---------------------------------
 

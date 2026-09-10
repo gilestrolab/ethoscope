@@ -244,6 +244,14 @@ class TestLightOverride:
         assert result["result"] == "success"
         client.set_light_override.assert_called_once_with("10.0.0.5", 50, port=80)
 
+    def test_none_clears_override(self, routes, storage, scanner, client):
+        _bind_live_unit(scanner, hostname="incubator-1")
+        storage.add({"name": "Inc1", "hostname": "incubator-1"})
+        result = routes.light_override("Inc1", None)
+        assert result["result"] == "success"
+        assert result["pct"] is None
+        client.set_light_override.assert_called_once_with("10.0.0.5", None, port=80)
+
     def test_unbound_is_error(self, routes, storage):
         storage.add({"name": "Inc1"})
         assert routes.light_override("Inc1", 50)["result"] == "error"

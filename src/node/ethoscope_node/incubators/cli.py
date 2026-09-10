@@ -286,8 +286,18 @@ def cmd_monitor(args, client: IncubatorFirmwareClient) -> int:
     return 0
 
 
+def _pct_or_auto(value: str) -> int | None:
+    """argparse type: a 0-100 percentage, or ``auto`` to resume the schedule."""
+    if value.lower() == "auto":
+        return None
+    try:
+        return int(value)
+    except ValueError as e:
+        raise argparse.ArgumentTypeError("expected 0-100 or 'auto'") from e
+
+
 def cmd_light(args, client: IncubatorFirmwareClient) -> int:
-    pct = max(0, min(100, args.pct))
+    pct = None if args.pct is None else max(0, min(100, args.pct))
     try:
         result = client.set_light_override(resolve_host(args.host), pct)
     except IncubatorHTTPError as e:
@@ -445,9 +455,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sp.set_defaults(func=cmd_monitor)
 
-    sp = sub.add_parser("light", help="Override LED brightness (transient).")
+    sp = sub.add_parser(
+        "light", help="Hold the LED at a level until the next scheduled transition."
+    )
     _add_host(sp)
-    sp.add_argument("pct", type=int, help="Brightness percent 0..100.")
+    sp.add_argument(
+        "pct", type=_pct_or_auto, help="Brightness percent 0..100, or 'auto' to resume."
+    )
     _add_json(sp)
     sp.set_defaults(func=cmd_light)
 

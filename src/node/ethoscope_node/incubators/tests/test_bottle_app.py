@@ -128,6 +128,22 @@ def test_light_override_validates_pct(routes):
     assert parsed["result"] == "error"
 
 
+def test_light_override_null_pct_resumes_schedule(routes):
+    """A null pct is the 'resume schedule' request and reaches the client as None."""
+    routes._storage.add({"name": "Inc1", "hostname": "incubator-1"})
+    device = MagicMock()
+    device.ip.return_value = "10.0.0.5"
+    device._port = 80
+    routes._scanner.get_device_by_hostname.return_value = device
+    app = make_app(routes, serve_static=False)
+    status, body = _call(
+        app, "POST", "/api/incubators/Inc1/light-override", {"pct": None}
+    )
+    assert status.startswith("200")
+    assert json.loads(body)["result"] == "success"
+    routes._client.set_light_override.assert_called_once_with("10.0.0.5", None, port=80)
+
+
 def test_web_directory_is_packaged():
     """The shipped tree must include the SPA so it works after `pip install`."""
     web_dir = os.path.join(

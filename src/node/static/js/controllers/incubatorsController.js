@@ -240,6 +240,65 @@
             return $scope.discoveredUnbound().map(function(u) { return u.hostname; }).join(', ');
         };
 
+        // --- Manual light control (smart units) ---------------------------------
+        // The firmware holds a manual level until the schedule next flips on/off
+        // and reports it as light_manual (-1 = following the schedule).
+
+        $scope.lightIsManual = function(incubator) {
+            var live = $scope.liveForIncubator(incubator);
+            return !!live && typeof live.light_manual === 'number' && live.light_manual >= 0;
+        };
+
+        $scope.lightIsOn = function(incubator) {
+            var live = $scope.liveForIncubator(incubator);
+            if (!live) return false;
+            if ($scope.lightIsManual(incubator)) return live.light_manual > 0;
+            return live.light_level > 0;
+        };
+
+        // Refresh one unit's live snapshot straight from the firmware. The
+        // scanner only polls every minute, too slow to reflect a command.
+        var refreshLive = function(incubator) {
+            if (!incubator || !incubator.hostname) return;
+            $http.get('/incubator/' + encodeURIComponent(incubator.name) + '/telemetry')
+                .then(function(response) {
+                    var t = response.data || {};
+                    if (t.result === 'error') return;
+                    var live = $scope.liveIncubators[incubator.hostname];
+                    if (live) angular.extend(live, t);
+                });
+        };
+
+        // pct 0-100 holds that level; null hands control back to the schedule.
+        $scope.setIncubatorLight = function(incubator, pct) {
+            if (!incubator || !incubator.name) return;
+            $http.post('/incubator/light-override', { name: incubator.name, pct: pct })
+                .then(function(response) {
+                    if (response.data.result !== 'success') {
+                        alert('Error setting the lights: ' + (response.data.message || 'Unknown error'));
+                        return;
+                    }
+                    // Mirror the command locally, then confirm against the unit.
+                    var live = $scope.liveForIncubator(incubator);
+                    if (live) {
+                        live.light_manual = (pct === null) ? -1 : pct;
+                        if (pct !== null) live.light_level = pct;
+                    }
+                    $timeout(function() { refreshLive(incubator); }, 1000);
+                })
+                .catch(function(error) {
+                    console.error('Error setting the lights:', error);
+                    alert('Error setting the lights. Please try again.');
+                });
+        };
+
+        // Bulb button: off if currently lit, else on at the unit's max brightness.
+        $scope.toggleIncubatorLight = function(incubator) {
+            var live = $scope.liveForIncubator(incubator);
+            var maxLight = (live && live.max_light > 0) ? live.max_light : 100;
+            $scope.setIncubatorLight(incubator, $scope.lightIsOn(incubator) ? 0 : maxLight);
+        };
+
         // Bind (or, with hostname null/empty, unbind) a DB record to a physical unit.
         // Pushes the incubator name into the unit's sensor location server-side.
         $scope.bindIncubator = function(name, hostname) {

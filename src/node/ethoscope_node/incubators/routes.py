@@ -148,6 +148,7 @@ class IncubatorRoutes:
             "lux": live.get("lux"),
             "set_temp": live.get("set_temp"),
             "light_level": live.get("light_level"),
+            "light_manual": live.get("light_manual"),
             "max_light": live.get("max_light"),
             "lights_on_fw": live.get("lights_on"),
             "lights_off_fw": live.get("lights_off"),
@@ -337,8 +338,12 @@ class IncubatorRoutes:
         pushed = self._maybe_push(name)
         return _ok(name=name, pushed=pushed)
 
-    def light_override(self, name: str, pct: int) -> dict[str, Any]:
-        """Transient firmware ``POST /command set_light``. Useful for bench testing."""
+    def light_override(self, name: str, pct: int | None) -> dict[str, Any]:
+        """Manual light override on the bound unit (``POST /command``).
+
+        ``pct`` 0-100 holds that level until the schedule next flips on/off;
+        ``None`` clears the override so the schedule resumes right away.
+        """
         record = self._storage.get(name=name)
         if record is None:
             return _err(f"Incubator '{name}' not found")
@@ -349,8 +354,9 @@ class IncubatorRoutes:
         if device is None:
             return _err(f"Unit '{hostname}' is offline")
         try:
-            self._client.set_light_override(device.ip(), int(pct), port=device._port)
-            return _ok(name=name, pct=int(pct))
+            level = None if pct is None else int(pct)
+            self._client.set_light_override(device.ip(), level, port=device._port)
+            return _ok(name=name, pct=level)
         except IncubatorHTTPError as e:
             return _err(str(e))
 

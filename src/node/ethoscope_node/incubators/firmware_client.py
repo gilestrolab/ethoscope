@@ -2,7 +2,8 @@
 
 The firmware exposes a small REST API on the same host that mDNS advertises
 under ``_incubator._tcp``. All endpoints are idempotent (with the exception of
-``POST /command set_light`` which is a transient override). This client is
+``POST /command set_light``, a manual override the firmware holds until the
+schedule next flips on/off, or until ``light_auto`` clears it). This client is
 pure HTTP — no mDNS, no threads. The scanner ``Incubator`` instance owns the
 polling thread; this client is used both by the scanner (for ``set_location``
 and ``push_config`` pushes) and by the standalone server (for ad-hoc pushes
@@ -96,15 +97,19 @@ class IncubatorFirmwareClient:
         return self._post_json(ip, "/set", {"location": location}, port)
 
     def set_light_override(
-        self, ip: str, pct: int, *, port: int = DEFAULT_PORT
+        self, ip: str, pct: int | None, *, port: int = DEFAULT_PORT
     ) -> dict[str, Any]:
-        """Force the panel to a brightness percentage via ``POST /command``.
+        """Hold the panel at a brightness percentage via ``POST /command``.
 
-        Transient — the next schedule tick on the firmware (~ once per
-        minute) re-overrides this. Useful for bench testing and for the
-        standalone UI's preview button.
+        Firmware 3.3+ keeps the level until the schedule next flips on/off,
+        then resumes the schedule; older firmware drops it within a tick.
+        ``pct=None`` sends ``light_auto`` instead, handing control back to
+        the schedule immediately.
         """
-        return self._post_json(ip, "/command", {"set_light": int(pct)}, port)
+        body: dict[str, Any] = (
+            {"light_auto": True} if pct is None else {"set_light": int(pct)}
+        )
+        return self._post_json(ip, "/command", body, port)
 
     def get_health(self, ip: str, *, port: int = DEFAULT_PORT) -> dict[str, Any]:
         """Fetch ``/health`` — a small subset of telemetry for liveness probes."""

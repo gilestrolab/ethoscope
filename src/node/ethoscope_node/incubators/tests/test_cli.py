@@ -185,6 +185,21 @@ def test_cmd_light_clamps_pct(capsys):
     client.set_light_override.assert_called_once_with("x.local", 0)
 
 
+def test_cmd_light_auto_resumes_schedule(capsys):
+    client = MagicMock()
+    client.set_light_override.return_value = {}
+    cli.cmd_light(_ns(host="x", pct=None, json=False), client)
+    client.set_light_override.assert_called_once_with("x.local", None)
+
+
+def test_pct_or_auto_parses_both_forms():
+    assert cli._pct_or_auto("auto") is None
+    assert cli._pct_or_auto("AUTO") is None
+    assert cli._pct_or_auto("42") == 42
+    with pytest.raises(argparse.ArgumentTypeError):
+        cli._pct_or_auto("bright")
+
+
 def test_cmd_reboot_calls_client(capsys):
     client = MagicMock()
     client.reboot.return_value = {"reboot": True}
