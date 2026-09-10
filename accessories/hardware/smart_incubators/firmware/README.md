@@ -187,10 +187,13 @@ runs each task on its own `millis()` timer.
   `light_cycle_anchor==0` the window is wall-clock `[lights_on, lights_off)`; otherwise
   it's `[lights_on, lights_off)` *within* a cycle of `light_period_minutes` whose phase is
   `(now − light_cycle_anchor) mod period`. Per-direction fade (`fade_in_ms` / `fade_out_ms`)
-  ramps the panel PWM between `0%` and `max_light` non-blockingly; a bench override is
-  available via `POST /command {"set_light":<pct>}` (transient — the next schedule tick
-  resumes control). The four legacy mode shortcuts (`DD/LL/DL/MM`) were removed in 3.2 —
-  the node is the single source of truth.
+  ramps the panel PWM between `0%` and `max_light` non-blockingly. A manual override,
+  `POST /command {"set_light":<pct>}`, holds that level **until the schedule next flips
+  on/off**, after which the schedule takes back control; `{"light_auto":true}` (or a
+  negative `set_light`) hands control back immediately. The override is never persisted
+  (a reboot returns to the schedule) and `/telemetry` reports it as `light_manual`
+  (`-1` while following the schedule). The four legacy mode shortcuts (`DD/LL/DL/MM`)
+  were removed in 3.2 — the node is the single source of truth.
 - **Humidity** is **sensed only** — the current hardware has no humidity actuator
   (`set_hum` is kept for logging/future use).
 - **Time:** NTP is primary; the server is the `ntp` config field (default `pool.ntp.org`).
@@ -283,7 +286,7 @@ from poll success/timeout.
 | `GET /telemetry` | live readings + state |
 | `GET /config` | current persisted configuration |
 | `POST /config` | update a subset of config fields (JSON), then persist |
-| `POST /command` | transient actions: `sync_time`, `set_time` (epoch), `set_light`, `identify`, `reboot` |
+| `POST /command` | actions: `sync_time`, `set_time` (epoch), `set_light` (hold until next transition), `light_auto`, `identify`, `reboot` |
 | `GET /health` | wifi / heap / time-valid / sensor-fault / uptime |
 | `GET /status` | human-readable status page (auto-refresh) |
 
@@ -321,8 +324,10 @@ curl -X POST http://incubator-1.local/config \
      -d "{\"lights_on\":\"00:00\",\"lights_off\":\"09:00\",
           \"light_period_minutes\":1260,\"light_cycle_anchor\":$(date -u +%s)}"
 
-# Transient bench override (next schedule tick takes back control)
+# Manual light override: held until the schedule next flips on/off
 curl -X POST http://incubator-1.local/command -d '{"set_light":50,"sync_time":true}'
+# ...or hand control back to the schedule right away
+curl -X POST http://incubator-1.local/command -d '{"light_auto":true}'
 
 # Offline lab: point the node at a local NTP server (e.g. the controller running ntpd)
 curl -X POST http://incubator-1.local/config -d '{"ntp":"192.168.1.10"}'

@@ -70,6 +70,7 @@ static void fillTelemetry(JsonObject o) {
   o["set_temp"]             = cfg.set_temp;
   o["set_hum"]              = cfg.set_hum;
   o["light_level"]          = state.light_level;
+  o["light_manual"]         = state.light_manual;   // -1 = following the schedule
   o["max_light"]            = cfg.max_light;
   o["lights_on"]            = cfg.lights_on;
   o["lights_off"]           = cfg.lights_off;
@@ -135,6 +136,7 @@ static void handleCommand() {
   if (in["sync_time"].as<bool>())  { TimeKeeper::syncRtcFromNtp(); resp["sync_time"] = true; }
   if (in["set_time"].is<unsigned long>()) { uint32_t e = in["set_time"].as<unsigned long>(); TimeKeeper::setTime(e); resp["set_time"] = e; }
   if (in["set_light"].is<int>())   { LightControl::setManualLevel(in["set_light"]); resp["set_light"] = (int)in["set_light"]; }
+  if (in["light_auto"].as<bool>()) { LightControl::setManualLevel(-1); resp["light_auto"] = true; }
   if (in["identify"].as<bool>())   { resp["identify"] = true; }   // (hook for a blink/beep)
   if (in["reboot"].as<bool>())     { resp["reboot"] = true; sendJson(resp); delay(200); ESP.restart(); return; }
 

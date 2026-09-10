@@ -11,7 +11,8 @@
 
 // Light scheduling is always LD (light-during-window) — the four legacy modes
 // (DD/LL/DL/MM) were removed in firmware 3.2.0 in favour of node-driven
-// schedules. For bench overrides use ``POST /command set_light`` (transient).
+// schedules. ``POST /command set_light`` holds a manual level until the schedule
+// next flips on/off (or ``light_auto`` clears it); it is never persisted.
 
 // Persisted configuration. Defaults below are written on first boot.
 struct Config {
@@ -68,6 +69,8 @@ struct State {
   // Actuators
   int  light_level  = 0;     // current light %, 0..100 (faded)
   int  light_target = 0;     // commanded light %, 0..100
+  int  light_manual = -1;    // manual override %, 0..100; -1 = follow the schedule
+  bool light_manual_sched_on = false; // what the schedule said when the override began
   int  peltier_duty = 0;     // -100..+100  (sign = direction; + = heating)
   bool fan_on       = false;
 

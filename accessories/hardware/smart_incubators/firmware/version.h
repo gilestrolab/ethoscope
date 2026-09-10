@@ -5,6 +5,6 @@
 // REST API so a flash is self-evident in /telemetry.
 #pragma once
 
-#define FW_VERSION     "3.2.0-wifi"
+#define FW_VERSION     "3.3.0-wifi"
 #define FW_BUILD       15
 #define FW_BUILD_DATE  __DATE__ " " __TIME__

@@ -49,7 +49,17 @@ static bool isLightOn() {
 }
 
 static void evaluateSchedule() {
-  state.light_target = isLightOn() ? cfg.max_light : 0;
+  bool on = isLightOn();
+  // Manual override: hold the requested level until the schedule next flips,
+  // then hand control back so nobody has to remember to undo it.
+  if (state.light_manual >= 0) {
+    if (on == state.light_manual_sched_on) {
+      state.light_target = state.light_manual;
+      return;
+    }
+    state.light_manual = -1;
+  }
+  state.light_target = on ? cfg.max_light : 0;
 }
 
 static void writeLevel(int pct) {
@@ -71,8 +81,13 @@ void begin() {
 }
 
 void setManualLevel(int pct) {
-  if (pct < 0) pct = 0;
+  if (pct < 0) {                      // back to the schedule; update() re-targets
+    state.light_manual = -1;
+    return;
+  }
   if (pct > 100) pct = 100;
+  state.light_manual = pct;
+  state.light_manual_sched_on = isLightOn();
   state.light_target = pct;
 }
 
