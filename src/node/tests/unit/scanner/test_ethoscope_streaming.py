@@ -18,7 +18,40 @@ import pytest
 from ethoscope_node.scanner.ethoscope_streaming import (
     STREAMING_PORT,
     EthoscopeStreamManager,
+    StreamUnavailable,
 )
+
+# The response a current device sends on STREAMING_PORT before the multipart body.
+MJPEG_RESPONSE_HEADERS = (
+    b"HTTP/1.0 200 OK\r\n"
+    b"Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n"
+)
+
+
+def serving_socket(*chunks):
+    """A mock socket that answers the handshake, then yields `chunks`, then EOF.
+
+    Always prefer this over a bare ``MagicMock()`` for a socket that a loop reads
+    from. A bare mock defeats every guard in the read loop at once - ``recv()``
+    returns a truthy mock, ``b"" + mock`` is a mock rather than a TypeError,
+    ``b"\r\n\r\n" not in mock`` is always True and ``len(mock)`` is 0 - so the
+    loop never exits and each iteration retains another mock through the parent's
+    call-recording chain. That is not a slow test; it is hundreds of megabytes a
+    second until the machine dies.
+
+    Health probes (``recv`` with ``MSG_PEEK``) are answered separately, so they do
+    not consume the scripted response.
+    """
+    body = iter([MJPEG_RESPONSE_HEADERS, *chunks, b""])
+    sock = MagicMock()
+
+    def recv(bufsize, flags=0):
+        if flags & socket.MSG_PEEK:
+            return b"-"  # alive, and peeking consumes nothing
+        return next(body, b"")
+
+    sock.recv.side_effect = recv
+    return sock
 
 
 class TestStreamingConstants:
@@ -58,8 +91,9 @@ class TestEthoscopeStreamManager:
         """Test successful shared streaming connection start."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-        # Mock socket
-        mock_socket = MagicMock()
+        # Mock socket: it must answer the handshake, which now happens here
+        # rather than inside the broadcast thread.
+        mock_socket = serving_socket()
         mock_socket_class.return_value = mock_socket
 
         # Mock thread
@@ -128,7 +162,7 @@ class TestEthoscopeStreamManager:
         manager._streaming_clients = {0: queue.Queue()}
 
         # Mock new socket
-        new_socket = MagicMock()
+        new_socket = serving_socket()
         mock_socket_class.return_value = new_socket
 
         # Start new streaming
@@ -226,17 +260,20 @@ class TestEthoscopeStreamManager:
         assert manager._is_socket_healthy() is False
 
     def test_is_socket_healthy_connection_ok(self):
-        """Test socket health check with healthy connection."""
+        """A live connection with nothing to read raises EAGAIN: healthy."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-        # Mock healthy socket that raises EAGAIN (no data available)
         mock_socket = MagicMock()
         mock_socket.recv.side_effect = OSError(errno.EAGAIN, "No data")
         manager._shared_socket = mock_socket
 
         assert manager._is_socket_healthy() is True
-        mock_socket.settimeout.assert_any_call(0)
-        mock_socket.settimeout.assert_any_call(None)
+        # Probed without touching the socket's timeout: the broadcast thread is
+        # reading through the same socket and would see the change as a failure.
+        mock_socket.settimeout.assert_not_called()
+        mock_socket.recv.assert_called_once_with(
+            1, socket.MSG_PEEK | socket.MSG_DONTWAIT
+        )
 
     def test_is_socket_healthy_connection_ok_ewouldblock(self):
         """Test socket health check with EWOULDBLOCK error (healthy)."""
@@ -249,6 +286,33 @@ class TestEthoscopeStreamManager:
 
         assert manager._is_socket_healthy() is True
 
+    def test_is_socket_healthy_peer_closed(self):
+        """An empty peek means the peer sent FIN: not healthy.
+
+        This is the case the old probe could not see. It used recv(0), which
+        returns b"" for a live socket and for a closed one alike, so the check
+        answered "healthy" for everything and the reconnect never fired.
+        """
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
+
+        mock_socket = MagicMock()
+        mock_socket.recv.return_value = b""
+        manager._shared_socket = mock_socket
+
+        assert manager._is_socket_healthy() is False
+
+    def test_is_socket_healthy_leaves_buffered_data_alone(self):
+        """The probe peeks, so a byte it finds is still there for the relay."""
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
+
+        mock_socket = MagicMock()
+        mock_socket.recv.return_value = b"-"
+        manager._shared_socket = mock_socket
+
+        assert manager._is_socket_healthy() is True
+        flags = mock_socket.recv.call_args[0][1]
+        assert flags & socket.MSG_PEEK
+
     def test_is_socket_healthy_connection_closed(self):
         """Test socket health check with closed connection."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
@@ -259,7 +323,6 @@ class TestEthoscopeStreamManager:
         manager._shared_socket = mock_socket
 
         assert manager._is_socket_healthy() is False
-        mock_socket.settimeout.assert_any_call(None)
 
     def test_is_socket_healthy_other_exception(self):
         """Test socket health check with other exceptions."""
@@ -272,21 +335,19 @@ class TestEthoscopeStreamManager:
 
         assert manager._is_socket_healthy() is False
 
-    def test_is_socket_healthy_timeout_reset_error(self):
-        """Test socket health check when timeout reset fails."""
+    def test_a_dead_connection_is_replaced(self):
+        """The whole point of the check: an unhealthy socket triggers a restart."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-        # Mock socket where settimeout(None) fails
         mock_socket = MagicMock()
-        mock_socket.recv.side_effect = OSError(errno.EAGAIN, "No data")
-        mock_socket.settimeout.side_effect = [
-            None,  # First call (set to 0) succeeds
-            Exception("Timeout error"),  # Second call (reset) fails
-        ]
+        mock_socket.recv.return_value = b""  # peer closed
         manager._shared_socket = mock_socket
+        manager._streaming_running = True
 
-        # Should still return True (healthy) and not raise error
-        assert manager._is_socket_healthy() is True
+        with patch.object(manager, "_start_shared_streaming") as restart:
+            manager._ensure_streaming_connection()
+
+        restart.assert_called_once()
 
     def test_ensure_streaming_connection_starts_new(self):
         """Test ensuring connection when none exists."""
@@ -489,16 +550,12 @@ class TestEthoscopeStreamManager:
         b"\xff\xd8\xff\xd9\r\n"
     )
 
-    def test_streaming_broadcast_loop_requests_and_relays_body(self):
-        """Loop requests the stream, skips HTTP headers, relays the body verbatim."""
+    def test_broadcast_loop_relays_body_verbatim(self):
+        """The loop relays the multipart body unchanged, with no re-framing."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
         mock_socket = MagicMock()
-        mock_socket.recv.side_effect = [
-            self._HTTP_HEADERS,  # headers arrive first (no trailing body)
-            self._MJPEG_PART,  # one frame part
-            b"",  # connection closed
-        ]
+        mock_socket.recv.side_effect = [self._MJPEG_PART, b""]
         manager._shared_socket = mock_socket
         manager._streaming_running = True
 
@@ -506,53 +563,147 @@ class TestEthoscopeStreamManager:
 
         manager._streaming_broadcast_loop()
 
-        # It must have issued an HTTP GET to the device's MJPEG server.
+        assert client_queue.get_nowait() == self._MJPEG_PART
+        assert manager._streaming_running is False
+
+    def test_broadcast_loop_relays_leftover_first(self):
+        """Body bytes read alongside the headers are relayed before the rest."""
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
+
+        mock_socket = MagicMock()
+        mock_socket.recv.side_effect = [b"tail", b""]
+        manager._shared_socket = mock_socket
+        manager._streaming_running = True
+
+        client_id, client_queue = manager._add_streaming_client()
+
+        manager._streaming_broadcast_loop(leftover=self._MJPEG_PART)
+
+        assert client_queue.get_nowait() == self._MJPEG_PART
+        assert client_queue.get_nowait() == b"tail"
+
+    def test_broadcast_loop_releases_clients_when_the_stream_dies(self):
+        """A stream that ends must wake its clients, not leave them on the timeout.
+
+        The client generator waits 30 s on its queue, so without the sentinel every
+        viewer stared at a frozen frame for half a minute after the device went away.
+        """
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
+
+        mock_socket = MagicMock()
+        mock_socket.recv.side_effect = OSError("device went away")
+        manager._shared_socket = mock_socket
+        manager._streaming_running = True
+
+        client_id, client_queue = manager._add_streaming_client()
+
+        manager._streaming_broadcast_loop()
+
+        assert client_queue.get_nowait() is None
+
+    def test_read_stream_headers_skips_headers_and_returns_body(self):
+        """Headers are consumed; body bytes in the same read come back to be relayed."""
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
+
+        mock_socket = MagicMock()
+        mock_socket.recv.side_effect = [self._HTTP_HEADERS + self._MJPEG_PART]
+        manager._shared_socket = mock_socket
+
+        leftover = manager._read_stream_headers()
+
         mock_socket.sendall.assert_called_once()
         assert b"GET" in mock_socket.sendall.call_args[0][0]
+        assert leftover == self._MJPEG_PART
 
-        # The body is relayed unchanged (no decoding/re-framing).
-        assert client_queue.get_nowait() == self._MJPEG_PART
-        assert manager._streaming_running is False
-
-    def test_streaming_broadcast_loop_relays_body_attached_to_headers(self):
-        """Body bytes that arrive in the same packet as the headers are still relayed."""
+    def test_read_stream_headers_accumulates_split_headers(self):
+        """Headers split across several recv() calls are accumulated."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
         mock_socket = MagicMock()
         mock_socket.recv.side_effect = [
-            self._HTTP_HEADERS + self._MJPEG_PART,  # headers + body together
-            b"",  # connection closed
+            b"HTTP/1.0 200 OK\r\n",
+            b"Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n",
         ]
         manager._shared_socket = mock_socket
-        manager._streaming_running = True
 
-        client_id, client_queue = manager._add_streaming_client()
+        assert manager._read_stream_headers() == b""
 
-        manager._streaming_broadcast_loop()
+    def test_read_stream_headers_rejects_the_pre_mjpeg_protocol(self):
+        """A device older than June 2026 answers with pickled frames, not HTTP.
 
-        assert client_queue.get_nowait() == self._MJPEG_PART
-        assert manager._streaming_running is False
+        That is the regression this guard exists for: the header loop used to read
+        until it found a blank line, which never came, so it swallowed the whole
+        stream in silence and the browser got a response with no frames in it.
+        """
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-    def test_streaming_broadcast_loop_handles_partial_headers(self):
-        """Loop accumulates HTTP headers split across multiple recv() calls."""
+        mock_socket = MagicMock()
+        # struct.pack("Q", 4) + pickled payload: binary, no HTTP anywhere.
+        mock_socket.recv.side_effect = [b"\x04\x00\x00\x00\x00\x00\x00\x00\x80\x04"]
+        manager._shared_socket = mock_socket
+
+        with pytest.raises(StreamUnavailable, match="older than June 2026"):
+            manager._read_stream_headers()
+
+        # It must decide on the first packet rather than reading on.
+        assert mock_socket.recv.call_count == 1
+
+    def test_read_stream_headers_rejects_a_non_mjpeg_content_type(self):
+        """An HTTP answer that is not a multipart stream is refused too."""
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
         mock_socket = MagicMock()
         mock_socket.recv.side_effect = [
-            b"HTTP/1.0 200 OK\r\n",  # header line 1
-            b"Content-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n",  # end
-            self._MJPEG_PART,  # body
-            b"",  # connection closed
+            b"HTTP/1.0 200 OK\r\nContent-Type: text/html\r\n\r\n"
         ]
         manager._shared_socket = mock_socket
-        manager._streaming_running = True
 
-        client_id, client_queue = manager._add_streaming_client()
+        with pytest.raises(StreamUnavailable):
+            manager._read_stream_headers()
 
-        manager._streaming_broadcast_loop()
+    def test_read_stream_headers_rejects_a_non_200_status(self):
+        """A device that answers with an error status is named, not relayed."""
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
-        assert client_queue.get_nowait() == self._MJPEG_PART
-        assert manager._streaming_running is False
+        mock_socket = MagicMock()
+        mock_socket.recv.side_effect = [b"HTTP/1.0 503 Service Unavailable\r\n\r\n"]
+        manager._shared_socket = mock_socket
+
+        with pytest.raises(StreamUnavailable, match="503"):
+            manager._read_stream_headers()
+
+    def test_read_stream_headers_gives_up_on_silence(self):
+        """A device that accepts the connection and says nothing must not hang."""
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
+
+        mock_socket = MagicMock()
+        mock_socket.recv.side_effect = TimeoutError()
+        manager._shared_socket = mock_socket
+
+        with pytest.raises(StreamUnavailable, match="no response headers"):
+            manager._read_stream_headers()
+
+    def test_read_stream_headers_gives_up_on_a_closed_connection(self):
+        """Headers that stop half way are an error, not an empty stream."""
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
+
+        mock_socket = MagicMock()
+        mock_socket.recv.side_effect = [b"HTTP/1.0 200 OK\r\n", b""]
+        manager._shared_socket = mock_socket
+
+        with pytest.raises(StreamUnavailable, match="closed the connection"):
+            manager._read_stream_headers()
+
+    def test_read_stream_headers_caps_the_header_size(self):
+        """An endless header is bounded rather than buffered for ever."""
+        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
+
+        mock_socket = MagicMock()
+        mock_socket.recv.return_value = b"HTTP/1." + b"x" * 4096
+        manager._shared_socket = mock_socket
+
+        with pytest.raises(StreamUnavailable, match="exceeded"):
+            manager._read_stream_headers()
 
     def test_streaming_broadcast_loop_socket_error(self):
         """Test broadcast loop handles socket errors."""
@@ -604,7 +755,7 @@ class TestEthoscopeStreamManager:
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
         # Mock socket and thread
-        mock_socket = MagicMock()
+        mock_socket = serving_socket()
         mock_socket_class.return_value = mock_socket
         mock_thread = MagicMock()
         mock_thread_class.return_value = mock_thread
@@ -644,7 +795,7 @@ class TestEthoscopeStreamManager:
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
         # Mock socket and thread
-        mock_socket = MagicMock()
+        mock_socket = serving_socket()
         mock_socket_class.return_value = mock_socket
         mock_thread = MagicMock()
         mock_thread_class.return_value = mock_thread
@@ -675,19 +826,19 @@ class TestEthoscopeStreamManager:
     def test_get_stream_for_client_error_cleanup(
         self, mock_thread_class, mock_socket_class
     ):
-        """Test that client is cleaned up even if error occurs."""
+        """A connection failure reaches the caller, and registers no client.
+
+        The failure used to be swallowed into an empty generator, so the endpoint
+        had already committed a 200 multipart response by the time anything went
+        wrong and the browser sat on a stream that never produced a frame.
+        """
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
         # Mock socket that fails
         mock_socket_class.side_effect = OSError("Connection failed")
 
-        # Get stream (should handle error and cleanup)
-        frames = []
-        for frame in manager.get_stream_for_client():
-            frames.append(frame)
-
-        # Should receive no frames
-        assert frames == []
+        with pytest.raises(OSError):
+            manager.get_stream_for_client()
 
         # Verify no clients remain
         assert len(manager._streaming_clients) == 0
@@ -701,7 +852,7 @@ class TestEthoscopeStreamManager:
         manager = EthoscopeStreamManager("192.168.1.100", "device_001")
 
         # Mock socket and thread
-        mock_socket = MagicMock()
+        mock_socket = serving_socket()
         mock_socket_class.return_value = mock_socket
         mock_thread = MagicMock()
         mock_thread_class.return_value = mock_thread
@@ -762,22 +913,6 @@ class TestEthoscopeStreamManager:
         manager._streaming_broadcast_loop()
 
         # Should exit cleanly and mark as not running
-        assert manager._streaming_running is False
-
-    def test_streaming_broadcast_loop_incomplete_headers(self):
-        """Loop exits cleanly if the connection closes before HTTP headers complete."""
-        manager = EthoscopeStreamManager("192.168.1.100", "device_001")
-
-        mock_socket = MagicMock()
-        mock_socket.recv.side_effect = [
-            b"HTTP/1.0 200 OK\r\n",  # partial headers, no blank line
-            b"",  # connection closed mid-header
-        ]
-        manager._shared_socket = mock_socket
-        manager._streaming_running = True
-
-        manager._streaming_broadcast_loop()
-
         assert manager._streaming_running is False
 
     def test_thread_safety_concurrent_client_operations(self):

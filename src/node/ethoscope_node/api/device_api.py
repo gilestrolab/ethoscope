@@ -12,6 +12,7 @@ import tempfile
 
 import bottle
 
+from ethoscope_node.scanner.ethoscope_streaming import StreamUnavailable
 from ethoscope_node.utils.device_locations import resolve_device_locations
 
 from .base import BaseAPI, error_decorator, warning_decorator
@@ -295,12 +296,26 @@ class DeviceAPI(BaseAPI):
 
     @error_decorator
     def _get_device_stream(self, id):
-        """Get device stream."""
+        """
+        Relay a device's live MJPEG stream.
+
+        The connection is opened before the multipart header is set, so a device
+        that cannot be streamed answers with a readable 502 rather than a stream
+        that never delivers a frame - which is what an out-of-date device used to
+        produce, indistinguishable from a camera pointing at the dark.
+        """
         device = self.validate_device_exists(id)
+        try:
+            stream = device.relay_stream()
+        except StreamUnavailable as e:
+            bottle.response.status = 502
+            bottle.response.content_type = "text/plain; charset=utf-8"
+            return f"Cannot stream from this ethoscope: {e}\n"
+
         bottle.response.set_header(
             "Content-type", "multipart/x-mixed-replace; boundary=frame"
         )
-        return device.relay_stream()
+        return stream
 
     @error_decorator
     def _get_device_backup_info(self, id):
