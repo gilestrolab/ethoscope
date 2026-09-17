@@ -9,7 +9,13 @@ the deletion after validating it again.
 
 import threading
 
-from ethoscope_node.utils.device_storage import classify_run, summarise
+from ethoscope_node.utils.device_storage import (
+    ACTION_ROOTS,
+    assess_free_space,
+    classify_run,
+    summarise,
+    thresholds_for,
+)
 
 from .base import BaseAPI, error_decorator
 
@@ -55,6 +61,21 @@ class StorageAPI(BaseAPI):
             self.logger.debug("Falling back to server data directories for storage")
         return dirs
 
+    def _thresholds(self, action: str) -> dict:
+        """
+        The free-space gates for one kind of run.
+
+        Read from the configuration's ``alerts`` section the same way
+        :meth:`_node_dirs` reads ``folders``, falling back to the module defaults so
+        an installation whose config predates these keys still gets a warning.
+        """
+        alerts = {}
+        try:
+            alerts = self.config.content["alerts"]
+        except (AttributeError, KeyError, TypeError):
+            self.logger.debug("No alerts configuration; using default storage gates")
+        return thresholds_for(action, alerts)
+
     def _device(self, device_id: str):
         """
         Return the live device object, or None if the scanner does not have one.
@@ -93,7 +114,19 @@ class StorageAPI(BaseAPI):
 
     @error_decorator
     def _get_device_storage(self, id):
-        """Report a device's disk usage and which of its runs can be deleted."""
+        """
+        Report a device's disk usage and which of its runs can be deleted.
+
+        With ``?action=tracking`` or ``?action=video`` the answer also carries a
+        ``preflight`` assessment, which is what the web interface consults before
+        starting a run. It is the same device call either way — the reclaimable
+        figure the warning quotes only exists once every run has been classified —
+        so this is one request, not two. Without a recognised ``action`` the
+        response is unchanged, and the Free up space modal keeps using it as before.
+
+        An unreachable or too-old device answers with a sentence, as the modal
+        expects; the caller treats that as "no warning" and starts anyway.
+        """
         device = self._device(id)
         if device is None:
             return {"error": UNREACHABLE_ERROR}
@@ -104,14 +137,23 @@ class StorageAPI(BaseAPI):
             return {"error": OUTDATED_FIRMWARE_ERROR}
 
         runs = listing["runs"]
-        return {
+        totals = summarise(runs)
+        disk = listing.get("disk", {})
+        response = {
             "device_id": id,
-            "disk": listing.get("disk", {}),
+            "disk": disk,
             "node_dirs": node_dirs,
             "runs": runs,
             "other": listing.get("other", {"files": 0, "size_bytes": 0}),
-            "totals": summarise(runs),
+            "totals": totals,
         }
+
+        action = self.get_query_param("action")
+        if action in ACTION_ROOTS:
+            response["preflight"] = assess_free_space(
+                disk, totals, action, self._thresholds(action), runs
+            )
+        return response
 
     @error_decorator
     def _purge_device_storage(self, id):

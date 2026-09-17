@@ -9,6 +9,11 @@
      *
      * The node decides what is deletable; this service only reflects that decision,
      * so a run the backend did not mark as backed up can never be selected here.
+     *
+     * It also asks, before a run starts, whether the device still has room. That
+     * judgement is the node's too: the thresholds live in its configuration and the
+     * arithmetic is unit-tested there, so nothing here parses a df figure or
+     * compares it to a limit.
      */
     app.factory('ethoscopeStorageService', function($http) {
 
@@ -42,6 +47,34 @@
             usedPercent: function(storage) {
                 var raw = storage && storage.disk ? storage.disk['Use%'] : null;
                 return raw ? parseInt(String(raw).replace('%', ''), 10) : 0;
+            },
+
+            /**
+             * Ask whether the device has room for a run, resolving to the node's
+             * assessment or to null.
+             *
+             * Null means "start as usual": no warning, an unreachable or too-old
+             * device, a timeout, anything. A disk check must never be the reason an
+             * experiment does not begin, so every failure resolves rather than
+             * rejects, and the timeout is well under the node's own 30 s for
+             * listing runs.
+             *
+             * @param {string} device_id
+             * @param {string} action 'tracking' or 'video'
+             * @returns {Promise<Object|null>}
+             */
+            preflight: function(device_id, action) {
+                return $http.get('/device/' + device_id + '/storage',
+                                 {params: {action: action}, timeout: 10000})
+                    .then(function(response) {
+                        var data = response.data || {};
+                        return data.preflight || null;
+                    })
+                    .catch(function(error) {
+                        console.warn('Could not check free space, starting anyway:',
+                                     error);
+                        return null;
+                    });
             },
 
             /** Load the device's runs and reset the modal to its list step. */

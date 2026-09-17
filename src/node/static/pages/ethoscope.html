@@ -1303,6 +1303,62 @@
 
 
 <!-- Modal stop tracking /recording-->
+<!-- Low disk space, shown before a run starts instead of the start going ahead
+     silently. The figures come from the node (GET /device/<id>/storage?action=...),
+     which reads the device's df for real rather than trusting the cached percentage
+     behind the hard-drive icon. It never blocks: "Start anyway" is always there. -->
+<div class="modal fade" id="lowSpaceModal" tabindex="-1" role="dialog" aria-labelledby="lowSpaceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title" id="lowSpaceModalLabel">
+                    <span class="fa-solid fa-triangle-exclamation text-warning"></span>
+                    {{device.name}} is low on disk space
+                </h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+            </div>
+            <div class="modal-body">
+
+                <div ng-if="lowSpace.assessment.used_percent !== null" style="margin-bottom: 15px;">
+                    <div class="ProgressBarContainer" style="width: 100%; background-color: #ddd; border-radius: 4px;">
+                        <div class="ProgressBar" ng-style="{width: lowSpace.assessment.used_percent + '%'}"
+                             ng-class="{'bg-danger': lowSpace.assessment.used_percent >= 80, 'bg-warning': lowSpace.assessment.used_percent < 80}"
+                             style="height: 24px; line-height: 24px; text-align: center; color: white; border-radius: 4px;">
+                            {{lowSpace.assessment.used_percent}}%
+                        </div>
+                    </div>
+                </div>
+
+                <p ng-repeat="reason in lowSpace.assessment.reasons" ng-class="{'font-weight-bold': $first}">{{reason}}</p>
+
+                <p ng-if="lowSpace.assessment.reclaimable_bytes > 0" class="text-muted">
+                    Freeing space deletes those runs from the ethoscope only. The
+                    copies on the node are left untouched.
+                </p>
+
+                <p ng-if="lowSpace.assessment.reclaimable_bytes <= 0 && lowSpace.assessment.pending_runs > 0" class="text-muted">
+                    Nothing can be deleted safely until the node has finished copying
+                    them, which the backup service does every few minutes.
+                </p>
+
+                <p class="text-muted">
+                    Starting anyway is fine if you have room for this run — but a card
+                    that fills up mid-run loses the experiment.
+                </p>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary"
+                        ng-if="lowSpace.assessment.reclaimable_bytes > 0"
+                        ng-click="ethoscope.lowSpaceFreeUp()">Free up space&hellip;</button>
+                <button type="button" class="btn btn-warning"
+                        ng-click="ethoscope.lowSpaceStartAnyway()">Start anyway</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="stopTrackingModal" tabindex="-1" role="dialog" aria-labelledby="stopTrackingModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">

@@ -204,6 +204,17 @@ class EthoscopeConfiguration:
             "enabled": True,
             "cooldown_seconds": 3600,
             "storage_warning_threshold": 80,
+            # Pre-flight gates for starting a run, read by
+            # device_storage.thresholds_for(). Separate from the notification
+            # threshold above: a message at 80% is cheap, a dialog at 80% in front
+            # of every start is not. Video is held to a higher bar than tracking
+            # because it writes about two orders of magnitude more per day.
+            "storage_start_warning_percent": 90,
+            "min_free_gb_tracking": 2,
+            "min_free_gb_video": 10,
+            # The percentage gate is ignored while this much space is still free, so
+            # a large disk at 91% is not reported as a problem.
+            "storage_percent_warning_ceiling_gb": 25,
             "device_timeout_minutes": 30,
             "unreachable_timeout_minutes": 20,
             "graceful_shutdown_grace_minutes": 5,

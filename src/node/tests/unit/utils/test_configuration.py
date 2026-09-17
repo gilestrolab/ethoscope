@@ -316,6 +316,25 @@ class TestEthoscopeConfigurationMerge:
 
         assert result == EthoscopeConfiguration.DEFAULT_SETTINGS
 
+    def test_merge_adds_the_storage_start_gates_to_an_older_config(self):
+        """
+        An installation whose alerts section predates the pre-flight keys still gets
+        them, which is what makes the low-space warning work without a config edit.
+        """
+        config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
+        config._logger = MagicMock()
+
+        result = config._merge_with_defaults(
+            {"alerts": {"enabled": True, "storage_warning_threshold": 75}}
+        )
+
+        alerts = result["alerts"]
+        assert alerts["storage_warning_threshold"] == 75
+        assert alerts["storage_start_warning_percent"] == 90
+        assert alerts["min_free_gb_tracking"] == 2
+        assert alerts["min_free_gb_video"] == 10
+        assert alerts["storage_percent_warning_ceiling_gb"] == 25
+
     def test_merge_preserves_custom_values(self):
         """Test merging preserves custom values."""
         config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)

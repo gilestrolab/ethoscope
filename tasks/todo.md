@@ -1062,3 +1062,98 @@ The partition-offset logic was factored out of `read_from_image` into `rootfs_of
 
 **Field fix**, for cards already burnt from this image: `sudo rm /.zerofill`. No
 re-burn, no data loss.
+
+---
+
+# Warn before starting a run on a device that is low on space
+
+Date: 2026-09-17
+
+## Problem
+
+Nothing stood between a user and starting a run on a device with 1 GB left: the
+Start button in `#startModal` POSTed straight to `/controls/start`, and the only
+disk signal on the page was a hard-drive icon most people never look at. A card
+that fills mid-run loses the experiment, and the device's own auto-cleanup reacts
+by deleting old data. The remedy already existed — Options -> Free up space
+(529e38b8) — it just was not offered at the moment it was needed.
+
+## Decisions
+
+- **Warn, never block.** "Free up space…" / "Start anyway" / "Cancel".
+- Trigger on **percent used OR free bytes**, whichever fires first, with a higher
+  free-bytes bar for video than tracking.
+- The percentage rule is **qualified by an absolute ceiling** so a large disk at
+  91% (90 GB free) stays quiet; the absolute rule has no such qualifier.
+- 90% rather than the existing `alerts.storage_warning_threshold` (80): that key
+  governs notifications, where a message is cheap. A dialog in front of every
+  start at 80% would be dismissed unread within a week, and 80% of a 32 GB card
+  still leaves ~6 GB — ample for tracking.
+
+## Tasks
+
+- [x] `assess_free_space()` + `thresholds_for()` + df parsing in `device_storage.py`
+- [x] Four new `alerts.*` config keys, auto-merged into existing installations
+- [x] `?action=` on the existing `GET /device/<id>/storage` (no new route)
+- [x] `preflight()` in `ethoscopeStorageService.js`; guard in both start paths
+- [x] `#lowSpaceModal`, with a variant for "nothing safe to delete yet"
+- [x] Unit tests (39 new) and end-to-end verification against a stand-in device
+
+## Review (2026-09-17)
+
+**Where the judgement lives.** All of it on the node: thresholds come from the
+config file, the arithmetic is one pure function, and the JS only asks and
+renders. There is no JS test runner in this repo, so every branch put in
+JavaScript is a branch nobody can test — that asymmetry, not elegance, decided it.
+
+**Why not the `used_space` already in the poll.** It is set once in
+`ControlThread.__init__` (`tracking.py:419`), never refreshed, and absent from
+`ControlThreadVideoRecording._info` (`record.py:647`) — so it can be days stale or
+missing, and it carries no byte figures. The warning reads the disk live instead,
+and corrects the icon's percentage from what it finds.
+
+**Fail open, deliberately.** An unreachable device, firmware too old to serve
+`/data/runs`, a timeout (10 s) or an unparseable `df` field all mean "no warning".
+A disk check must never be why an experiment fails to start.
+
+**Fixed in passing** (same function, would have been worse to refactor around):
+`start_tracking` called `startTrackingWithData()`, which is defined nowhere in the
+repo — so choosing a **custom ROI template** uploaded it and then threw a
+ReferenceError instead of starting. The two identical POST blocks are now one
+local `postStart()`, which is also what line 1188 now calls.
+
+**Verified** — unit: 1826 node tests pass (39 new, covering both gates, the
+large-disk ceiling, df suffixes incl. a locale comma and a grouped number that
+must stay unreadable, every unreadable input, and config migration).
+End-to-end against a stand-in ethoscope (scratchpad `fake_ethoscope.py`, mDNS +
+the routes the scanner polls, with a disk of my choosing) driven through the real
+browser UI:
+
+| Case | Result |
+|---|---|
+| 93% full, tracking | warns, no start issued |
+| 93% full, video | warns, "most recent run" line correctly absent |
+| Start anyway | exactly one start POST, no double-start |
+| Cancel | no start, no spinner left spinning |
+| Free up space… | hands off to `#freeSpaceModal`, run listed as backed up |
+| after closing | no `.modal-backdrop`, no `modal-open`, page clickable |
+| 44% full | no modal, starts in one click |
+| firmware too old (404) | no modal, starts anyway |
+| 420 px wide | buttons stack, nothing clipped |
+
+No console errors throughout.
+
+## Discovered During Work
+
+- `EthoscopeScanner._check_storage_warnings()` (`ethoscope_scanner.py:1109`) is
+  **dead code**: it reads `_info["machine_info"]["disk_usage"]`, which no device
+  endpoint produces, so `send_storage_warning_alert()` has never fired. Reviving
+  it wants a per-poll disk figure for the whole fleet — i.e. fixing `used_space`
+  first. Left alone here.
+- `cleanup_old_data()` (`pi.py:1266`) globs `<dir>/tracking` while the real tree
+  is `results/`, so the 85% auto-cleanup can only ever delete videos. Worth a
+  decision of its own: the honest fix may be to stop auto-deleting data at all,
+  now that the user gets warned instead.
+- `tracking.py:419` does `pi.get_partition_info(...)["Use%"]` and
+  `get_partition_info` returns `None` on failure — a `TypeError` in
+  `ControlThread.__init__` on a device where `df` misbehaves.

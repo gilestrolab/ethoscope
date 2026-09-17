@@ -848,6 +848,62 @@
         }
 
         /**
+         * Show one modal only once another has finished closing.
+         *
+         * Bootstrap 4 releases .modal-open, its scrollbar padding and its backdrop
+         * on the closing modal's transitionend. A modal shown before that point
+         * loses all three, which leaves the page dimmed and unclickable after it is
+         * dismissed, so the second modal waits for 'hidden', never 'hide'.
+         */
+        function chainModal(fromSelector, toSelector) {
+            var $from = $(fromSelector);
+            var $to = $(toSelector);
+
+            if (!$from.length || !$from.is(':visible')) {
+                $to.modal('show');
+                return;
+            }
+            // .one, not .on: otherwise every later dismissal reopens $to.
+            $from.one('hidden.bs.modal', function() {
+                $to.modal('show');
+            });
+            $from.modal('hide');
+        }
+
+        /**
+         * Ask the node whether the device has room, and either proceed or warn.
+         *
+         * The check is advisory: if the node cannot tell us — old firmware, an
+         * unreachable device, a timeout — proceed() runs anyway. Nobody should lose
+         * the start of an experiment to a disk query.
+         *
+         * @param {string} action 'tracking' or 'video'
+         * @param {Function} proceed Called to actually start the run.
+         */
+        function guardLowSpace(action, proceed) {
+            ethoscopeStorageService.preflight(device_id, action)
+                .then(function(assessment) {
+                    if (!assessment || !assessment.warn) {
+                        proceed();
+                        return;
+                    }
+                    // Reason: the icon's percentage is set once when the device's
+                    // control thread starts and never refreshed, so it can show
+                    // green while this says 93%. We have just read the disk for
+                    // real; correct the icon rather than contradict it.
+                    if (assessment.used_percent !== null &&
+                        assessment.used_percent !== undefined) {
+                        $scope.device.used_space = assessment.used_percent;
+                    }
+                    manageSpinner('stop');
+                    $scope.lowSpace.assessment = assessment;
+                    $scope.lowSpace.proceed = proceed;
+                    chainModal(action === 'video' ? '#recordModal' : '#startModal',
+                               '#lowSpaceModal');
+                });
+        }
+
+        /**
          * Get sensor IP address by location (an incubator name).
          *
          * A virtual "shoe box" has no sensor of its own — the temperature and
@@ -1039,11 +1095,25 @@
         // ===========================
 
         /**
-         * Start tracking with selected options
+         * Start tracking with selected options.
+         *
+         * @param {Object} option Tracking options as filled in the form.
+         * @param {boolean} [force] Set when the user has been told the device is low
+         *     on space and chose to start regardless.
          */
-        $scope.ethoscope.start_tracking = function(option) {
+        $scope.ethoscope.start_tracking = function(option, force) {
             $("#startModal").modal('hide');
             manageSpinner('start');
+
+            // Check before normaliseArguments below, which mutates `option` in
+            // place: "Start anyway" re-enters this function, and it must re-enter
+            // with the form's own values untouched.
+            if (!force) {
+                guardLowSpace('tracking', function() {
+                    $scope.ethoscope.start_tracking(option, true);
+                });
+                return;
+            }
 
             // Turn widget values into what the device expects. Shared with
             // start_recording, which used to normalise a different subset.
@@ -1169,6 +1239,25 @@
             var templateName = null;
             var isCustomTemplate = false;
 
+            // One place to send the start command. The custom-template branch below
+            // called a startTrackingWithData() that is defined nowhere, so choosing a
+            // custom mask uploaded it and then threw a ReferenceError instead of
+            // starting the run; the other two branches each carried their own copy of
+            // this block.
+            function postStart() {
+                console.log('Starting tracking with options:', option);
+
+                $http.post('/device/' + device_id + '/controls/start', option)
+                    .then(function(response) {
+                        $scope.device.status = response.data.status;
+                        refreshDeviceStatus();
+                    })
+                    .catch(function(error) {
+                        console.error('Failed to start tracking:', error);
+                        manageSpinner('stop');
+                    });
+            }
+
             if (option.roi_builder && option.roi_builder.arguments && option.roi_builder.arguments.template_name) {
                 templateName = option.roi_builder.arguments.template_name;
 
@@ -1185,7 +1274,7 @@
                         } else {
                             console.log("Custom template upload failed, proceeding anyway");
                         }
-                        startTrackingWithData();
+                        postStart();
                     });
                 } else {
                     // For builtin templates, no transfer needed
@@ -1193,33 +1282,11 @@
                         console.log("Builtin template detected: " + templateName + ". No transfer needed.");
                     }
 
-                    console.log('Starting tracking with options:', option);
-
-                    // Send start command to ethoscope
-                    $http.post('/device/' + device_id + '/controls/start', option)
-                        .then(function(response) {
-                            $scope.device.status = response.data.status;
-                            // Refresh device data after starting
-                            refreshDeviceStatus();
-                        })
-                        .catch(function(error) {
-                            console.error('Failed to start tracking:', error);
-                            manageSpinner('stop');
-                        });
+                    postStart();
                 }
             } else {
                 // ROI builder without template_name (e.g., TargetGridROIBuilder)
-                console.log('Starting tracking with options (no template):', option);
-
-                $http.post('/device/' + device_id + '/controls/start', option)
-                    .then(function(response) {
-                        $scope.device.status = response.data.status;
-                        refreshDeviceStatus();
-                    })
-                    .catch(function(error) {
-                        console.error('Failed to start tracking:', error);
-                        manageSpinner('stop');
-                    });
+                postStart();
             }
         };
 
@@ -1382,9 +1449,17 @@
         /**
          * Start video recording with selected options
          */
-        $scope.ethoscope.start_recording = function(option) {
+        $scope.ethoscope.start_recording = function(option, force) {
             $("#recordModal").modal('hide');
             manageSpinner('start');
+
+            // See start_tracking: warn before anything mutates `option`.
+            if (!force) {
+                guardLowSpace('video', function() {
+                    $scope.ethoscope.start_recording(option, true);
+                });
+                return;
+            }
 
             // Turn widget values into what the device expects. Shared with
             // start_tracking, which used to normalise a different subset.
@@ -1651,6 +1726,30 @@
 
         $scope.storageUsedPercent = function() {
             return ethoscopeStorageService.usedPercent($scope.storage);
+        };
+
+        /**
+         * Low-space warning shown before a run starts.
+         *
+         * Kept off $scope.storage on purpose: ethoscopeStorageService.load() resets
+         * that object wholesale, so handing over to the Free up space modal would
+         * wipe the pending start.
+         */
+        $scope.lowSpace = {assessment: null, proceed: null};
+
+        $scope.ethoscope.lowSpaceStartAnyway = function() {
+            var proceed = $scope.lowSpace.proceed;
+            $scope.lowSpace.proceed = null;
+            $('#lowSpaceModal').modal('hide');
+            if (proceed) { proceed(); }
+        };
+
+        $scope.ethoscope.lowSpaceFreeUp = function() {
+            // Load inside the digest, and touch the DOM only in chainModal's
+            // callback, which runs outside it.
+            ethoscopeStorageService.load(device_id, $scope);
+            $scope.lowSpace.proceed = null;
+            chainModal('#lowSpaceModal', '#freeSpaceModal');
         };
 
         $scope.ethoscope.purgeStorage = function() {
