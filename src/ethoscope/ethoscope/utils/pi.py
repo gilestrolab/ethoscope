@@ -1119,6 +1119,36 @@ def get_SD_CARD_NAME():
         return "N/A"
 
 
+# How long a used-space reading stays good for. df sits on the status-poll path,
+# hit every few seconds per device, so the control threads cache it this long. A
+# minute is far fresher than the previous behaviour, which was to read it once at
+# construction and never again.
+USED_SPACE_TTL_S = 60
+
+
+def used_space_percent(folder=""):
+    """
+    Percentage of the partition holding a folder that is in use.
+
+    Args:
+        folder (str): A path on the partition of interest.
+
+    Returns:
+        str | None: The percentage without its ``%`` (e.g. ``"67"``), or None when
+        df could not be read.
+
+    Reason: :func:`get_partition_info` returns None on failure, and its callers
+    used to subscript that None straight away — a df that misbehaves would take
+    the control thread down with a TypeError at construction.
+    """
+    info = get_partition_info(folder)
+    try:
+        return str(info["Use%"]).replace("%", "")
+    except (TypeError, KeyError, IndexError):
+        logging.warning("Could not read the used space for %s", folder or "/")
+        return None
+
+
 def get_partition_info(folder=""):
     """
     Returns information about the mounted partitions. If a folder is specified,

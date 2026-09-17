@@ -1157,3 +1157,66 @@ No console errors throughout.
 - `tracking.py:419` does `pi.get_partition_info(...)["Use%"]` and
   `get_partition_info` returns `None` on failure — a `TypeError` in
   `ControlThread.__init__` on a device where `df` misbehaves.
+
+---
+
+# The free-space figure never refreshed
+
+Date: 2026-09-17
+
+## Problem (measured, not inferred)
+
+A user freed space on ETHOSCOPE_025 and it still read 93% full an hour later.
+Comparing the two sources on the production node:
+
+| | |
+|---|---|
+| live `df` on the device (`/device/<id>/machineinfo`) | **67% used, 9.2 GB free** |
+| what the node reports and the icon draws (`used_space`) | **93%** |
+
+The deletion had worked. The reading was frozen.
+
+`used_space` is set in `ControlThread.__init__` (`tracking.py:419`) and nowhere
+else; `_update_info()` — which runs on every status poll — never touched it. A
+`ControlThread` is constructed in exactly two places: `device_listener.py:61`
+(service start) and `:266` (a `start` command). So the figure only ever changed
+when the listener restarted or a new run began, and on a device that is *running*
+it is a snapshot of the moment that run started.
+
+Everything downstream was working correctly and faithfully re-transmitting a
+stale number:
+
+| Link | Interval |
+|---|---|
+| device recomputes `used_space` | **never** (now ≤ 60 s) |
+| node scanner polls `/data/<id>` | 5 s (60 s when unreachable) |
+| browser polls `/device/<id>/data` | 10 s |
+| `/machine/<id>` partitions, `/data/runs/<id>` | live, on request |
+
+`ControlThreadVideoRecording._info` omitted `used_space` altogether, so a
+recording device — the state that fills a card fastest — reported nothing at all
+and drew the grey question-mark icon.
+
+## Fix
+
+- `pi.used_space_percent()` — reads the figure, returns None instead of raising.
+  `get_partition_info()` returns None on failure and all three call sites
+  subscripted it immediately, so a misbehaving `df` was a `TypeError` in
+  `ControlThread.__init__`.
+- `_refresh_used_space()` on both control threads, called from `_update_info()`,
+  cached for `pi.USED_SPACE_TTL_S` (60 s). The TTL keeps `df` off the poll path —
+  info is read every few seconds per device — while bounding staleness to a
+  minute.
+- The video recorder now carries the field at all, and refreshes it outside its
+  `_recorder is None` guard.
+
+**Verified**: 430 device unit tests pass (11 new: the reader's None paths, both
+threads replacing a stale figure, both throttling inside the TTL, and an
+unreadable `df` leaving the last known value alone).
+
+**Takes effect after a fleet update.** Until a device is updated, its figure
+still only moves when its listener restarts or its next run starts — so
+ETHOSCOPE_025 will correct itself when its current run ends. Do not restart
+`ethoscope_listener.service` on a device that is running: it would end the run.
+The low-space warning added in ad12c0f5 reads the disk live, so it shows the true
+figure regardless of firmware, and corrects the icon when it fires.

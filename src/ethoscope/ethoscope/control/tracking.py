@@ -416,12 +416,16 @@ class ControlThread(Thread):
             "id": machine_id,
             "name": name,
             "version": version,
-            "used_space": pi.get_partition_info(ethoscope_dir)["Use%"].replace("%", ""),
+            "used_space": pi.used_space_percent(ethoscope_dir),
             "autostop": False,
             "autostop_at": None,
         }
         self._monit = None
         self._drawer = None  # Initialize drawer to None until monitor starts
+
+        # Kept so the used-space figure can be refreshed later, not just here.
+        self._ethoscope_dir = ethoscope_dir
+        self._used_space_checked_at = time.time()
 
         # Initialize cache directory first
         self._cache_dir = os.path.join(ethoscope_dir, "cache")
@@ -456,9 +460,7 @@ class ControlThread(Thread):
                     "id": machine_id,
                     "name": name,
                     "version": version,
-                    "used_space": pi.get_partition_info(ethoscope_dir)["Use%"].replace(
-                        "%", ""
-                    ),
+                    "used_space": pi.used_space_percent(ethoscope_dir),
                 }
 
         # Final safety check: ensure _info is always a dictionary
@@ -470,9 +472,7 @@ class ControlThread(Thread):
                 "id": machine_id,
                 "name": name,
                 "version": version,
-                "used_space": pi.get_partition_info(ethoscope_dir)["Use%"].replace(
-                    "%", ""
-                ),
+                "used_space": pi.used_space_percent(ethoscope_dir),
             }
 
         # Initialize database info now that _info is fully constructed
@@ -890,11 +890,32 @@ class ControlThread(Thread):
             self._option_dict[key]["class"] = Class
             self._option_dict[key]["kwargs"] = kwargs
 
+    def _refresh_used_space(self):
+        """
+        Re-read the data partition, at most once every pi.USED_SPACE_TTL_S.
+
+        Reason: this figure used to be taken once in __init__ and never again, so
+        the hard-drive icon in the web interface showed whatever was true when the
+        listener last started or the current run began. Freeing space on a device
+        did not move it for days, which made the reading worse than useless. The
+        TTL keeps df off the poll path — info is read every few seconds per
+        device — while bounding the staleness to a minute.
+        """
+        now = time.time()
+        if now - self._used_space_checked_at < pi.USED_SPACE_TTL_S:
+            return
+        self._used_space_checked_at = now
+
+        used = pi.used_space_percent(getattr(self, "_ethoscope_dir", ""))
+        if used is not None:
+            self._info["used_space"] = used
+
     def _update_info(self):
         """
         Updates a dictionary with information that relates to the current status of the machine, ie data linked for instance to data acquisition
         Information that is not related to control and it is not experiment-dependent will come from elsewhere
         """
+        self._refresh_used_space()
 
         if self._monit is None:
             return

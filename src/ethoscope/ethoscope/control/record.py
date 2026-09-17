@@ -17,6 +17,7 @@ import cv2
 
 from ethoscope.control.tracking import ControlThread, ExperimentalInformation
 from ethoscope.hardware.input.cameras import OurPiCameraAsync, V4L2Camera
+from ethoscope.utils import pi
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.description import DescribedObject
 from ethoscope.utils.scheduler import (  # noqa: F401
@@ -626,8 +627,6 @@ class ControlThreadVideoRecording(ControlThread):
 
         # Manage disk space before starting video recording
         try:
-            from ethoscope.utils import pi
-
             space_result = pi.manage_disk_space(ethoscope_dir)
             if space_result.get("cleanup_performed", False):
                 logging.info(
@@ -655,9 +654,14 @@ class ControlThreadVideoRecording(ControlThread):
             "name": name,
             "version": version,
             "experimental_info": {},
+            # Reason: the recorder used to omit this, so a device reported no
+            # used_space at all while recording — the very activity that fills a
+            # card fastest — and the web interface showed a grey question mark.
+            "used_space": pi.used_space_percent(ethoscope_dir),
             "autostop": False,
             "autostop_at": None,
         }
+        self._used_space_checked_at = time.time()
 
         self._init_autostop_state()
         self._parse_user_options(data)
@@ -667,7 +671,22 @@ class ControlThreadVideoRecording(ControlThread):
     def controltype(self):
         return "recording"
 
+    def _refresh_used_space(self):
+        """Re-read the data partition, at most every pi.USED_SPACE_TTL_S."""
+        now = time.time()
+        if now - self._used_space_checked_at < pi.USED_SPACE_TTL_S:
+            return
+        self._used_space_checked_at = now
+
+        used = pi.used_space_percent(self._video_root_dir)
+        if used is not None:
+            self._info["used_space"] = used
+
     def _update_info(self):
+        # Outside the recorder guard below: a device that is recording is exactly
+        # the one whose free space is changing fastest.
+        self._refresh_used_space()
+
         if self._recorder is None:
             return
         self._last_info_t_stamp = time.time()
