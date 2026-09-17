@@ -1220,3 +1220,234 @@ ETHOSCOPE_025 will correct itself when its current run ends. Do not restart
 `ethoscope_listener.service` on a device that is running: it would end the run.
 The low-space warning added in ad12c0f5 reads the disk live, so it shows the true
 figure regardless of firmware, and corrects the icon when it fires.
+
+---
+
+## Bug report: live stream dead on newly built Pi 4B ethoscopes (2026-09-17)
+
+Reported: new Pi 4B ethoscopes never produce a live stream; the Pi 3B one does.
+Button flips to "Stop" (device reports `streaming`), but no video reaches the node.
+Tracking works on the same devices. Node fully updated.
+
+### Reproduction / findings
+
+- [x] Baseline: streaming works end to end on real hardware. ETHOSCOPE_312
+      (Pi 3B, imx219, dev @ 785932ce) streamed 224 JPEG frames in 14 s through
+      `GET /device/<id>/stream`. Device returned to `stopped` cleanly.
+- [x] Synthetic end-to-end (fake camera -> `cameraCaptureThread` MJPEG server ->
+      `EthoscopeStreamManager`) relays frames correctly on current `dev`.
+- [x] **No Pi-model branch exists anywhere in the streaming path.** The only
+      `pi_version()` consumers are `isMachinePI()` and `_tuning_dirs_for_this_pi()`
+      (`_FIRST_PISP_MODEL = 5`, so Pi 3 and Pi 4 take the identical branch).
+      So "Pi 4B" is a property of *when those devices were built*, not of the code.
+- [x] **Reproduced the exact symptom from node/device version skew.** Ran the
+      pre-`2e28b763` device streamer (pickle + `struct.pack("Q")` framing) against
+      the current node relay: the relay blocks forever in its
+      `while b"\r\n\r\n" not in header` loop, swallows the whole stream and yields
+      **zero bytes**. The browser `<img>` never paints; the device is unaware and
+      keeps reporting `streaming`. `2e28b763` (9 Jun 2026) touched only
+      `record.py` + `ethoscope_streaming.py`, which is why tracking is unaffected.
+- [x] **Reproduced the silent-failure defect.** With port 8887 already bound,
+      `cameraCaptureThread.run()` dies on `OSError: [Errno 98]` before the camera
+      loop, yet the recorder still reports `status: streaming`, `error: null`.
+      `ControlThreadVideoRecording.run()` sets the status before `start_recording()`
+      and nothing downstream ever revises it.
+
+### Discovered During Work
+
+- [ ] Node: detect a device whose 8887 response is not an HTTP header and report
+      "device software too old to stream" instead of hanging in the header loop.
+      Bound that loop by bytes and by time.
+- [ ] Device: surface a dead `cameraCaptureThread` in `_info["error"]` / status
+      rather than leaving the device stuck in `streaming`.
+- [ ] `GeneralVideoRecorder.stop()` still closes `self._p.connection`, a leftover
+      of the pickle era; the attribute no longer exists and the call is a no-op
+      inside `try/except`.
+- [ ] Race in `EthoscopeStreamManager._is_socket_healthy()`: it flips the shared
+      socket's timeout to 0 and back while `_streaming_broadcast_loop` is reading
+      the same socket in another thread.
+
+### Follow-up: the reporter's Pi 4s will not boot the August images (2026-09-17)
+
+Root cause found by reading the **published** artefacts, not the repo.
+
+- [x] **`20260819_ethoscope000_pi3_pi4.img.zip` cannot boot a Pi 4.** Its
+      `/boot/firmware/config.txt` still carries the legacy block:
+      `start_file=start_x.elf` + `fixup_file=fixup_x.dat` (+ `gpu_mem=256`,
+      `awb_auto_is_greyworld=1`, `dtparam=camera=on`). `start_x.elf` is Pi 0–3-only
+      firmware, so the Pi 4 stops with error 44 — ACT LED **4 long + 4 short,
+      "unsupported board type"** — exactly what was reported. Neither a second
+      board nor an EEPROM update can help: the firmware reads `config.txt` before
+      userspace exists. Predates the fix in `7608dba6` (26 Aug 2026 18:15).
+      Everything else a Pi 4 needs is present in that image (`start4.elf`,
+      `fixup4.dat`, `bcm2711-rpi-4-b.dtb`, `vc4-kms-v3d.dtbo`, `kernel8.img`), so
+      the `start_file` override is the sole blocker.
+- [x] **`20260826` is correct**: the managed block is `dtoverlay=vc4-kms-v3d` /
+      `gpu_mem=128` / `camera_auto_detect=1`, no `start_file`. Its `config.txt` is
+      stamped 26 Aug 17:05, an hour before the commit. It still carries a stray
+      `config.txt.camtest.bak` holding the old bad block.
+- [x] **The reporter cannot have tested 20260826.** `Last-Modified` on
+      `20260826_ethoscope000_pi3_pi4.img.zip` is **Thu, 17 Sep 2026 11:46 GMT**
+      (today's re-publish after the `/.zerofill` fix); its manifest says
+      `"published": "2026-09-17T11:45:29Z"`. Before today the newest image
+      advertised was 20260819. Both of their attempts were effectively that build.
+
+#### Actions
+
+- [ ] **Retire 20260819**: it is still advertised on the resources page as "for
+      Pi 3 / Pi 4" while bricking Pi 4 boot. `rm
+      /srv/http/ethoscope/images/20260819_ethoscope000_pi3_pi4.img.zip.json` on
+      `ctb.gilest.ro` drops it from the list.
+- [ ] Repair-in-place for anyone already holding a 20260819 card: mount the FAT
+      boot partition on any machine and replace the managed block with the KMS
+      one. No re-flash needed.
+- [ ] `publish-image.sh` should refuse to publish an image whose `config.txt`
+      contains `start_file=` while the name claims `pi4` — the same shape as the
+      existing free-space guard. This shipped because nothing checks the boot
+      partition before upload.
+- [ ] Delete the stray `config.txt.camtest.bak` from the image's boot partition.
+
+### Image hygiene follow-up (2026-09-17)
+
+**One image for both models is possible — 20260826 already is it.** Verified from
+the published artefact: no `start_file` override, and every Pi-4 prerequisite
+present (`start4.elf`, `fixup4.dat`, `bcm2711-rpi-4-b.dtb`, `vc4-kms-v3d.dtbo`,
+`kernel8.img`, `arm_64bit=1`). Firmware auto-picks `start.elf` on Pi 0–3 and
+`start4.elf` on Pi 4. No per-model split is warranted; 20260819 simply predates
+`7608dba6` and should never have been named `pi3_pi4`.
+
+- [x] **Publish-time guard** (`accessories/publish-image.sh`): `check_boot_firmware()`
+      refuses to publish when the name claims pi4+ and `config.txt` pins Pi 0–3-only
+      firmware. Reads the FAT partition with `mtype` (no root), loop-mount fallback.
+      Override with `ETHOSCOPE_PUBLISH_SKIP_BOOT_CHECK=1`.
+      Verified against the real artefacts: 20260819 as `pi3 pi4` → refused naming the
+      offending line; 20260826 as `pi3 pi4` → passes; 20260819 as `pi3` only → passes.
+      `rootfs_offset()` generalised to `partition_offset N` + `bootfs_offset()`.
+      Both checks are skipped for a pre-made `.zip`, now stated in the output.
+
+- [x] **The 20260826 image's checkout is 31 commits behind `dev`.** `/opt/ethoscope`
+      sits at `7608dba6` (26 Aug 18:19, `FETCH_HEAD` confirms `branch 'dev'`);
+      `dev` is now `3ed036af`. Missed in today's re-publish, which only removed
+      `/.zerofill`. No packaging change in those 31 commits (no `pyproject.toml`
+      diff, identical `__init__.py` set), so the editable finder in the image still
+      maps the right packages and the update can skip pip:
+
+      ```
+      sudo ./accessories/ethoscope-image-update.sh --branch dev --no-pip <image>.img
+      ./accessories/publish-image.sh <image>.img          # re-date the name first
+      ```
+
+- [ ] **Retire 20260819 from the server** — still advertised as "for Pi 3 / Pi 4"
+      and still directly downloadable. `rm .../20260819_*.img.zip.json` drops it
+      from the page; remove the `.zip` too, since the direct URL is what people
+      paste to each other.
+
+- [x] Side note for the streaming report: the reporter's devices were on the
+      **20260511** image, which predates `2e28b763` (9 Jun) — so they ran the
+      pickle framing. That closes the first half of the report.
+
+### Image retirement + refresh (2026-09-17, in progress)
+
+- [x] **20260819 retired.** Moved (not deleted) to
+      `ctb.gilest.ro:/srv/http/ethoscope/images/retired/` — both the `.zip` and its
+      manifest. The resources page now lists only 20260826; both direct URLs 404;
+      `/latest_sd_image/pi3` and `/pi4` resolve to 20260826. `links.json` carries no
+      image entry for it, so nothing resurrects it. The bytes are still there if
+      they are ever wanted.
+- [x] Stray `config.txt.camtest.bak` deleted from the master image's boot partition
+      (`mdel`, no root needed — udisks mounts the FAT partition `uid=1000`).
+- [x] Pre-flight on the master image: rootfs clean, 75% free; boot partition had the
+      **FAT dirty bit set**, so the refresh run needs `--fsck` as well.
+- [x] Acceptance checker written:
+      `/tmp/claude-1000/-home-gg-Code-ethoscope-project-ethoscope/84a8ea88-bce1-470f-82af-f000e9c69f4b/scratchpad/verify_image.sh`
+      — identity, checkout vs github `dev`, cross-model boot (no `start_file`,
+      `start4.elf`/`start.elf`/both DTBs/`kernel8.img` present), free space,
+      leftover fill file, both filesystems. Verified it flags all four defects on
+      the un-updated master.
+- [ ] **Needs root** (no sudo password available to the agent):
+      `sudo ./accessories/ethoscope-image.sh --fsck --update --rename --zerofree /home/gg/ethoscope_images/20260826_ethoscope000_pi3_pi4.img`
+      `--update` fetches the URL directly, so the image's `origin`
+      (`git://node.local/ethoscope.git`, unreachable off-site) does not matter.
+      No pip needed: no packaging change between `7608dba6` and `3ed036af`.
+- [ ] Rename the file to match `/etc/sdimagename`, re-run the checker, publish, prune.
+- [ ] Real boot test on a Pi 3 and a Pi 4. QEMU cannot substitute: its `raspi3b`/
+      `raspi4b` machines take `-kernel`/`-dtb` directly and never run `start4.elf`,
+      so the firmware path that broke 20260819 is exactly what it would skip.
+
+#### Refresh completed (2026-09-17)
+
+The first `ethoscope-image.sh` run died on `umount: target is busy` **after** the
+git update and retag had landed, leaving `/dev/loop0p2` mounted read-write on the
+image. The second run then attached a *second* loop device to the same file, so its
+`e2fsck` was repairing a filesystem another mount still held live — which is where
+the bitmap/free-count mismatches came from. Recovery, all without root:
+
+- `udisksctl unmount -b /dev/loop0p2` cleared the stale mount (the loop was
+  autoclear, so it detached itself);
+- `e2fsck -fy "<img>?offset=545259520"` — the ext2fs library takes the offset
+  syntax and the file is user-owned, so no loop device and no sudo;
+- a second `e2fsck -fn` pass confirmed clean with no changes;
+- `zerofree -v "<img>?offset=545259520"` also accepts the offset syntax — 849
+  dirty free blocks zeroed (small, because the August pass had already done the
+  bulk).
+
+**`--fsck`/`--zerofree` never needed root in the first place.** Only the git update
+does, because udisks mounts ext4 root-owned.
+
+- [x] Image renamed to `/home/gg/ethoscope_images/20260917_ethoscope000_pi3_pi4.img`;
+      stale 20260826 `.zip`/`.json` deleted locally.
+- [x] Acceptance checker: **all pass** — retagged to today, checkout `3ed036af` ==
+      github `dev`, no `start_file`, KMS block, `start.elf`+`start4.elf`, both DTBs,
+      `kernel8.img`, 75% free, no leftover, both filesystems clean.
+- [x] Skipping pip confirmed safe on the real artefact: the editable finder maps
+      `ethoscope -> /opt/ethoscope/src/ethoscope/ethoscope` (present, populated),
+      no new package or namespace directories, and **no change under `services/`**
+      between `7608dba6` and `3ed036af`, so the installed units are current.
+- [x] `publish-image.sh --dry-run` on the new image passes both guards, including
+      the new one: "boot: firmware auto-selected (no start_file override) — Pi 4 OK".
+- [ ] Boot test on real hardware, then publish + prune.
+
+#### Boot test PASSED on real Pi 4 hardware (2026-09-17)
+
+Flashed `20260917_ethoscope000_pi3_pi4.img` to SD, booted a Pi 4B. Verified from the
+workstation over mDNS (the Pi is on the local LAN; `node` is reached over the VPN at
+a different site, so it never appears in the node's device list — look for the
+`_ethoscope._tcp` zeroconf record with `avahi-browse -artp` instead).
+
+| check | result |
+|---|---|
+| boots on Pi 4 | **yes** — `pi_version {model_number: 4, model_type: "Model B Rev"}`, kernel `6.18.39+rpt-rpi-v8` |
+| zeroconf | `_ethoscope._tcp` `ETHOSCOPE000-b14bdd6b…` at 192.168.68.130:9000 |
+| checkout | `3ed036af`, dated 2026-09-17 — current `dev` |
+| rootfs expansion | `/` 29G, 25% used, 21G avail (no `/.zerofill` regression) |
+| camera | live detect `imx219` Rotation 180; NoIR tuning **loaded**: `imx219_noir.json` |
+| **streaming** | `HTTP/1.0 200 multipart/x-mixed-replace; boundary=frame`; 195 JPEG frames in 12 s (~16 fps) |
+| frame content | 640x480 greyscale arena image, mean 134.6 / std 37.4, "FPS: 15.0" overlay — inspected visually, correctly exposed and in focus |
+| stop | returns to `stopped`, `error: null` |
+
+That closes the original report end to end: the image boots the model that 20260819
+could not, and a device on current code streams over the new MJPEG protocol.
+
+- [x] Published `20260917_ethoscope000_pi3_pi4.img.zip`
+      (md5 `2c1968d1727e75548b4a4d75c9c59d99`, 2.0G).
+- [x] Moved 20260826 to `images/retired/` after the new one verified remotely.
+      Do **not** use `--prune`: it runs before the upload, so it would delete the
+      only published image and leave a gap. (It does correctly ignore `retired/` —
+      `ls -1 | grep '\.img\.zip$'` matches no directory.)
+- [x] **Pi 3 boot verified on the same card** — `pi_version {model_number: 3}`,
+      same kernel `6.18.39+rpt-rpi-v8`, same checkout `3ed036af`, `/` 29G at 21%.
+      Streaming: correct MJPEG headers, 195 JPEG frames in 12 s, NoIR tuning loaded
+      (`imx219_noir.json`), frame inspected visually — well exposed and in focus.
+      Back to `stopped`, no error. One image, one card, both models: settled on
+      hardware, not inferred.
+
+#### Published and live (2026-09-17)
+
+`https://repo.ethoscope.lab.gilest.ro/images/20260917_ethoscope000_pi3_pi4.img.zip`
+— 2.0G, md5 `2c1968d1727e75548b4a4d75c9c59d99`, remote md5 verified by the
+publisher. The resources page lists it alone; `latest_sd_image/pi3` and `/pi4` both
+resolve to it; both retired images 404. `images/retired/` holds 20260819 and
+20260826 (4.8G) if the bytes are ever wanted — `rm -rf` reclaims it.
+
+Pi 4 powered off over the device API (`POST /controls/<id>/poweroff`) so the card
+could move to a Pi 3; ping and :9000 both confirmed down before reporting it safe.

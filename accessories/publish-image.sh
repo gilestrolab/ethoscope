@@ -35,6 +35,9 @@
 #   ETHOSCOPE_PUBLISH_MIN_FREE_PCT
 #                           refuse to publish an image with less than this much
 #                           of its rootfs free (default 40, 0 disables the check)
+#   ETHOSCOPE_PUBLISH_SKIP_BOOT_CHECK
+#                           set to 1 to publish an image whose boot firmware
+#                           cannot start every Pi model its name claims
 
 set -euo pipefail
 
@@ -44,6 +47,7 @@ REMOTE_DIR="${ETHOSCOPE_PUBLISH_DIR:-/srv/http/ethoscope/images}"
 BASE_URL="${ETHOSCOPE_PUBLISH_URL:-https://repo.ethoscope.lab.gilest.ro/images}"
 RESOURCE_URL="${ETHOSCOPE_RESOURCE_URL:-https://ethoscope-resources.lab.gilest.ro}"
 MIN_FREE_PCT="${ETHOSCOPE_PUBLISH_MIN_FREE_PCT:-40}"
+SKIP_BOOT_CHECK="${ETHOSCOPE_PUBLISH_SKIP_BOOT_CHECK:-0}"
 
 NAME=""
 TITLE=""
@@ -92,19 +96,23 @@ SUDO=""
 
 # --- helpers ----------------------------------------------------------------
 
-# Byte offset of the image's rootfs (partition 2) inside the file.
-rootfs_offset() {
-  local table ss start
-  command -v sfdisk >/dev/null && command -v debugfs >/dev/null || return 1
+# Byte offset of the Nth partition inside the image file.
+partition_offset() {
+  local want="$1" table ss start
+  command -v sfdisk >/dev/null || return 1
   table=$(sfdisk -d "$IMG" 2>/dev/null) || return 1
   ss=$(printf '%s\n' "$table" | awk -F': *' '/^sector-size:/{print $2}')
   [[ -n "$ss" ]] || ss=512
-  # second "start=" line is partition 2, the rootfs
   start=$(printf '%s\n' "$table" \
-          | awk -F'start=' '/start=/{n++; if (n==2) {split($2,a,","); gsub(/[^0-9]/,"",a[1]); print a[1]; exit}}')
+          | awk -F'start=' -v want="$want" \
+                '/start=/{n++; if (n==want) {split($2,a,","); gsub(/[^0-9]/,"",a[1]); print a[1]; exit}}')
   [[ -n "$start" ]] || return 1
   printf '%s' $(( start * ss ))
 }
+
+# Partition 1 is the FAT firmware partition, partition 2 the ext4 rootfs.
+bootfs_offset()  { partition_offset 1; }
+rootfs_offset()  { command -v debugfs >/dev/null || return 1; partition_offset 2; }
 
 # Read a file out of the rootfs without mounting it: e2fsprogs understands the
 # "image?offset=N" syntax, so no root is needed.
@@ -142,6 +150,63 @@ check_rootfs_space() {
       | awk '$6 + 0 > 1073741824 { printf "       leftover to delete: /%s (%.1f GiB)\n", $NF, $6/1073741824 }'
     echo "       Remove it, re-run 'ethoscope-image.sh --zerofree', then publish again"
     echo "       (or set ETHOSCOPE_PUBLISH_MIN_FREE_PCT=0 to override)."
+  } >&2
+  exit 1
+}
+
+# Read a file out of the FAT firmware partition. mtools does it without root;
+# a loop mount is the fallback, as for the rootfs.
+read_from_bootfs() {
+  local path="$1" off loop mnt out
+  off=$(bootfs_offset) || return 1
+  if command -v mtype >/dev/null; then
+    mtype -i "${IMG}@@${off}" "::${path}" 2>/dev/null && return 0
+  fi
+  loop=$($SUDO losetup -fP --show "$IMG" 2>/dev/null) || return 1
+  mnt=$(mktemp -d /tmp/ethoscope-publish.XXXXXX)
+  if $SUDO mount -o ro "${loop}p1" "$mnt" 2>/dev/null; then
+    out=$($SUDO cat "$mnt$path" 2>/dev/null) || true
+    $SUDO umount "$mnt"
+  fi
+  rmdir "$mnt"
+  $SUDO losetup -d "$loop"
+  [[ -n "${out:-}" ]] && printf '%s' "$out"
+}
+
+# Refuse to publish an image whose boot firmware cannot start every Pi model the
+# NAME claims. `start_x.elf` and its siblings are Pi 0-3-only firmware: a
+# `start_file=` override pointing at one stops a Pi 4 dead, green ACT LED
+# flashing 4 long + 4 short ("unsupported board type"), before any userspace
+# exists to correct it. That is how 20260819 shipped as "pi3_pi4" and bricked
+# every Pi 4 it was flashed to. The firmware picks the right file by itself when
+# nothing overrides it, so the only safe cross-model config has no start_file at
+# all - see accessories/configure_pi_camera.sh.
+check_boot_firmware() {
+  local off cfg bad want_pi4=0 m
+  for m in $MODELS; do [[ "${m#pi}" =~ ^[0-9]+$ ]] && (( ${m#pi} >= 4 )) && want_pi4=1; done
+  (( want_pi4 )) || { echo "    boot:      <no pi4+ in the name — not checked>"; return 0; }
+
+  off=$(bootfs_offset) || { echo "    boot:      <partition table unreadable — NOT CHECKED>" >&2; return 0; }
+  cfg=$(read_from_bootfs /config.txt) || cfg=""
+  if [[ -z "$cfg" ]]; then
+    echo "    boot:      <config.txt unreadable — NOT CHECKED, install mtools>" >&2
+    return 0
+  fi
+
+  bad=$(printf '%s\n' "$cfg" | grep -E '^[[:space:]]*start_file=[[:space:]]*start(_x|_cd|_db)?\.elf' || true)
+  if [[ -z "$bad" ]]; then
+    echo "    boot:      firmware auto-selected (no start_file override) — Pi 4 OK"
+    return 0
+  fi
+  {
+    echo "ERROR: this image is named for $(pretty_models "$MODELS") but its config.txt pins"
+    echo "       Pi 0-3-only firmware, so it cannot boot a Pi 4 at all:"
+    printf '         %s\n' "$bad"
+    echo "       A Pi 4 flashes its ACT LED 4 long + 4 short ('unsupported board type')"
+    echo "       and never reaches userspace, so nothing on the card can fix it."
+    echo "       Run accessories/configure_pi_camera.sh against the image's config.txt to"
+    echo "       replace the block with the KMS one, then publish again"
+    echo "       (or set ETHOSCOPE_PUBLISH_SKIP_BOOT_CHECK=1 to override)."
   } >&2
   exit 1
 }
@@ -233,8 +298,10 @@ printf '    date:      %s\n' "$IMG_DATE"
 printf '    target:    %s:%s\n' "$REMOTE_HOST" "$REMOTE_DIR"
 if (( IS_ZIP )); then
   echo "    rootfs:    <pre-made .zip — not checked>"
+  echo "    boot:      <pre-made .zip — not checked>"
 else
   check_rootfs_space
+  (( SKIP_BOOT_CHECK )) || check_boot_firmware
 fi
 
 # --- compress ---------------------------------------------------------------
