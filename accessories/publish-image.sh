@@ -32,6 +32,9 @@
 #   ETHOSCOPE_PUBLISH_HOST  ssh host            (default ctb.gilest.ro)
 #   ETHOSCOPE_PUBLISH_DIR   remote directory    (default /srv/http/ethoscope/images)
 #   ETHOSCOPE_PUBLISH_URL   public base URL     (default https://repo.ethoscope.lab.gilest.ro/images)
+#   ETHOSCOPE_PUBLISH_MIN_FREE_PCT
+#                           refuse to publish an image with less than this much
+#                           of its rootfs free (default 40, 0 disables the check)
 
 set -euo pipefail
 
@@ -40,6 +43,7 @@ REMOTE_HOST="${ETHOSCOPE_PUBLISH_HOST:-ctb.gilest.ro}"
 REMOTE_DIR="${ETHOSCOPE_PUBLISH_DIR:-/srv/http/ethoscope/images}"
 BASE_URL="${ETHOSCOPE_PUBLISH_URL:-https://repo.ethoscope.lab.gilest.ro/images}"
 RESOURCE_URL="${ETHOSCOPE_RESOURCE_URL:-https://ethoscope-resources.lab.gilest.ro}"
+MIN_FREE_PCT="${ETHOSCOPE_PUBLISH_MIN_FREE_PCT:-40}"
 
 NAME=""
 TITLE=""
@@ -52,7 +56,7 @@ DRY_RUN=0
 FORCE_ZIP=0
 IMG=""
 
-usage() { sed -n '2,34p' "$0"; exit "${1:-0}"; }
+usage() { sed -n '2,37p' "$0"; exit "${1:-0}"; }
 
 while (( $# )); do
   case "$1" in
@@ -88,10 +92,9 @@ SUDO=""
 
 # --- helpers ----------------------------------------------------------------
 
-# Read a file out of the image's rootfs (partition 2) without mounting it.
-# e2fsprogs understands the "image?offset=N" syntax, so no root is needed.
-read_from_image() {
-  local path="$1" table ss start off
+# Byte offset of the image's rootfs (partition 2) inside the file.
+rootfs_offset() {
+  local table ss start
   command -v sfdisk >/dev/null && command -v debugfs >/dev/null || return 1
   table=$(sfdisk -d "$IMG" 2>/dev/null) || return 1
   ss=$(printf '%s\n' "$table" | awk -F': *' '/^sector-size:/{print $2}')
@@ -100,8 +103,47 @@ read_from_image() {
   start=$(printf '%s\n' "$table" \
           | awk -F'start=' '/start=/{n++; if (n==2) {split($2,a,","); gsub(/[^0-9]/,"",a[1]); print a[1]; exit}}')
   [[ -n "$start" ]] || return 1
-  off=$(( start * ss ))
+  printf '%s' $(( start * ss ))
+}
+
+# Read a file out of the rootfs without mounting it: e2fsprogs understands the
+# "image?offset=N" syntax, so no root is needed.
+read_from_image() {
+  local path="$1" off
+  off=$(rootfs_offset) || return 1
   debugfs -R "cat $path" "${IMG}?offset=${off}" 2>/dev/null
+}
+
+# Refuse to publish an image whose rootfs is (nearly) full. Such an image is
+# almost always one that kept the fill file of an interrupted
+# `ethoscope-image.sh --zerofree` pass, and nothing downstream gives it away:
+# a file of zeros compresses to nothing, so the .zip is its usual size and its
+# checksum verifies perfectly. The card simply arrives 98% full, with the device
+# deleting data on first boot to make room. One superblock read catches it.
+check_rootfs_space() {
+  local off total free bs pct
+  off=$(rootfs_offset) || { echo "    rootfs:    <partition table unreadable — not checked>"; return 0; }
+  read -r total free bs < <(debugfs -R "stats -h" "${IMG}?offset=${off}" 2>/dev/null | awk -F': *' '
+    /^Block count:/ {t=$2} /^Free blocks:/ {f=$2} /^Block size:/ {b=$2}
+    END {print t, f, b}')
+  if [[ -z "${total:-}" || -z "${free:-}" || -z "${bs:-}" || "$total" -le 0 ]]; then
+    echo "    rootfs:    <superblock unreadable — not checked>"
+    return 0
+  fi
+  pct=$(( 100 * free / total ))
+  printf '    rootfs:    %d MiB free of %d MiB (%d%% free)\n' \
+    $(( free * bs / 1048576 )) $(( total * bs / 1048576 )) "$pct"
+  (( MIN_FREE_PCT > 0 )) || return 0
+  (( pct >= MIN_FREE_PCT )) && return 0
+  {
+    echo "ERROR: only ${pct}% of the rootfs is free (want >= ${MIN_FREE_PCT}%)."
+    echo "       An image this full leaves no room to record — do not publish it."
+    debugfs -R "ls -l /" "${IMG}?offset=${off}" 2>/dev/null \
+      | awk '$6 + 0 > 1073741824 { printf "       leftover to delete: /%s (%.1f GiB)\n", $NF, $6/1073741824 }'
+    echo "       Remove it, re-run 'ethoscope-image.sh --zerofree', then publish again"
+    echo "       (or set ETHOSCOPE_PUBLISH_MIN_FREE_PCT=0 to override)."
+  } >&2
+  exit 1
 }
 
 # Fallback: mount the rootfs read-only under sudo and cat the file.
@@ -189,6 +231,11 @@ printf '    title:     %s\n' "$TITLE"
 printf '    models:    %s\n' "${MODELS:-<none detected>}"
 printf '    date:      %s\n' "$IMG_DATE"
 printf '    target:    %s:%s\n' "$REMOTE_HOST" "$REMOTE_DIR"
+if (( IS_ZIP )); then
+  echo "    rootfs:    <pre-made .zip — not checked>"
+else
+  check_rootfs_space
+fi
 
 # --- compress ---------------------------------------------------------------
 if (( IS_ZIP )); then

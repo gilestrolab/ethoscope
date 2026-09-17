@@ -133,6 +133,19 @@ detach_loop() {
   LOOP=""
 }
 
+report_fs() {
+  # How much of the rootfs is actually free. A near-zero figure means a fill file
+  # was left behind; publish-image.sh refuses to publish such an image.
+  local part="$1" total free bs
+  command -v dumpe2fs >/dev/null || return 0
+  read -r total free bs < <(dumpe2fs -h "$part" 2>/dev/null | awk -F': *' '
+    /^Block count:/ {t=$2} /^Free blocks:/ {f=$2} /^Block size:/ {b=$2}
+    END {print t, f, b}')
+  [[ -n "$total" && -n "$free" && -n "$bs" && "$total" -gt 0 ]] || return 0
+  printf '    rootfs:           %d MiB free of %d MiB (%d%% free)\n' \
+    $(( free * bs / 1048576 )) $(( total * bs / 1048576 )) $(( 100 * free / total ))
+}
+
 # --- operations -------------------------------------------------------------
 op_info() {
   echo "==> Image info"
@@ -154,6 +167,7 @@ op_info() {
   else
     printf '    /opt/ethoscope:   <not a git repo>\n'
   fi
+  report_fs "${LOOP}p2"
 }
 
 op_update() {
@@ -218,15 +232,25 @@ op_zerofree() {
     local mnt
     mnt=$(mktemp -d /tmp/ethoscope-zerofree.XXXXXX)
     mount "$part" "$mnt"
-    # dd stops with ENOSPC once the filesystem is full; that is the success case.
-    dd if=/dev/zero of="$mnt/.zerofill" bs=4M status=none || true
-    sync
+    # Reason: the fill file is unlinked *before* it is written, so the kernel
+    # releases its blocks the moment the fd closes — including when this script
+    # is killed mid-pass. Deleting it after the write instead meant one
+    # interrupted run shipped an image with a 21 GiB /.zerofill still in it:
+    # a file of zeros compresses to nothing, so the .zip looked normal and the
+    # card arrived 98% full.
+    rm -f "$mnt/.zerofill"   # leftover from a run that predates the fix
+    exec 3>"$mnt/.zerofill"
     rm -f "$mnt/.zerofill"
+    # dd stops with ENOSPC once the filesystem is full; that is the success case.
+    dd if=/dev/zero bs=4M status=none >&3 || true
+    sync                     # write the zeros out while the inode still exists
+    exec 3>&-                # closing releases every block again
     sync
     umount "$mnt"
     rmdir "$mnt"
     e2fsck -f -y "$part"
   fi
+  report_fs "$part"
 }
 
 # --- orchestration ----------------------------------------------------------

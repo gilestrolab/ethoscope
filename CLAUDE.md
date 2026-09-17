@@ -568,6 +568,37 @@ command and it resumes. Run it as a normal user (it uses your ssh keys); reading
 image needs no root. Use `--dry-run` to rehearse, `--prune N` to keep only the N newest
 images on the server.
 
+It also refuses, before compressing, to publish an image whose rootfs is less than
+40% free (`ETHOSCOPE_PUBLISH_MIN_FREE_PCT`, 0 disables). The 20260826 image shipped
+with a 21.7 GiB `/.zerofill` left behind by an interrupted `--zerofree` pass, and
+nothing downstream showed it: a file of zeros compresses to nothing, so the `.zip`
+was its usual 2.0 GB and its checksum was valid — the card just arrived 98% full.
+The fill pass now unlinks the file *before* writing it, so the kernel reclaims the
+blocks even if the run is killed.
+
+To inspect a published image without root — or without downloading all 30 GB, since
+the zeros stream fast:
+
+```bash
+curl -s https://repo.ethoscope.lab.gilest.ro/images/<name>.img.zip | funzip \
+  | dd bs=1M iflag=fullblock,skip_bytes,count_bytes skip=$((520*1024*1024)) \
+        count=$((1600*1024*1024)) of=head.bin
+truncate -s 30912020480 head.bin          # partition 2 is 520 MiB into the image
+debugfs -c -R "stats -h" head.bin | grep -E 'Block count|Free blocks'
+debugfs -c -R "ls -l /"    head.bin       # names any leftover fill file
+```
+
+On a local `.img`, `debugfs`/`e2fsck` take the offset directly
+(`"image?offset=545259520"`), so a leftover can be removed and the counters repaired
+without mounting anything:
+
+```bash
+debugfs -w -R "rm /.zerofill" "image.img?offset=545259520"
+e2fsck -fy "image.img?offset=545259520"
+```
+
+The freed blocks are already zeros, so the image needs no second `--zerofree` pass.
+
 ### Updating an image's checkout on its own
 
 `accessories/ethoscope-image-update.sh` does step one on its own, and lets you pick

@@ -995,3 +995,70 @@ assertion 25 -> 23.
 **Not verified**: nothing has run against a real ethoscope, because the two device
 routes only exist once devices are updated. On a device that is still on old firmware
 the modal says so.
+
+---
+
+# SD image shipped 98% full — `/.zerofill` left inside `20260826`
+
+Date: 2026-09-17
+
+## Diagnosis (confirmed, reproduced from the published zip)
+
+A user reported a freshly burnt card showing 27 G used of 29 G, after expanding the
+filesystem. The card is fine; **the published image is not**.
+
+`20260826_ethoscope000_pi3_pi4.img` contains `/.zerofill`, 23,293,067,264 bytes
+(21.7 GiB), dated 26 Aug 19:09 — the fill file of an interrupted
+`ethoscope-image.sh --zerofree` fill-and-delete pass (the fallback used when the
+`zerofree` binary is absent). The `rm` never ran.
+
+| image | rootfs total | free | leftover |
+|---|---|---|---|
+| `20260819` | 28.71 GiB | 23.0 GiB | — |
+| `20260826` | 28.71 GiB | **0.02 GiB** | `/.zerofill` 21.7 GiB |
+
+Undetectable downstream: a file of zeros compresses to nothing, so the `.zip` came out
+at 2.0 GB (*smaller* than the previous week's 2.8 GB) and its md5 verified. Expanding
+the filesystem is also a no-op — the image ships a 29400 M filesystem by design.
+
+The device's own cleanup (`pi.py:1360`) cannot help: it only prunes `/ethoscope_data`,
+so on such a card it fires forever and will delete real experiments once any are older
+than 60 days.
+
+## Tasks
+
+- [x] Reproduce from the published artefact, not from a card (stream the zip, read the
+      ext4 superblock)
+- [x] Confirm `20260819` is clean, so it is a safe rollback target
+- [x] Make the fill pass crash-safe (`accessories/ethoscope-image.sh:242`)
+- [x] Refuse to publish a near-full image (`accessories/publish-image.sh:122`)
+- [x] Report rootfs free space in `--info`
+- [x] Repair the local source image and verify it
+- [x] Document in `CLAUDE.md`
+- [ ] Upload the repaired image (blocked for the agent by the sandbox classifier — the
+      `.zip` and manifest are built and waiting in `/home/gg/ethoscope_images/`)
+
+## Review (2026-09-17)
+
+**Fix 1 — crash-safe zeroing.** The fill file is now unlinked *before* it is written,
+so the kernel reclaims its blocks whenever the writer dies; the `sync` happens while
+the fd is still open, so the zeros still reach the disk. A stale `/.zerofill` from a
+pre-fix run is removed on the way in.
+
+**Fix 2 — publish guard.** `check_rootfs_space()` reads the superblock through
+`debugfs "image?offset=N"` (no root, no mount) before compressing and aborts below 40%
+free (`ETHOSCOPE_PUBLISH_MIN_FREE_PCT`, 0 disables), naming any file over 1 GiB in `/`.
+The partition-offset logic was factored out of `read_from_image` into `rootfs_offset`.
+
+**Verified**:
+- guard refuses a deliberately-full test image (`5% free`, exit 1) and passes a healthy
+  one; its leftover detector names `/.zerofill (21.7 GiB)` on the real broken image
+- unlink-before-write holds 800 MiB while writing, leaves no directory entry, and
+  releases every byte when the writer is killed
+- repaired source image: `e2fsck` clean with no corrections, 21.7 GiB free,
+  `/etc/sdimagename` and the `/opt/ethoscope` checkout intact
+- guard on the repaired image: `22230 MiB free of 29400 MiB (75% free)`
+- both scripts pass `bash -n`
+
+**Field fix**, for cards already burnt from this image: `sudo rm /.zerofill`. No
+re-burn, no data loss.
