@@ -1213,26 +1213,11 @@
                                         <input ng-if="arg.type == 'str'" id="input-{{arg.name}}" type=text name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]">
 
 
-                                        <div ng-if="arg.type == 'boolean' && arg.name != 'expand_rootfs'" style="display: flex; align-items: center; justify-content: space-between;">
+                                        <div ng-if="arg.type == 'boolean'" style="display: flex; align-items: center; justify-content: space-between;">
                                             <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}} <i ng-if="arg.requires_reboot" class="fa fa-refresh" style="color: #ff6b35; margin-left: 5px;" title="Requires reboot to take effect"></i></label>
                                             <label class="switch" style="margin: 0;">
                                                 <input id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]"><span class="slider"></span>
                                             </label>
-                                        </div>
-
-                                        <!-- Special handling for expand_rootfs checkbox -->
-                                        <div ng-if="arg.name == 'expand_rootfs'">
-                                            <div style="display: flex; align-items: center; justify-content: space-between;">
-                                                <label for="input-{{arg.name}}" class="switchlabel" style="margin: 0; flex: 1;">{{arg.description}}</label>
-                                                <label class="switch" style="margin: 0;">
-                                                    <input id="input-{{arg.name}}" type="checkbox" name={{arg.name}} ng-model="selected_options.update_machine[name]['arguments'][arg.name]">
-                                                    <span class="slider"></span>
-                                                </label>
-                                            </div>
-                                            <div class="alert alert-warning" style="margin-top: 10px; font-size: 12px; padding: 8px;">
-                                                <i class="fa fa-exclamation-triangle"></i>
-                                                <strong>Warning:</strong> Expands filesystem to use full SD card space. Reboot required.
-                                            </div>
                                         </div>
                                     </li>
                                 </ul>
@@ -1244,7 +1229,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal" ng-if="device.status == 'stopped'">Cancel</button>
-                <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.update_machine(selected_options.update_machine)" data-toggle="modal">Update</button>
+                <button type="button" class="btn btn-primary" ng-if="device.status == 'stopped'" ng-click="ethoscope.update_machine(selected_options.update_machine)" data-toggle="modal">{{ ethoscope.machine_update_needs_reboot(selected_options.update_machine) ? 'Update and Reboot' : 'Update' }}</button>
             </div>
         </div>
     </div>

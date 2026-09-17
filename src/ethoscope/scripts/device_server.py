@@ -1039,8 +1039,26 @@ def user_options(id):
                             "type": "boolean",
                             "name": "expand_rootfs",
                             "description": "Expand root filesystem to use full SD card space",
-                            "default": False,
+                            # On by default for a device still called ETHOSCOPE_000,
+                            # i.e. one straight off the image that has never been
+                            # given a number. Expanding is the one thing every new
+                            # device needs and the one thing nobody remembers to
+                            # tick, and the reboot it asks for is the same reboot
+                            # the rename already needs. Once the device has a
+                            # number the toggle goes back to being opt-in, so a
+                            # later settings change never re-runs it unasked.
+                            # pi.expand_rootfs() is a no-op when the root partition
+                            # already fills the disk, so leaving it on costs
+                            # nothing on a card that was expanded by other means.
+                            "default": machine_info["machine-number"] == 0,
                             "requires_reboot": True,
+                            # This one asks the device to DO something rather than
+                            # describing a state it holds, so its default is a
+                            # recommendation, not the current setting. The node uses
+                            # the distinction to work out whether the pending edit
+                            # needs a reboot: a state counts once it differs from the
+                            # default, an action counts whenever it is on.
+                            "is_action": True,
                         },
                         {
                             "type": "boolean",

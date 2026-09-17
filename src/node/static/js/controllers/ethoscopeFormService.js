@@ -101,6 +101,54 @@
             },
 
             /**
+             * Would submitting this form need the device rebooted to take effect?
+             *
+             * Reads the pending values against the descriptors the device served,
+             * so the answer is the same whether it is asked to label the submit
+             * button or to decide what to do once the POST comes back.
+             *
+             * @param {Object} options - Raw options data from the device, as
+             *   $scope.user_options[optionType].
+             * @param {Object} selected - The payload about to be submitted, as
+             *   $scope.selected_options[optionType].
+             * @returns {boolean} True if any argument marked requires_reboot is
+             *   actually pending.
+             */
+            requiresReboot: function(options, selected) {
+                if (!options || !selected) return false;
+
+                return Object.keys(options).some(function(group) {
+                    var chosen = selected[group];
+                    if (!chosen) return false;
+
+                    var candidates = options[group] || [];
+                    var opt = null;
+                    for (var i = 0; i < candidates.length; i++) {
+                        if (candidates[i].name === chosen.name) {
+                            opt = candidates[i];
+                            break;
+                        }
+                    }
+                    if (!opt) return false;
+
+                    return (opt.arguments || []).some(function(arg) {
+                        if (!arg.requires_reboot) return false;
+                        var value = (chosen.arguments || {})[arg.name];
+
+                        // An argument flagged is_action asks the device to DO
+                        // something, so its default is a recommendation and not the
+                        // state the device holds: it is pending whenever it is on.
+                        // Every other argument describes a state, and is pending
+                        // only once the user has actually moved it - otherwise a
+                        // device that merely has remote logging enabled would offer
+                        // to reboot on every visit to the settings dialog.
+                        if (arg.is_action) return !!value;
+                        return String(value) !== String(arg.default);
+                    });
+                });
+            },
+
+            /**
              * Initialize form options with default values
              * @param {string} optionType - Type of options (tracking, recording, update_machine)
              * @param {Object} data - Raw options data from server

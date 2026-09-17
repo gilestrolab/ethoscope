@@ -1599,9 +1599,29 @@
         // ===========================
 
         /**
+         * Does this machine-settings payload need a reboot to take effect?
+         *
+         * Labels the settings dialog's submit button, which is also what tells the
+         * user that pressing it will reboot the device.
+         *
+         * @param {Object} option Machine options as filled in the form.
+         * @returns {boolean} True when a pending argument is marked requires_reboot.
+         */
+        $scope.ethoscope.machine_update_needs_reboot = function(option) {
+            return ethoscopeFormService.requiresReboot(
+                ($scope.user_options || {}).update_machine, option);
+        };
+
+        /**
          * Update machine settings
+         *
+         * @param {Object} option Machine options as filled in the form.
          */
         $scope.ethoscope.update_machine = function(option) {
+            // Asked of the same payload the button was labelled from, so what
+            // happens cannot disagree with what the button said it would do.
+            var needs_reboot = $scope.ethoscope.machine_update_needs_reboot(option);
+
             $("#changeInfo").modal('hide');
             $http.post('/device/' + device_id + '/machineinfo', option)
                 .then(function(response) {
@@ -1610,7 +1630,14 @@
                     // Immediately refresh device data to show updated time/settings
                     refreshDeviceStatus();
 
-                    if (response.data.haschanged) {
+                    if (!response.data.haschanged) return;
+
+                    if (needs_reboot) {
+                        // Told before it is asked for: alert() blocks the tab, and
+                        // the reboot request would sit in the queue behind it.
+                        $scope.ethoscope.alert("Settings updated. The ethoscope will now reboot and be back shortly.");
+                        $scope.ethoscope.reboot(true);
+                    } else {
                         $scope.ethoscope.alert("Some settings have changed. Please REBOOT your ethoscope now.");
                     }
                 })
@@ -1635,13 +1662,17 @@
 
         /**
          * Reboot the ethoscope device
+         *
+         * @param {boolean} [stay] Keep this page open. Options -> Reboot leaves,
+         *   because there is nothing left to look at; the settings dialog reboots
+         *   as the second half of "Update and Reboot" and still has to report back.
          */
-        $scope.ethoscope.reboot = function() {
+        $scope.ethoscope.reboot = function(stay) {
             console.log("Rebooting ethoscope");
             $http.post('/device/' + device_id + '/controls/reboot', {})
                 .then(function(response) {
                     $scope.device = response.data;
-                    window.close();
+                    if (!stay) window.close();
                 })
                 .catch(function(error) {
                     console.error('Failed to reboot:', error);
