@@ -18,7 +18,7 @@ from ethoscope.control.record import ControlThreadVideoRecording
 from ethoscope.control.tracking import ControlThread
 from ethoscope.hardware.interfaces import interfaces
 from ethoscope.io.cache import DatabasesInfo
-from ethoscope.utils import pi
+from ethoscope.utils import pi, storage
 
 try:
     from cheroot.wsgi import Server as WSGIServer  # noqa: F401
@@ -43,6 +43,8 @@ update_machine_json_data = {}
 /data/databases/<id>                    GET     get a comprehensive list of available databases on the machine and their statuses
 /data/listfiles/<category>/<id>         GET     provides a list of files in the ethoscope data folders, that were either uploaded or generated (masks, videos, etc).
 /data/log/<id>                          GET     fetch the journalctl log
+/data/runs/<id>                         GET     list the run directories under results/ and videos/ with per-file size and mtime, plus disk usage
+/data/runs/<id>/remove                  POST    delete run directories the node has verified as backed up; refused unless the device is stopped
 
 /machine/<id>                           GET     information about the ethoscope that is not changing in time such as hardware specs and configuration parameters
 /module/<id>                            GET
@@ -749,6 +751,49 @@ def databases_info(id):
     return DB_INFO.get_databases_info()
 
 
+@api.get("/data/runs/<id>")
+@error_decorator
+def list_run_data(id):
+    """
+    Lists the run directories under results/ and videos/ with the size and mtime of
+    every file, so the node can check each one against its own rsync copy, plus the
+    usage of the partition holding the data.
+    """
+    if id != _MACHINE_ID:
+        raise WrongMachineID
+
+    listing = storage.list_runs(_DATA_ROOTS)
+    listing["disk"] = pi.get_partition_info(_ETHOSCOPE_DIR)
+    return listing
+
+
+@api.post("/data/runs/<id>/remove")
+@error_decorator
+def remove_run_data(id):
+    """
+    Deletes the run directories named in the JSON body ``{"runs": [...]}``.
+
+    The node only asks for runs it has verified as backed up; this end keeps the
+    device safe regardless: nothing is deleted unless the device is stopped, the run
+    holding the database in use is refused, and every path must be a well-formed run
+    directory under results/ or videos/ (see ``ethoscope.utils.storage``).
+    """
+    if id != _MACHINE_ID:
+        raise WrongMachineID
+
+    info = send_command("info")
+    status = info.get("status") if isinstance(info, dict) else "unreachable"
+    if status != "stopped":
+        return {"error": f"Refusing to delete data while the device is {status}"}
+
+    data = bottle.request.json or {}
+    result = storage.remove_runs(
+        data.get("runs", []), _DATA_ROOTS, protected=[info.get("sqlite_source_path")]
+    )
+    result["disk"] = pi.get_partition_info(_ETHOSCOPE_DIR)
+    return result
+
+
 def _inject_roi_template_options(tracking_options):
     """
     Inject ROI template dropdown options into FileBasedROIBuilder options.
@@ -1133,6 +1178,8 @@ if __name__ == "__main__":
     _ETHOSCOPE_VIDEOS_DIR = os.path.join(_ETHOSCOPE_DIR, "videos")
     _ETHOSCOPE_TRACKING_DIR = os.path.join(_ETHOSCOPE_DIR, "results")
     _ETHOSCOPE_CACHE_DIR = os.path.join(_ETHOSCOPE_DIR, "cache")
+    # The two trees that hold run directories; see ethoscope.utils.storage.
+    _DATA_ROOTS = {"results": _ETHOSCOPE_TRACKING_DIR, "videos": _ETHOSCOPE_VIDEOS_DIR}
 
     if not listenerIsAlive():
         logging.error(

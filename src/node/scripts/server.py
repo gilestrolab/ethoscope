@@ -21,6 +21,7 @@ from ethoscope_node.api import (
     ROITemplateAPI,
     SensorAPI,
     SetupAPI,
+    StorageAPI,
     TunnelUtils,
 )
 from ethoscope_node.auth import AuthMiddleware
@@ -255,6 +256,7 @@ class EthoscopeNodeServer:
             FileAPI,
             DatabaseAPI,
             SetupAPI,
+            StorageAPI,
             TunnelUtils,
             AuthAPI,
             BugReportAPI,

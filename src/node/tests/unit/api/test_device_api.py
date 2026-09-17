@@ -63,7 +63,7 @@ class TestDeviceAPI(unittest.TestCase):
         self.api.register_routes()
 
         # Should register 25 routes (including firmware status and update)
-        self.assertEqual(len(route_calls), 25)
+        self.assertEqual(len(route_calls), 23)
 
         # Check specific routes
         paths = [call[0] for call in route_calls]
@@ -82,7 +82,6 @@ class TestDeviceAPI(unittest.TestCase):
         self.assertIn("/device/<id>/dbg_img", paths)
         self.assertIn("/device/<id>/stream", paths)
         self.assertIn("/device/<id>/backup", paths)
-        self.assertIn("/device/<id>/dumpSQLdb", paths)
         self.assertIn("/device/<id>/retire", paths)
         self.assertIn("/device/<id>/controls/<instruction>", paths)
         self.assertIn("/device/<id>/log", paths)
@@ -539,84 +538,6 @@ class TestDeviceAPI(unittest.TestCase):
         mock_get_backup_info.assert_called_once_with(
             "device1", {"db1": {"status": "active"}}, "/ethoscope_data"
         )
-
-    @patch("ethoscope_node.backup.helpers.get_device_backup_info")
-    @patch("ethoscope_node.backup.helpers.BackupClass")
-    def test_force_device_backup_success(self, mock_backup_class, mock_get_backup_info):
-        """Test forcing device backup successfully."""
-        mock_device = Mock()
-        mock_device.info.return_value = {"id": "device1", "name": "test"}
-        self.api.device_scanner.get_device.return_value = mock_device
-
-        # Mock backup info detection
-        mock_get_backup_info.return_value = {"recommended_backup_type": "mysql"}
-
-        # Mock backup job
-        mock_backup_job = Mock()
-        mock_backup_job.backup.return_value = [
-            json.dumps({"status": "running"}),
-            json.dumps({"status": "success"}),
-        ]
-        mock_backup_class.return_value = mock_backup_job
-
-        result = self.api._force_device_backup("device1")
-
-        self.assertTrue(result["success"])
-        mock_backup_class.assert_called_once()
-
-    @patch("ethoscope_node.backup.helpers.get_device_backup_info")
-    @patch("ethoscope_node.backup.helpers.BackupClass")
-    def test_force_device_backup_failure(self, mock_backup_class, mock_get_backup_info):
-        """Test forcing device backup with failure."""
-        mock_device = Mock()
-        mock_device.info.return_value = {"id": "device1", "name": "test"}
-        self.api.device_scanner.get_device.return_value = mock_device
-
-        # Mock backup info detection
-        mock_get_backup_info.return_value = {"recommended_backup_type": "mysql"}
-
-        # Mock backup job that fails
-        mock_backup_job = Mock()
-        mock_backup_job.backup.return_value = [
-            json.dumps({"status": "running"}),
-            json.dumps({"status": "error", "message": "Backup failed"}),
-        ]
-        mock_backup_class.return_value = mock_backup_job
-
-        result = self.api._force_device_backup("device1")
-
-        self.assertFalse(result["success"])
-
-    @patch("ethoscope_node.backup.helpers.get_device_backup_info")
-    @patch("ethoscope_node.backup.helpers.BackupClass")
-    def test_force_device_backup_exception(
-        self, mock_backup_class, mock_get_backup_info
-    ):
-        """Test forcing device backup handles exceptions."""
-        mock_device = Mock()
-        mock_device.info.return_value = {"id": "device1", "name": "test"}
-        self.api.device_scanner.get_device.return_value = mock_device
-
-        # Mock backup info detection
-        mock_get_backup_info.return_value = {"recommended_backup_type": "mysql"}
-
-        mock_backup_class.side_effect = Exception("Backup error")
-
-        result = self.api._force_device_backup("device1")
-
-        # error_decorator catches and returns error dict
-        self.assertIn("error", result)
-
-    def test_device_local_dump(self):
-        """Test requesting device to perform local SQL dump."""
-        mock_device = Mock()
-        mock_device.dump_sql_db.return_value = {"success": True}
-        self.api.device_scanner.get_device.return_value = mock_device
-
-        result = self.api._device_local_dump("device1")
-
-        self.assertTrue(result["success"])
-        mock_device.dump_sql_db.assert_called_once()
 
     def test_retire_device(self):
         """Test retiring a device."""

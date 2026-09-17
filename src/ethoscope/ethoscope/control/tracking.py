@@ -210,7 +210,6 @@ class ControlThread(Thread):
     Note: Options are passed and shown only if the remote class contains a "_description" field!
     """
 
-    _auto_SQL_backup_at_stop = False
     LIGHT_SCHEDULE_FILE = "/run/ethoscope/light_schedule.json"
 
     # How often the autostop supervisor compares the clock against its target.
@@ -1937,11 +1936,6 @@ class ControlThread(Thread):
             if self._monit is not None:
                 self._monit.stop()
                 self._monit = None
-
-                if self._auto_SQL_backup_at_stop:
-                    logging.info("Performing a SQL dump of the database.")
-                    t = Thread(target=pi.SQL_dump)
-                    t.start()
 
             self._info["status"] = "stopped"
             self._info["time"] = time.time()

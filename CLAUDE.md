@@ -313,6 +313,50 @@ ssh-copy-id -i /ethoscope_data/config/keys/id_rsa.pub ethoscope@<device-ip>
 3. Verify SSH daemon is running on ethoscope
 4. Check firewall rules if applicable
 
+## Freeing space on a device
+
+Options -> **Free up space** on the ethoscope page deletes experiments from a device's
+`/ethoscope_data` once the node holds them. Devices fill their card long before anyone
+notices, and the only alternative was an ssh session.
+
+The node cannot look up whether a file is backed up: nothing records that. What it has
+is the rsync copy, so it applies rsync's own test. A run directory
+(`<results|videos>/<machine_id>/<NAME>/<date_time>/`) is deletable when every file in
+it exists on the node with the same size and mtime, give or take two seconds. rsync
+preserves mtime (`-t`), so a clock adrift on the Pi never enters into it.
+
+Two files break the pattern and are handled explicitly:
+
+- `*.db-wal` / `*.db-shm` / `*.db-journal` are excluded from the backup, so their
+  absence on the node proves nothing. But a **non-empty** write-ahead log holds
+  committed rows the copied `.db` does not have, so such a run is held back. If one
+  never clears, the run needs a `PRAGMA wal_checkpoint(TRUNCATE)` on the device.
+- a missing `.h264` is accepted when the node's copy of that run holds a settled
+  `.mp4` (no `.tmp` sibling, untouched for ten minutes), because
+  `accessories/h264_to_mp4.py --purge` deletes the node's chunks after merging them.
+
+Checksums are deliberately not used: the backup does not use them either, and hashing
+multi-gigabyte files off an SD card costs minutes per run.
+
+The work is split so that neither side has to trust the other:
+
+| Where | What |
+|---|---|
+| `src/ethoscope/ethoscope/utils/storage.py` | lists runs with per-file size/mtime; validates and deletes a run directory |
+| `GET /data/runs/<id>` | the listing, plus `df` for the data partition |
+| `POST /data/runs/<id>/remove` | deletes; refuses unless the device is stopped, refuses the run holding the live database, refuses any path that is not a run directory under `results/` or `videos/` |
+| `src/node/ethoscope_node/utils/device_storage.py` | `classify_run()` — the backed-up rule above |
+| `src/node/ethoscope_node/api/storage_api.py` | `GET /device/<id>/storage`, `POST /device/<id>/storage/purge` |
+
+The purge endpoint never forwards the browser's list as given: it re-lists the device,
+keeps only the paths still present and still verified, and sends those. The device
+validates them again. A device too old to serve `/data/runs` makes the modal say so
+rather than failing obscurely.
+
+Note that deleted runs still appear in the device's `databases_info` (its cache under
+`/ethoscope_data/cache` is the run ledger and is left alone); they report
+`file_exists: false`, shown in the backup panel as "Not on device".
+
 ## Updating the platform from the command line
 
 `accessories/update_platform.py` is the CLI equivalent of the web updater. It drives
@@ -523,6 +567,35 @@ manifest lands last, an interrupted upload is never advertised — just re-run t
 command and it resumes. Run it as a normal user (it uses your ssh keys); reading the
 image needs no root. Use `--dry-run` to rehearse, `--prune N` to keep only the N newest
 images on the server.
+
+### Updating an image's checkout on its own
+
+`accessories/ethoscope-image-update.sh` does step one on its own, and lets you pick
+the branch — `ethoscope-image.sh --update` is hardcoded to `dev`:
+
+```bash
+sudo ./accessories/ethoscope-image-update.sh --branch dev /path/to/ethoscope.img
+sudo ./accessories/ethoscope-image-update.sh -n /path/to/ethoscope.img   # dry run
+./accessories/ethoscope-image-update.sh --list-branches                 # no image needed
+```
+
+It loop-mounts the image and bind-mounts `/dev`, `/proc`, `/sys` and `/run` into it,
+so the rootfs is a working chroot. It fetches through whichever named remote in the
+image already points at the upstream URL (`github` on current images) rather than
+`origin`, which on a device is its node's bare repo at `git://node.local/ethoscope.git`
+and unreachable from a workstation.
+
+Where the host can execute the image's binaries — same architecture, or qemu-user with
+a registered binfmt handler — it then re-runs the editable installs exactly as
+`updater.create_python_egg()` does on a device. From an x86_64 workstation against an
+aarch64 image it cannot, and says so; if the update also changed the set of Python
+packages it warns, because the editable finder written into the image still maps the
+old set and new sub-packages will not import until pip is re-run on the device.
+
+Other flags: `--root DIR` (work on an already-mounted rootfs), `--no-pip`, `--shell`
+(drop into the image), `--keep-mounted`, `--remote URL`.
+
+**Location**: `accessories/ethoscope-image-update.sh`
 
 ### Where things live
 

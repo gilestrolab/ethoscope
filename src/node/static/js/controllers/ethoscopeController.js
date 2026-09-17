@@ -7,7 +7,7 @@
      * Ethoscope Controller - Controls individual ethoscope device interface
      * Manages tracking, recording, machine settings, and real-time updates
      */
-    app.controller('ethoscopeController', function($scope, $http, $routeParams, $interval, ethoscopeBackupService, ethoscopeFormService) {
+    app.controller('ethoscopeController', function($scope, $http, $routeParams, $interval, ethoscopeBackupService, ethoscopeFormService, ethoscopeStorageService) {
 
         // ===========================
         // INITIALIZATION & VARIABLES
@@ -755,7 +755,9 @@
             if (dbInfo.file_exists === true) {
                 return 'Backed Up';
             } else if (dbInfo.file_exists === false) {
-                return 'Missing';
+                // The database is no longer on the ethoscope (deleted to free space);
+                // the node's backup copy is what the rest of the page reports on.
+                return 'Not on device';
             } else if (dbInfo.db_status === 'tracking') {
                 return 'In Progress';
             } else {
@@ -1618,110 +1620,47 @@
         // MAINTENANCE FUNCTIONS
         // ===========================
 
-        // Backup configuration state
-        $scope.backupConfig = {
-            type: 'none',
-            backupDatabases: true,
-            backupVideos: false,
-            loading: false
-        };
-        $scope.backupInProgress = false;
-        $scope.backupComplete = false;
-        $scope.backupError = null;
-        $scope.backupProgress = { message: '', percent: 0 };
-
         /**
-         * Initialize backup modal - detect backup type.
-         * Called when backup modal is opened.
+         * Free up space: list the device's runs and delete the backed-up ones.
+         *
+         * All the logic lives in ethoscopeStorageService; the node decides which runs
+         * are safe to delete, so the checkboxes only mirror what it reports.
          */
-        $scope.ethoscope.backup = function() {
-            // Reset state
-            $scope.backupInProgress = false;
-            $scope.backupComplete = false;
-            $scope.backupError = null;
-            $scope.backupProgress = { message: '', percent: 0 };
-            $scope.backupConfig = {
-                type: 'none',
-                backupDatabases: true,
-                backupVideos: false,
-                loading: true
-            };
+        $scope.storage = {step: 'loading', runs: [], selected: {}};
 
-            // Fetch backup info to detect type
-            $http.get('/device/' + device_id + '/backup')
-                .then(function(response) {
-                    $scope.backupConfig = {
-                        type: response.data.recommended_backup_type || 'none',
-                        backupDatabases: true,
-                        backupVideos: false,
-                        loading: false
-                    };
-                })
-                .catch(function(error) {
-                    console.error('Failed to get backup info:', error);
-                    $scope.backupConfig = {
-                        type: 'none',
-                        backupDatabases: true,
-                        backupVideos: false,
-                        loading: false
-                    };
-                });
+        $scope.ethoscope.loadStorage = function() {
+            ethoscopeStorageService.load(device_id, $scope);
         };
 
-        /**
-         * Execute backup with selected options.
-         * Called when Start Backup button is clicked.
-         */
-        $scope.ethoscope.startBackup = function() {
-            $scope.backupInProgress = true;
-            $scope.backupComplete = false;
-            $scope.backupError = null;
-            $scope.backupProgress = { message: 'Initiating backup...', percent: 10 };
+        $scope.storageToggleAll = function(select) {
+            ethoscopeStorageService.toggleAll($scope, select);
+        };
 
-            $http.post('/device/' + device_id + '/backup', {
-                backup_databases: $scope.backupConfig.backupDatabases,
-                backup_videos: $scope.backupConfig.backupVideos
-            })
-            .then(function(response) {
-                if (response.data.success) {
-                    $scope.backupComplete = true;
-                    $scope.backupProgress.message = 'Backup completed!';
-                    $scope.backupProgress.percent = 100;
-                } else {
-                    $scope.backupError = response.data.error || 'Backup failed';
-                }
-                $scope.backupInProgress = false;
-            })
-            .catch(function(error) {
-                console.error('Backup error:', error);
-                $scope.backupError = 'Network error during backup';
-                $scope.backupInProgress = false;
+        $scope.storageSelectedCount = function() {
+            return ethoscopeStorageService.selectedPaths($scope).length;
+        };
+
+        $scope.storageSelectedSize = function() {
+            return ethoscopeStorageService.humanBytes(
+                ethoscopeStorageService.selectedBytes($scope));
+        };
+
+        $scope.storageHuman = function(bytes) {
+            return ethoscopeStorageService.humanBytes(bytes);
+        };
+
+        $scope.storageUsedPercent = function() {
+            return ethoscopeStorageService.usedPercent($scope.storage);
+        };
+
+        $scope.ethoscope.purgeStorage = function() {
+            var purge = ethoscopeStorageService.purge(device_id, $scope);
+            if (!purge) { return; }
+            purge.then(function() {
+                // Reason: the hard-drive icon comes from the device info poll, so ask
+                // for a fresh one rather than leaving the pre-deletion figure on screen.
+                loadDeviceData();
             });
-        };
-
-        /**
-         * Dump SQL database with progress tracking
-         */
-        $scope.ethoscope.SQLdump = function() {
-            function checkDumpStatus() {
-                $http.get('/device/' + device_id + '/dumpSQLdb')
-                    .then(function(response) {
-                        $scope.SQLdumpStatus = response.data.Status;
-                        $scope.SQLdumpStarted = response.data.Started;
-                    })
-                    .catch(function(error) {
-                        console.error('Failed to check SQL dump status:', error);
-                    });
-            }
-
-            // Poll dump status every 2 seconds until finished
-            var timer = setInterval(function() {
-                if ($scope.SQLdumpStatus !== 'Finished') {
-                    checkDumpStatus();
-                } else {
-                    clearInterval(timer);
-                }
-            }, 2000);
         };
 
         /**

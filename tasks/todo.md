@@ -932,3 +932,66 @@ it was safe too.
 
 Not verified on hardware: needs a device to confirm a 16-ROI grid now builds; the fix is
 in served static JS, so a browser refresh on the node is enough to pick it up.
+
+# Options menu: drop SQL dump + manual Backup, add "Free up space"
+
+Date: 2026-09-17. Plan: `~/.claude/plans/replicated-nibbling-crab.md`.
+
+## Tasks
+
+- [x] A. Remove SQL dump: html `<li>` + modal, controller `SQLdump`, node route `dumpSQLdb`,
+      scanner `dump_sql_db`/`"dumpdb"`, device `pi.SQL_dump` + `_auto_SQL_backup_at_stop`, tests.
+- [x] B. Remove manual Backup: html `<li>` + modal, controller `backup`/`startBackup` + state,
+      node `POST /device/<id>/backup` (`_force_device_backup`), tests. Keep the GET.
+- [x] C. Device: `ethoscope/utils/storage.py` (`list_runs`, `validate_run_dir`, `remove_runs`),
+      routes `GET /data/runs/<id>` + `POST /data/runs/<id>/remove`, unit tests.
+- [x] D. Node: scanner `list_runs`/`remove_runs`, `utils/device_storage.py` (`classify_run`,
+      `summarise`), `api/storage_api.py` (`GET /device/<id>/storage`, `POST .../storage/purge`),
+      registration, unit tests.
+- [x] E. Frontend: "Free up space" item + `#freeSpaceModal`, `ethoscopeStorageService.js`,
+      relabel `file_exists === false` → "Not on device".
+- [x] F. Docs: CLAUDE.md section, device_server route table; run both test suites.
+
+## Discovered During Work
+
+- `pi.cleanup_old_data`/`manage_disk_space` (`pi.py:1306-1455`) run at every tracking start,
+  age-only and backup-blind, and target a non-existent `tracking/` dir — disable or make
+  backup-aware.
+- `_checkpoint_sqlite_databases` (`backup/helpers.py:1404-1408`) glob `results/*/*.db` is two
+  levels too shallow and runs `sqlite3` as `ethoscope` on root-owned 0644 files, so it has never
+  checkpointed anything; ETHOSCOPE_025 carries a 4.6 MB un-checkpointed WAL as a result.
+- `used_space` is set once in `ControlThread.__init__` and never refreshed;
+  `ControlThreadVideoRecording` never sets it (UI 89 % vs `df` 93 % on 025).
+- scanner `_check_storage_warnings` keys on `machine_info["disk_usage"]`, which the device never
+  produces.
+- `VideoBackupClass.get_video_list_json` calls `/list_video_files`, which no device serves.
+
+## Review (2026-09-17)
+
+Done and verified. The feature is node-orchestrated but device-executed, over the
+regular device HTTP API (an earlier SSH-based design was rejected; see
+`tasks/lessons.md`).
+
+**Removed**: SQL dump end to end (UI item, modal, controller, node route, scanner
+methods, `pi.SQL_dump`, `_auto_SQL_backup_at_stop`) and the manual Backup modal with
+`POST /device/<id>/backup`. The GET stays, since the status bars use it. Route count
+assertion 25 -> 23.
+
+**Added**: device `ethoscope/utils/storage.py` + `GET /data/runs/<id>` and
+`POST /data/runs/<id>/remove`; node `utils/device_storage.py` (`classify_run`),
+`api/storage_api.py`, scanner `list_runs`/`remove_runs`; UI "Free up space" item,
+`#freeSpaceModal`, `ethoscopeStorageService.js`, modal width/nowrap CSS.
+
+**Verified**:
+- node suite 1787 passed; device unit suite 419 passed; ruff and black clean.
+- end-to-end logic against a synthetic tree
+  (scratchpad `smoke_storage.py`): backed-up run deletable, dirty-WAL run held back,
+  unsynced run held back, video run with a merged mp4 deletable, stray file counted as
+  "other", and three refusals (live database, `/etc`, wrong depth).
+- browser: every modal step rendered and inspected; real endpoint drives it; no console
+  errors. An unreachable device now answers with a sentence rather than a traceback
+  (other device endpoints still return tracebacks; not changed here).
+
+**Not verified**: nothing has run against a real ethoscope, because the two device
+routes only exist once devices are updated. On a device that is still on old firmware
+the modal says so.

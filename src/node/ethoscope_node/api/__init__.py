@@ -10,6 +10,7 @@ Modules:
 - device_api: Device management and control
 - backup_api: Backup system management
 - sensor_api: Sensor data and configuration
+- storage_api: Device storage inspection and reclaiming
 - roi_template_api: ROI template management
 - node_api: Node system management
 - file_api: File operations and downloads
@@ -30,6 +31,7 @@ from .node_api import NodeAPI
 from .roi_template_api import ROITemplateAPI
 from .sensor_api import SensorAPI
 from .setup_api import SetupAPI
+from .storage_api import StorageAPI
 from .tunnel_utils import TunnelUtils
 
 __all__ = [
@@ -43,6 +45,7 @@ __all__ = [
     "FileAPI",
     "DatabaseAPI",
     "SetupAPI",
+    "StorageAPI",
     "TunnelUtils",
     "AuthAPI",
     "BugReportAPI",

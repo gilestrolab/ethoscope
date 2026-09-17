@@ -45,12 +45,12 @@ class Ethoscope(BaseDevice):
         "stream": "stream.mjpg",
         "user_options": "user_options",
         "log": "data/log",
+        "runs": "data/runs",
         "static": "static",
         "controls": "controls",
         "machine_info": "machine",
         "connected_module": "module",
         "update": "update",
-        "dumpdb": "dumpSQLdb",
     }
 
     ALLOWED_INSTRUCTIONS = {
@@ -64,7 +64,6 @@ class Ethoscope(BaseDevice):
         "poweroff": ["stopped"],
         "reboot": ["stopped"],
         "restart": ["stopped"],
-        "dumpdb": ["stopped"],
         "offline": [],
         "test_module": ["stopped"],
     }
@@ -306,17 +305,45 @@ class Ethoscope(BaseDevice):
         except ScanException:
             return None
 
-    def dump_sql_db(self) -> dict[str, Any] | None:
-        """Trigger SQL database dump on ethoscope."""
+    def list_runs(self) -> dict[str, Any] | None:
+        """
+        List the device's run directories with per-file size and mtime.
+
+        Returns:
+            dict | None: The device's listing (``runs``, ``other``, ``disk``), or
+            None when the device cannot be reached or is too old to serve the route.
+        """
         try:
-            url = f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['dumpdb']}/{self._id}"
-            return self._get_json(url, timeout=3)
+            url = (
+                f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['runs']}/{self._id}"
+            )
+            return self._get_json(url, timeout=30)
         except ScanException:
             return None
 
-    def dumpSQLdb(self):
-        """Legacy method name for compatibility."""
-        return self.dump_sql_db()
+    def remove_runs(self, paths: list[str]) -> dict[str, Any] | None:
+        """
+        Ask the device to delete the given run directories.
+
+        The node sends only runs it has verified against its own backup copies; the
+        device validates them again and refuses unless it is stopped.
+
+        Args:
+            paths (list[str]): Absolute run directories on the device.
+
+        Returns:
+            dict | None: The device's result (``removed``, ``failed``,
+            ``freed_bytes``, ``disk``), or None when it cannot be reached.
+        """
+        try:
+            url = (
+                f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['runs']}"
+                f"/{self._id}/remove"
+            )
+            post_data = json.dumps({"runs": list(paths)}).encode("utf-8")
+            return self._get_json(url, timeout=120, post_data=post_data)
+        except ScanException:
+            return None
 
     def last_image(self):
         """Get the last drawn image from ethoscope."""

@@ -1167,46 +1167,6 @@ def set_datetime(time_on_node):
         return False
 
 
-def SQL_dump(
-    database_name=None,
-    credentials=None,
-    output_dir="/ethoscope_data/backup",
-    outputfile=None,
-):
-    """
-    Creates a SQL dump of the specified database
-    """
-
-    if credentials is None:
-        credentials = {"username": "ethoscope", "password": "ethoscope"}
-    if database_name is None:
-        database_name = get_machine_name() + "_db"
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    if outputfile is None:
-        formatted_time = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        outputfile = f"{database_name}_{formatted_time}.sql"
-
-    fullpath = os.path.join(output_dir, outputfile)
-
-    cmd = "mysqldump -alv --compatible=ansi --skip-extended-insert --compact --user={} --password={} {} > {}".format(
-        credentials["username"], credentials["password"], database_name, fullpath
-    )
-
-    try:
-        # Exporting the database can take some time
-        # I am not really sure if there is a way to get a real time feedback of the process
-        with os.popen(cmd, "r") as c:
-            c.read()
-
-        return True
-
-    except Exception:
-        return False
-
-
 def loggingStatus(status=None):
     """
     Set or read the current logging status

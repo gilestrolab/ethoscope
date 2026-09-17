@@ -1035,6 +1035,26 @@ pre.command {
     max-width: 650px !important;
 }
 
+/* The run table needs room: dates, sizes and the reason a run is not deletable
+   all sit on one line. The generic rule above caps modals at 600px and leaves
+   width auto, so a dialog shrinks to its content and wraps every date; this one
+   asks for a width instead of merely permitting one. */
+#freeSpaceModal .modal-dialog {
+    max-width: 820px !important;
+    width: 820px !important;
+}
+
+#freeSpaceModal table td,
+#freeSpaceModal table th {
+    vertical-align: middle;
+}
+
+/* Experiment date and size each belong on one line. */
+#freeSpaceModal table td:nth-child(2),
+#freeSpaceModal table td:nth-child(4) {
+    white-space: nowrap;
+}
+
 /* Small modals for simple confirmations */
 #powerOffAlert .modal-dialog,
 #rebootAlert .modal-dialog,

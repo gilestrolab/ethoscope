@@ -148,30 +148,77 @@ class TestEthoscope:
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
     @patch("urllib.request.urlopen")
-    def test_dump_sql_db_success(self, mock_urlopen, mock_config_class, mock_db_class):
-        """Test dump_sql_db method."""
+    def test_list_runs_success(self, mock_urlopen, mock_config_class, mock_db_class):
+        """Test list_runs returns the device listing."""
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+
+        listing = {"runs": [], "other": {"files": 0, "size_bytes": 0}, "disk": {}}
+        mock_response = MagicMock()
+        mock_response.__enter__.return_value = mock_response
+        mock_response.read.return_value = json.dumps(listing).encode()
+        mock_urlopen.return_value = mock_response
+
+        result = device.list_runs()
+        assert result == listing
+        assert "data/runs/test_device" in mock_urlopen.call_args[0][0].full_url
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch("urllib.request.urlopen")
+    def test_list_runs_network_error(
+        self, mock_urlopen, mock_config_class, mock_db_class
+    ):
+        """Test list_runs returns None when the device cannot be reached."""
+        device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
+
+        mock_urlopen.side_effect = ScanException("Network error")
+
+        assert device.list_runs() is None
+
+    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
+    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
+    @patch("urllib.request.urlopen")
+    def test_remove_runs_posts_paths(
+        self, mock_urlopen, mock_config_class, mock_db_class
+    ):
+        """Test remove_runs posts the run paths to the device."""
         device = Ethoscope("192.168.1.100")
         device._id = "test_device"
 
         mock_response = MagicMock()
         mock_response.__enter__.return_value = mock_response
-        mock_response.read.return_value = json.dumps({"status": "ok"}).encode()
+        mock_response.read.return_value = json.dumps(
+            {"removed": [], "failed": [], "freed_bytes": 0}
+        ).encode()
         mock_urlopen.return_value = mock_response
 
-        result = device.dump_sql_db()
-        assert result == {"status": "ok"}
+        result = device.remove_runs(["/ethoscope_data/results/a/B/2026-01-01_00-00-00"])
+
+        assert result["freed_bytes"] == 0
+        request = mock_urlopen.call_args[0][0]
+        assert request.full_url.endswith("data/runs/test_device/remove")
+        assert json.loads(request.data) == {
+            "runs": ["/ethoscope_data/results/a/B/2026-01-01_00-00-00"]
+        }
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
-    def test_dumpSQLdb_legacy_method(self, mock_config_class, mock_db_class):
-        """Test legacy dumpSQLdb method."""
+    @patch("urllib.request.urlopen")
+    def test_remove_runs_network_error(
+        self, mock_urlopen, mock_config_class, mock_db_class
+    ):
+        """Test remove_runs returns None when the device cannot be reached."""
         device = Ethoscope("192.168.1.100")
+        device._id = "test_device"
 
-        with patch.object(device, "dump_sql_db") as mock_dump:
-            mock_dump.return_value = {"status": "ok"}
-            result = device.dumpSQLdb()
-            assert result == {"status": "ok"}
-            mock_dump.assert_called_once()
+        mock_urlopen.side_effect = ScanException("Network error")
+
+        assert (
+            device.remove_runs(["/ethoscope_data/results/a/B/2026-01-01_00-00-00"])
+            is None
+        )
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
@@ -860,21 +907,6 @@ class TestEthoscopeVideofilesMethods:
         mock_urlopen.side_effect = ScanException("Network error")
 
         result = device.get_log()
-        assert result is None
-
-    @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
-    @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
-    @patch("urllib.request.urlopen")
-    def test_dump_sql_db_network_error(
-        self, mock_urlopen, mock_config_class, mock_db_class
-    ):
-        """Test dump_sql_db method with network error."""
-        device = Ethoscope("192.168.1.100")
-        device._id = "test_device"
-
-        mock_urlopen.side_effect = ScanException("Network error")
-
-        result = device.dump_sql_db()
         assert result is None
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")

@@ -562,8 +562,7 @@
             <ul class="dd-menu">
                 <li ng-click="ethoscope.log()">Info and Logs</li>
                 <li data-toggle="modal" data-target="#changeInfo">Settings</li>
-                <li data-toggle="modal" data-target="#backupProgress" ng-click="ethoscope.backup()">Backup</li>
-                <li data-toggle="modal" data-target="#SQLdumpProgress" ng-click="ethoscope.SQLdump()">SQL dump</li>
+                <li data-toggle="modal" data-target="#freeSpaceModal" ng-click="ethoscope.loadStorage()">Free up space</li>
                 <li ng-class="{'disabled':!machine_info.Module.Connected}" data-toggle="modal" data-target="#ModuleTest">Module Info</li>
             </ul>
         </label>
@@ -831,107 +830,130 @@
     </div>
 </div>
 
-<!-- Modal SQLdump -->
-<div class="modal fade" id="SQLdumpProgress" tabindex="-1" role="dialog" aria-labelledby="SQLdumpProgressLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<!-- Modal Free up space -->
+<div class="modal fade" id="freeSpaceModal" tabindex="-1" role="dialog" aria-labelledby="freeSpaceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h4 class="modal-title" id="myModalLabel">Backup progress</h4>
+                <h4 class="modal-title" id="freeSpaceModalLabel"><span class="fa-solid fa-hard-drive"></span> Free up space on {{device.name}}</h4>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
 
-                <br>
-                <p>Asking {{device.name}} to perform a SQLdump: {{ SQLdumpStatus }}</p>
-                <p ng-if="SQLdumpStatus == 'Finished'">The latest SQL dump was made {{ SQLdumpStarted }} minutes ago.</p>
-                <p ng-if="SQLdumpStatus == 'Dumping'">Wait till the process is finished and do not close this window</p>
-            </div>
-            <div class="modal-footer">
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal Backup -->
-<div class="modal fade" id="backupProgress" tabindex="-1" role="dialog" aria-labelledby="backupProgressLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h4 class="modal-title"><span class="fa fa-database"></span> Backup {{device.name}}</h4>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-            </div>
-            <div class="modal-body">
-                <!-- Configuration (before backup starts) -->
-                <div ng-if="!backupInProgress && !backupComplete && !backupError">
-                    <!-- Backup type indicator -->
-                    <div class="alert" ng-class="{'alert-info': backupConfig.type === 'rsync',
-                                                   'alert-warning': backupConfig.type === 'mysql',
-                                                   'alert-danger': backupConfig.type === 'none'}">
-                        <strong>Backup Type:</strong>
-                        <span ng-if="backupConfig.type === 'mysql'"><span class="fa fa-server"></span> MySQL/MariaDB</span>
-                        <span ng-if="backupConfig.type === 'rsync'"><span class="fa fa-file"></span> SQLite (rsync)</span>
-                        <span ng-if="backupConfig.type === 'none'"><span class="fa fa-exclamation-triangle"></span> No databases available</span>
-                        <span ng-if="backupConfig.loading"><span class="fa fa-spinner fa-spin"></span> Detecting...</span>
-                    </div>
-
-                    <!-- Checkboxes for rsync devices -->
-                    <div ng-if="backupConfig.type === 'rsync'" style="padding: 15px; background: #f8f9fa; border-radius: 4px; margin: 15px 0;">
-                        <h5>Select what to backup:</h5>
-                        <div class="form-check" style="padding: 8px 0;">
-                            <input type="checkbox" class="form-check-input" id="backupDatabases" ng-model="backupConfig.backupDatabases">
-                            <label class="form-check-label" for="backupDatabases">
-                                <span class="fa fa-database"></span> Databases (SQLite)
-                            </label>
-                        </div>
-                        <div class="form-check" style="padding: 8px 0;">
-                            <input type="checkbox" class="form-check-input" id="backupVideos" ng-model="backupConfig.backupVideos">
-                            <label class="form-check-label" for="backupVideos">
-                                <span class="fa fa-video-camera"></span> Videos (h264)
-                            </label>
+                <!-- Disk usage, shown as soon as we know it -->
+                <div ng-if="storage.disk['Use%']" style="margin-bottom: 15px;">
+                    <div class="ProgressBarContainer" style="width: 100%; background-color: #ddd; border-radius: 4px;">
+                        <div class="ProgressBar" ng-style="{width: storageUsedPercent() + '%'}"
+                             ng-class="{'bg-danger': storageUsedPercent() >= 80, 'bg-warning': storageUsedPercent() >= 60 && storageUsedPercent() < 80, 'bg-success': storageUsedPercent() < 60}"
+                             style="height: 24px; line-height: 24px; text-align: center; color: white; border-radius: 4px;">
+                            {{storage.disk['Use%']}}
                         </div>
                     </div>
-
-                    <!-- MySQL info -->
-                    <div ng-if="backupConfig.type === 'mysql'" style="padding: 15px;">
-                        <p><span class="fa fa-info-circle"></span> MySQL databases will be backed up to SQLite format.</p>
-                        <p class="text-muted"><small>Video backup not available for MySQL devices.</small></p>
-                    </div>
-
-                    <!-- Start button -->
-                    <div class="text-center" style="margin-top: 20px;">
-                        <button type="button" class="btn btn-primary" ng-click="ethoscope.startBackup()"
-                                ng-disabled="backupConfig.type === 'none' || backupConfig.loading ||
-                                           (backupConfig.type === 'rsync' && !backupConfig.backupDatabases && !backupConfig.backupVideos)">
-                            <span class="fa fa-play"></span> Start Backup
-                        </button>
-                    </div>
+                    <small class="text-muted">{{storage.disk.Used}} used of {{storage.disk.Size}}, {{storage.disk.Avail}} free.</small>
                 </div>
 
-                <!-- Progress (during backup) -->
-                <div ng-if="backupInProgress">
-                    <div class="ProgressBarContainer" style="width: 100%; background-color: grey; border-radius: 4px;">
-                        <div class="ProgressBar" style="width: {{backupProgress.percent || 0}}%; height: 30px; background-color: #4CAF50;
-                                    text-align: center; line-height: 30px; color: white; border-radius: 4px;">
-                            {{backupProgress.percent || 0}}%
-                        </div>
-                    </div>
-                    <p style="margin-top: 15px;"><span class="fa fa-spinner fa-spin"></span> {{backupProgress.message || 'Backing up...'}}</p>
-                </div>
-
-                <!-- Completion -->
-                <div ng-if="backupComplete" class="alert alert-success" style="margin-top: 15px;">
-                    <span class="fa fa-check-circle"></span> Backup completed successfully!
+                <!-- Loading -->
+                <div ng-if="storage.step == 'loading'" class="text-center" style="padding: 20px;">
+                    <span class="fa fa-spinner fa-spin"></span> Reading the data stored on this ethoscope and checking it against the node's backups&hellip;
                 </div>
 
                 <!-- Error -->
-                <div ng-if="backupError" class="alert alert-danger" style="margin-top: 15px;">
-                    <span class="fa fa-exclamation-circle"></span> {{backupError}}
+                <div ng-if="storage.step == 'error'" class="alert alert-danger">
+                    <span class="fa fa-exclamation-circle"></span> {{storage.error}}
+                </div>
+
+                <!-- Run list -->
+                <div ng-if="storage.step == 'list'">
+                    <p ng-if="!storage.runs.length" class="text-muted">This ethoscope holds no experiment data.</p>
+
+                    <div ng-if="storage.runs.length">
+                        <p>
+                            {{storage.totals.backed_up_runs}} of {{storage.runs.length}} experiments are backed up on the node
+                            and can be deleted, freeing {{storageHuman(storage.totals.reclaimable_bytes)}}.
+                            Only backed-up experiments can be selected.
+                        </p>
+                        <p>
+                            <button type="button" class="btn btn-sm btn-secondary" ng-click="storageToggleAll(true)">Select all backed-up</button>
+                            <button type="button" class="btn btn-sm btn-secondary" ng-click="storageToggleAll(false)">Clear selection</button>
+                        </p>
+
+                        <div style="max-height: 320px; overflow-y: auto; overflow-x: auto;">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th></th>
+                                        <th>Experiment</th>
+                                        <th>Type</th>
+                                        <th>Size</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr ng-repeat="run in storage.runs">
+                                        <td>
+                                            <input type="checkbox" ng-model="storage.selected[run.path]" ng-disabled="!run.backed_up">
+                                        </td>
+                                        <td>{{run.date}}</td>
+                                        <td>
+                                            <span class="fa fa-database" ng-if="run.kind == 'results'" title="Tracking data"></span>
+                                            <span class="fa fa-video-camera" ng-if="run.kind == 'videos'" title="Video"></span>
+                                        </td>
+                                        <td>{{storageHuman(run.size_bytes)}}</td>
+                                        <td>
+                                            <span ng-if="run.backed_up" class="text-success"><span class="fa fa-check"></span> Backed up</span>
+                                            <span ng-if="!run.backed_up" class="text-muted" title="{{run.missing.join(', ')}}">{{run.reason}}</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p ng-if="storage.other.files" class="text-muted">
+                            <small>{{storage.other.files}} other file(s) ({{storageHuman(storage.other.size_bytes)}}) sit outside the experiment folders and are left alone.</small>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Confirmation -->
+                <div ng-if="storage.step == 'confirm'">
+                    <div class="alert alert-warning">
+                        <span class="fa fa-exclamation-triangle"></span>
+                        Delete {{storageSelectedCount()}} experiment(s) from {{device.name}}, freeing {{storageSelectedSize()}}?
+                        The data stays on the node; this only removes the copies on the ethoscope.
+                    </div>
+                </div>
+
+                <!-- Working -->
+                <div ng-if="storage.step == 'working'" class="text-center" style="padding: 20px;">
+                    <span class="fa fa-spinner fa-spin"></span> Deleting&hellip; do not close this window.
+                </div>
+
+                <!-- Result -->
+                <div ng-if="storage.step == 'done'">
+                    <div class="alert alert-success">
+                        <span class="fa fa-check-circle"></span>
+                        Deleted {{storage.result.deleted.length}} experiment(s) and freed {{storageHuman(storage.result.freed_bytes)}}.
+                    </div>
+                    <div ng-if="storage.result.skipped.length" class="alert alert-warning">
+                        <p>Left in place:</p>
+                        <ul>
+                            <li ng-repeat="item in storage.result.skipped">{{item.path}} &mdash; {{item.reason}}</li>
+                        </ul>
+                    </div>
                 </div>
 
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">
-                    {{backupComplete || backupError ? 'Close' : 'Cancel'}}
+                    {{storage.step == 'done' || storage.step == 'error' ? 'Close' : 'Cancel'}}
+                </button>
+                <button type="button" class="btn btn-danger" ng-if="storage.step == 'list'"
+                        ng-disabled="!storageSelectedCount()" ng-click="storage.step = 'confirm'">
+                    <span class="fa fa-trash"></span> Delete selected
+                </button>
+                <button type="button" class="btn btn-secondary" ng-if="storage.step == 'confirm'" ng-click="storage.step = 'list'">Back</button>
+                <button type="button" class="btn btn-danger" ng-if="storage.step == 'confirm'" ng-click="ethoscope.purgeStorage()">
+                    <span class="fa fa-trash"></span> Yes, delete
                 </button>
             </div>
         </div>

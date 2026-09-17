@@ -37,3 +37,20 @@ destructured binding), controller code must mutate that object in place -- clear
 and re-seed -- never rebind it. When a value the user typed reaches a backend as its
 default, suspect object identity before suspecting the backend, and reproduce by measuring
 the geometry the defaults would produce against the screenshot.
+
+## Node ↔ device traffic goes through the device HTTP API, never ad-hoc SSH (2026-09-17)
+
+Designing "free up space on the ethoscope", I proposed having the node `ssh ethoscope@<ip>`
+to list and `sudo rm` files, because the node already holds a key for rsync. Rejected: "we
+don't do anything like that beside rsync". The convention is that every node → device
+operation is a route on `device_server.py` (port 9000) called through the scanner's
+`Ethoscope` class; SSH exists only so rsync can pull data.
+
+**Why:** a second control channel splits the device's safety logic in two places, bypasses
+the device's own knowledge of what it is doing (`send_command("info")`, `_busy_with()`), and
+depends on filesystem permissions and sudoers that are not part of the device API contract.
+"No firmware change needed" is not a virtue here — the fleet is updated from the node anyway.
+
+**How to apply:** when a feature needs the device to do something, add a device route (and a
+pure helper in `ethoscope/utils/`), a scanner method, and a node API that orchestrates. If it
+needs information the node lacks, add a GET route that returns it. Reserve SSH for rsync.
