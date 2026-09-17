@@ -334,6 +334,11 @@ class TestSlackNotificationService:
         assert call_args[3] == "slack"
         assert call_args[4] == "run123"
 
+    # ~120 s: unlike its neighbours this one leaves get_device_logs unpatched,
+    # so it really goes out to the (absent) device and waits for the network to
+    # give up. Worth fixing on its own; until then it needs more than the
+    # suite-wide cap, which exists to kill runaway loops, not slow I/O.
+    @pytest.mark.timeout(300)
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
     def test_send_device_stopped_alert_dedups_via_alert_logs(
         self, mock_send, slack_service_webhook
@@ -630,6 +635,11 @@ class TestSlackNotificationService:
 
         assert not result
 
+    # ~120 s: unlike its neighbours this one leaves get_device_logs unpatched,
+    # so it really goes out to the (absent) device and waits for the network to
+    # give up. Worth fixing on its own; until then it needs more than the
+    # suite-wide cap, which exists to kill runaway loops, not slow I/O.
+    @pytest.mark.timeout(300)
     @patch("ethoscope_node.notifications.slack.SlackNotificationService._send_message")
     @patch(
         "ethoscope_node.notifications.slack.SlackNotificationService.analyze_device_failure"

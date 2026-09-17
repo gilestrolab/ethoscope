@@ -1451,3 +1451,58 @@ resolve to it; both retired images 404. `images/retired/` holds 20260819 and
 
 Pi 4 powered off over the device API (`POST /controls/<id>/poweroff`) so the card
 could move to a Pi 3; ping and :9000 both confirmed down before reporting it safe.
+
+## Streaming fixes (2026-09-17)
+
+Three defects, all of which presented as "the device says it is streaming and the
+browser shows nothing".
+
+- [x] **The node hung instead of saying why.** `_streaming_broadcast_loop` read
+      `recv()` until it found `\r\n\r\n`, unbounded in both bytes and time. Against a
+      device older than `2e28b763` (pickle framing) that blank line never comes, so
+      the node swallowed the whole stream and yielded nothing, for ever. The
+      handshake is now `_read_stream_headers()`, called synchronously from
+      `_start_shared_streaming()`: 10 s timeout, 8 KiB cap, and the response is
+      validated (`HTTP/1.` prefix checked on the *first* packet, 200 status,
+      `multipart/x-mixed-replace`). A device that fails any of these raises
+      `StreamUnavailable`, which `GET /device/<id>/stream` turns into a **502 with a
+      readable reason** — naming the June 2026 change when the answer is not HTTP.
+      `get_stream_for_client()` now connects eagerly and returns an inner generator,
+      so the failure arrives before the response is committed.
+- [x] **A dead capture thread kept claiming to be busy.** `cameraCaptureThread.run()`
+      is now `try/except/finally` around `_acquire()`: the traceback is kept on
+      `self.error` and `_release()` always hands back the camera, the stream server
+      and the video writer. `ControlThreadVideoRecording._recorder_died()`, called
+      from `_update_info()` (i.e. on every status poll), turns a thread that exited
+      on its own into `status: stopped` with the traceback in `error`. Guarded by
+      `_capture_started` so a poll landing between "status = streaming" and
+      `start_recording()` is not mistaken for a death, and cleared first thing in
+      `stop()` so a poll during its 10 s join is not either.
+- [x] **`_is_socket_healthy()` could never report unhealthy** (found by the jenner
+      session, verified here on real sockets): it probed with `recv(0)`, which
+      returns `b""` for a live peer and a closed one alike and never raises EAGAIN,
+      so the reconnect in `_ensure_streaming_connection()` never fired. Now
+      `recv(1, MSG_PEEK | MSG_DONTWAIT)` — `b""` means FIN, EAGAIN means alive, and
+      nothing is consumed. Dropping the `settimeout(0)`/`settimeout(None)` pair also
+      removes a race: it mutated a socket the broadcast thread reads concurrently,
+      which that thread saw as a stream failure and tore down for every viewer.
+
+Also: `_stop_stream_server()` now `shutdown()`s before `close()` and joins the
+acceptor. `close()` alone does not release the port while a thread is blocked in
+`accept()`, so a failed stream left 8887 bound and the *next* start failed with
+EADDRINUSE — one fault turning into an unrelated-looking second one. Proved by a
+test that binds the port after a failed run.
+
+And the broadcast loop now pushes the end-of-stream sentinel to every client when
+it exits, instead of leaving them on a 30 s queue timeout.
+
+**Tests**: 12 new device tests (`test_recorder_failure_visible.py`) and the node
+streaming suite reworked to 52. Device unit suite 444 passed; node unit suite
+1774 passed.
+
+- [x] `pytest-timeout` added to both packages' dev deps with `--timeout=120` in
+      addopts. A test of mine looped on a bare `MagicMock` socket and took the
+      workstation to 79.5 GB RSS before the OOM killer fired; a per-test cap turns
+      that into a failed test. `serving_socket()` in the node streaming tests is now
+      the sanctioned way to mock a socket a loop reads from, and its docstring says
+      why a bare mock defeats every guard in a read loop at once.

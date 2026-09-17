@@ -528,6 +528,11 @@ class TestMattermostNotificationService:
             call_args[0][0] == "https://mattermost.example.com/api/v4/posts"
         )  # URL as first positional arg
 
+    # ~120 s: unlike its neighbours this one leaves get_device_logs unpatched,
+    # so it really goes out to the (absent) device and waits for the network to
+    # give up. Worth fixing on its own; until then it needs more than the
+    # suite-wide cap, which exists to kill runaway loops, not slow I/O.
+    @pytest.mark.timeout(300)
     @patch.object(MattermostNotificationService, "_send_message")
     @patch.object(MattermostNotificationService, "analyze_device_failure")
     def test_send_device_stopped_alert_sends_even_when_analysis_says_completed_normally(
