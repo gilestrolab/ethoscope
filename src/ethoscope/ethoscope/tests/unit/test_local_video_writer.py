@@ -92,6 +92,10 @@ def _make_recorder(tmp_path, n_frames, chunk_duration=None, writer_opens=True):
     obj._video_prefix = str(tmp_path / "prefix")
     obj._img_path = str(tmp_path / "last_img.jpg")
     obj.video_file_index = 0
+    # The writer lives on the instance so that _release() can close it however
+    # acquisition ended; the capture thread's error slot likewise.
+    obj._writer = None
+    obj.error = None
     obj._stream_lock = threading.Lock()
     obj.camera = FakeCamera(obj, n_frames)
 

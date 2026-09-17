@@ -107,11 +107,23 @@ class cameraCaptureThread(threading.Thread):
         self._img_path = img_path
         self._stream = stream
 
+        # Set by run() when acquisition stops on an exception. The control thread
+        # that starts this one returns as soon as the camera is handed over, so
+        # this attribute is the only way the device can tell that a recording or
+        # a stream has died. See ControlThreadVideoRecording._recorder_died().
+        self.error = None
+
+        # The local video writer, when one is in use (non-Pi camera recording).
+        # On the instance rather than a local so that _release() can close it
+        # however acquisition ended.
+        self._writer = None
+
         # Streaming server state (only used when self._stream is True).
         # One shared TCP server fans the same encoded frame out to every connected client
         # via a per-client bounded queue, so a slow client drops frames instead of stalling
         # the camera loop, and the JPEG is only ever encoded once per frame.
         self._stream_server_socket = None
+        self._stream_acceptor = None  # thread running _accept_stream_clients()
         self._stream_clients = []  # list of (client_socket, queue.Queue)
         self._stream_lock = threading.Lock()
 
@@ -204,8 +216,24 @@ class cameraCaptureThread(threading.Thread):
         """
 
         self.start_time = self.preview_time = time.time()
-        writer = None
 
+        try:
+            self._acquire()
+        except Exception:
+            # Reason: this thread *is* the recording or the stream - the control
+            # thread returned the moment it handed the camera over. An exception
+            # here used to die with the thread, leaving the device reporting
+            # "recording"/"streaming" with error null for ever and the traceback
+            # visible only in the listener's journal. Keep it where the status
+            # poll can find it.
+            self.error = traceback.format_exc()
+            logging.error("The camera capture thread stopped with an error:")
+            logging.error(self.error)
+        finally:
+            self._release()
+
+    def _acquire(self):
+        """Acquire frames until asked to stop, recording and/or streaming them."""
         if self._stream:
             self._start_stream_server()
 
@@ -227,31 +255,31 @@ class cameraCaptureThread(threading.Thread):
                     # got at most one frame, none of them were ever released, and
                     # the chunk index climbed with the frame counter.
                     chunk_full = (
-                        writer is not None
+                        self._writer is not None
                         and time.time() - self.start_time >= self._VIDEO_CHUNCK_DURATION
                     )
 
                     if (
-                        writer is None and ix >= self._FRAMES_BEFORE_RECORDING
+                        self._writer is None and ix >= self._FRAMES_BEFORE_RECORDING
                     ) or chunk_full:
-                        if writer is not None:
-                            writer.release()
+                        if self._writer is not None:
+                            self._writer.release()
 
-                        writer = cv2.VideoWriter(
+                        self._writer = cv2.VideoWriter(
                             self._get_video_chunk_filename(ext="h264"),
                             cv2.VideoWriter_fourcc(*"H264"),
                             self.camera.fps,
                             (self.camera.width, self.camera.height),
                         )
-                        if not writer.isOpened():
+                        if not self._writer.isOpened():
                             logging.error(
                                 "Error: failed to open Video writer destination. The Video file cannot be saved."
                             )
 
                         self.start_time = time.time()
 
-                    if writer is not None and writer.isOpened():
-                        writer.write(frame)
+                    if self._writer is not None and self._writer.isOpened():
+                        self._writer.write(frame)
 
                 if self._stream:
 
@@ -286,18 +314,32 @@ class cameraCaptureThread(threading.Thread):
                 # AFTER writing, annotates the frame for preview but only once every 5 seconds
                 if not self._stream and ((time.time() - self.preview_time) > 5):
                     writing_status = (
-                        "CV2 Writing" if writer is not None else "PI Recording"
+                        "CV2 Writing" if self._writer is not None else "PI Recording"
                     )
                     self._save_preview_frame(frame, writing_status)
 
         # out of the loop - exit signal received
-        self.camera._close()
+
+    def _release(self):
+        """
+        Give the camera, the stream server and the video writer back.
+
+        Runs whether acquisition ended on request or on an exception, so a failed
+        run cannot leave port 8887 bound or the camera held - which is what then
+        made the *next* start fail too, for a reason unrelated to the first.
+        """
+        try:
+            self.camera._close()
+        except Exception as e:
+            logging.warning(f"Could not close the camera cleanly: {e}")
 
         if self._stream:
             self._stop_stream_server()
 
+        writer = getattr(self, "_writer", None)
         if writer:
             writer.release()
+            self._writer = None
 
     def _start_stream_server(self):
         """Open the MJPEG TCP server and start accepting clients in the background."""
@@ -305,7 +347,10 @@ class cameraCaptureThread(threading.Thread):
         self._stream_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._stream_server_socket.bind(("", STREAMING_PORT))
         self._stream_server_socket.listen(5)
-        threading.Thread(target=self._accept_stream_clients, daemon=True).start()
+        self._stream_acceptor = threading.Thread(
+            target=self._accept_stream_clients, daemon=True
+        )
+        self._stream_acceptor.start()
         logging.info("MJPEG stream server initialised on port %d.", STREAMING_PORT)
 
     def _accept_stream_clients(self):
@@ -387,11 +432,27 @@ class cameraCaptureThread(threading.Thread):
             except queue.Full:
                 pass
         if self._stream_server_socket is not None:
+            # Reason: close() on its own does not give the port back while the
+            # acceptor thread is blocked in accept(). The kernel keeps the socket
+            # open until that call returns, so the port stayed bound and the next
+            # attempt to stream failed with "Address already in use" - a failure
+            # with nothing to do with the run that actually broke. shutdown()
+            # wakes the acceptor, and the join makes the release observable to
+            # whoever binds next.
+            try:
+                self._stream_server_socket.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
             try:
                 self._stream_server_socket.close()
             except OSError:
                 pass
             self._stream_server_socket = None
+
+        acceptor = getattr(self, "_stream_acceptor", None)
+        if acceptor is not None:
+            acceptor.join(timeout=5)
+            self._stream_acceptor = None
 
 
 class GeneralVideoRecorder(DescribedObject):
@@ -483,6 +544,22 @@ class GeneralVideoRecorder(DescribedObject):
     def start_recording(self):
         """ """
         self._p.start()
+
+    def is_alive(self):
+        """
+        Returns:
+            bool: True while the capture thread is still acquiring frames.
+        """
+        return self._p.is_alive()
+
+    @property
+    def error(self):
+        """
+        Returns:
+            str: the traceback that stopped the capture thread, or None if it
+                stopped on request (or has not stopped at all).
+        """
+        return self._p.error
 
     def stop(self):
         """
@@ -637,6 +714,10 @@ class ControlThreadVideoRecording(ControlThread):
 
         # Metadata
         self._recorder = None
+        # Set once the capture thread is actually running, so that a status poll
+        # landing between "status = recording" and start_recording() does not read
+        # a not-yet-started thread as a dead one.
+        self._capture_started = False
         self._machine_id = machine_id
         self._device_name = name
         self._video_root_dir = ethoscope_dir
@@ -689,7 +770,36 @@ class ControlThreadVideoRecording(ControlThread):
 
         if self._recorder is None:
             return
+        if self._recorder_died():
+            return
         self._last_info_t_stamp = time.time()
+
+    def _recorder_died(self):
+        """
+        Notice a capture thread that stopped on its own, and report it.
+
+        run() sets the status to "recording" or "streaming" before starting the
+        capture thread and never revisits it, because the control thread returns
+        as soon as the camera has been handed over. So a capture thread that
+        raised - a camera that stopped yielding frames, port 8887 already taken -
+        left the device claiming to be busy with error null until somebody pressed
+        Stop. The node believed it and showed a live stream that never had a frame
+        in it; the only trace was a traceback in the listener's journal.
+
+        Returns:
+            bool: True if a dead capture thread was found and reported.
+        """
+        if not self._capture_started or self._recorder.is_alive():
+            return False
+
+        activity = self._info["status"]
+        error = self._recorder.error or (
+            f"The camera stopped delivering frames and the {activity} thread "
+            "exited without being asked to."
+        )
+        logging.error(f"The {activity} thread is gone; stopping.")
+        self.stop(error=error)
+        return True
 
     def _parse_one_user_option(self, field, data):
 
@@ -798,6 +908,7 @@ class ControlThreadVideoRecording(ControlThread):
                 pass
 
             self._recorder.start_recording()
+            self._capture_started = True
 
         except Exception:
             self.stop(traceback.format_exc())
@@ -809,6 +920,10 @@ class ControlThreadVideoRecording(ControlThread):
 
     def stop(self, error=None):
         """ """
+        # Reason: cleared before anything else. stop() joins the capture thread for
+        # up to ten seconds, and a status poll arriving in that window would
+        # otherwise see a thread that has already exited and call stop() again.
+        self._capture_started = False
         self._info["status"] = "stopping"
         self._info["time"] = time.time()
 
