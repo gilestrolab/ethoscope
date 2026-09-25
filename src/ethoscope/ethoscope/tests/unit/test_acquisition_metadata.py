@@ -32,6 +32,8 @@ EXPECTED_FIELDS = {
     "pi_version",
     "picamera2_version",
     "tracker_class",
+    "module_connected",
+    "module_info",
 }
 
 
@@ -157,3 +159,68 @@ def test_camera_version_file_is_read_from_where_it_is_written():
     # runtime directory does not need this test edited again.
     assert pi.PICAMERA_VERSION_FILE.startswith(pi.RUNTIME_DIR)
     assert not pi.PICAMERA_VERSION_FILE.startswith(pi.LEGACY_CONFIG_DIR)
+
+
+_NANO = {
+    "arduino_nano": {
+        "name": "Arduino Nano",
+        "family": "arduino",
+        "model": "nano",
+        "used_for": ["optomotor", "mAGO", "opto_LED"],
+        "id": ["2341:0058"],
+    }
+}
+
+
+def _with_usb(found=None, side_effect=None):
+    """Patch the USB scan the module fields are built from."""
+    return patch(
+        "ethoscope.control.tracking.connectedUSB",
+        return_value=({}, found or {}),
+        side_effect=side_effect,
+    )
+
+
+def test_records_an_attached_module():
+    """
+    A plugged-in module is recorded with its name and USB ID.
+
+    The stimulator logs has_interacted whether or not a module answers, so
+    without this a run that stimulated could not be told from one that only
+    meant to.
+    """
+    with _with_usb(_NANO):
+        metadata = ControlThread._acquisition_metadata(_FakeCam(), _FakeTracker)
+
+    assert metadata["module_connected"] == "True"
+    assert "Arduino Nano" in metadata["module_info"]
+    assert "2341:0058" in metadata["module_info"]
+
+
+def test_records_that_no_module_was_attached():
+    """No known module on USB is a definite False, not a missing value."""
+    with _with_usb({}):
+        metadata = ControlThread._acquisition_metadata(_FakeCam(), _FakeTracker)
+
+    assert metadata["module_connected"] == "False"
+    assert metadata["module_info"] is None
+
+
+def test_module_status_is_unknown_without_pyusb():
+    """If USB cannot be probed the answer is unknown, not 'no module'."""
+    noUSB = {"noUSB": {"name": "python-usb not loaded", "id": ["0000:0000"]}}
+    with _with_usb(noUSB):
+        metadata = ControlThread._acquisition_metadata(_FakeCam(), _FakeTracker)
+
+    assert metadata["module_connected"] is None
+    assert metadata["module_info"] is None
+
+
+def test_a_failing_module_probe_does_not_break_the_experiment():
+    """A USB scan that raises degrades to None; the rest is still collected."""
+    with _with_usb(side_effect=OSError("usb gone")):
+        metadata = ControlThread._acquisition_metadata(_FakeCam(), _FakeTracker)
+
+    assert metadata["module_connected"] is None
+    assert metadata["module_info"] is None
+    assert metadata["target_fps"] == "5.0"

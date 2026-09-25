@@ -22,7 +22,11 @@ from ethoscope.hardware.input.cameras import (
     OurPiCameraAsync,
     V4L2Camera,
 )
-from ethoscope.hardware.interfaces.interfaces import EthoscopeSensor, HardwareConnection
+from ethoscope.hardware.interfaces.interfaces import (
+    EthoscopeSensor,
+    HardwareConnection,
+    connectedUSB,
+)
 from ethoscope.io import (
     MySQLResultWriter,
     SQLiteResultWriter,
@@ -749,6 +753,31 @@ class ControlThread(Thread):
                     return getattr(obj, name)
             return None
 
+        def _module_status():
+            """
+            Which known stimulator modules are plugged in, from USB IDs alone.
+
+            Reason: the stimulator logs has_interacted whether or not a module
+            answers, so a database could not tell a run that stimulated the
+            animals from one that only intended to. The serial port is left
+            closed on purpose - opening it resets an Arduino, and the
+            stimulator's own connection is about to use it.
+
+            Returns:
+                tuple: (connected, info). connected is True/False, or None when
+                USB cannot be probed; info maps each module found to its name
+                and USB IDs, or is None when nothing was found.
+            """
+            _, found = connectedUSB()
+            if "noUSB" in found:
+                return None, None
+            info = {
+                k: {"name": v.get("name"), "id": v.get("id")} for k, v in found.items()
+            }
+            return bool(found), info or None
+
+        module_connected, module_info = _safe(_module_status, default=(None, None))
+
         metadata = {
             # Sampling rate: the configured ceiling, and what the camera was
             # actually asked for (they differ for video recording).
@@ -772,6 +801,9 @@ class ControlThread(Thread):
             "tracker_class": (
                 getattr(TrackerClass, "__name__", None) if TrackerClass else None
             ),
+            # Whether a stimulator module was physically attached, and which.
+            "module_connected": module_connected,
+            "module_info": module_info,
         }
 
         return {k: str(v) if v is not None else None for k, v in metadata.items()}
