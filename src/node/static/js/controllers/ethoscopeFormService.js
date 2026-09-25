@@ -164,6 +164,15 @@
                     var key = keys[i];
                     if (!data[key] || !data[key][0]) continue;
 
+                    // Reason: the interactor is chosen only through the stimulator
+                    // sequence ("Add Stimulator"); no widget shows a seeded class.
+                    // Seeding the first listed class here meant that, once
+                    // DefaultStimulator was hidden from the list (41c1975a), every
+                    // run started without a stimulator silently got
+                    // ComposedStimulator with its defaults (inactivity-triggered
+                    // motor pulses). No sequence must mean no stimulus.
+                    if (optionType === 'tracking' && key === 'interactor') continue;
+
                     $scope.selected_options[optionType][key] = {
                         name: data[key][0].name,
                         arguments: {}

@@ -1226,13 +1226,13 @@
                     }
                 }
             } else {
-                // If no stimulators in sequence, use DefaultStimulator
-                if (!option.interactor || !option.interactor.name) {
-                    option.interactor = {
-                        name: 'DefaultStimulator',
-                        arguments: {}
-                    };
-                }
+                // No stimulators in the sequence means no stimulation, whatever
+                // interactor the payload carries: a pre-seeded class is invisible
+                // to the user (see initializeSelectedOptions) and must not be sent.
+                option.interactor = {
+                    name: 'DefaultStimulator',
+                    arguments: {}
+                };
             }
 
             // Check if we need to handle custom template transfer for FileBasedROIBuilder
