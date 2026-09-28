@@ -128,13 +128,13 @@ class commandingThread(threading.Thread):
                     result = json.dumps({"response": f"ERROR: {error_msg}"}).encode(
                         "utf-8"
                     )
-                client.send(result)
+                client.sendall(result)
             else:
                 # Empty request received
                 result = json.dumps(
                     {"response": "ERROR: Empty request received"}
                 ).encode("utf-8")
-                client.send(result)
+                client.sendall(result)
 
         except Exception as e:
             # Log the error and close connection

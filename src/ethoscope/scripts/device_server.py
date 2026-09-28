@@ -11,7 +11,7 @@ from optparse import OptionParser
 
 import bottle
 import netifaces as ni
-from ethoclient import listenerIsAlive, send_command
+from ethoclient import STOP_TIMEOUT, listenerIsAlive, send_command
 from zeroconf import ServiceInfo, Zeroconf
 
 from ethoscope.control.record import ControlThreadVideoRecording
@@ -379,7 +379,7 @@ def controls(id, action):
 
     elif action in ["stop", "close", "poweroff", "reboot", "restart"]:
 
-        send_command("stop")
+        send_command("stop", timeout=STOP_TIMEOUT)
 
         if action == "close":
             close()

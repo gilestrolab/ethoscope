@@ -32,6 +32,16 @@ COMM_PACKET_SIZE = (
     1024 * 16
 )  # in bytes. This should be large because it has to account for possible raise error messages coming backs
 
+# Seconds to wait on the listener before giving up. device_server.py serves one
+# request at a time, so a call that waits for ever wedges the whole web server:
+# /id stops answering, the node marks the device offline and hides it, while the
+# listener goes on tracking and ssh still works.
+COMMAND_TIMEOUT = 10
+
+# "stop" joins the control thread for up to device_listener's
+# _STOP_JOIN_TIMEOUT (30 s) before it answers, so it needs longer.
+STOP_TIMEOUT = 45
+
 
 def listenerIsAlive():
     """
@@ -57,6 +67,7 @@ def send_command(
     port=5000,
     size=COMM_PACKET_SIZE,
     return_timing=False,
+    timeout=COMMAND_TIMEOUT,
 ):
     """
     Executes remote command execution via TCP socket communication with a JSON protocol.
@@ -71,6 +82,7 @@ def send_command(
         port (int): TCP port number for service communication
         size (int): Maximum receive buffer size in bytes (must accommodate largest expected response)
         return_timing (bool): If True, returns tuple of (response, response_time_ms)
+        timeout (float): Seconds allowed for connecting and for each receive
 
     Returns:
         any: Deserialized response content from the service's JSON reply
@@ -78,6 +90,7 @@ def send_command(
 
     Raises:
         socket.error: On network communication failures
+        TimeoutError: If the listener does not answer within ``timeout``
         json.JSONDecodeError: If malformed response data received
     """
 
@@ -86,6 +99,7 @@ def send_command(
     start_time = time.time()
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(timeout)
         s.connect((host, port))
         s.sendall(json.dumps(message).encode("utf-8"))
 
@@ -166,7 +180,7 @@ if __name__ == "__main__":
         help="Include response time in output",
     )
 
-    (options, args) = parser.parse_args()
+    options, args = parser.parse_args()
     option_dict = vars(options)
 
     # Parse the data argument from JSON string to dict
@@ -179,6 +193,8 @@ if __name__ == "__main__":
     else:
         data_dict = None
 
+    timeout = STOP_TIMEOUT if option_dict["command"] == "stop" else COMMAND_TIMEOUT
+
     try:
         if option_dict["timing"]:
             r, response_time = send_command(
@@ -186,12 +202,16 @@ if __name__ == "__main__":
                 data=data_dict,
                 host=option_dict["host"],
                 return_timing=True,
+                timeout=timeout,
             )
             print(f"Response: {r}")
             print(f"Response time: {response_time:.2f} ms")
         else:
             r = send_command(
-                action=option_dict["command"], data=data_dict, host=option_dict["host"]
+                action=option_dict["command"],
+                data=data_dict,
+                host=option_dict["host"],
+                timeout=timeout,
             )
             print(r)
     except Exception as e:
