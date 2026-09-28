@@ -3060,7 +3060,7 @@ def _enhance_databases_with_rsync_info(
         device_data = rsync_data.get("devices", {}).get(device_id, {})
 
         if device_data:
-            logging.info(
+            logging.debug(
                 f"[ENHANCE] Found device data for {device_id} in rsync service"
             )
         else:
@@ -3097,13 +3097,13 @@ def _enhance_databases_with_rsync_info(
         video_data = synced_data.get("videos", {})
         transfer_details = device_data.get("transfer_details", {})
 
-        logging.info(f"[ENHANCE] Video data available: {bool(video_data)}")
-        logging.info(
+        logging.debug(f"[ENHANCE] Video data available: {bool(video_data)}")
+        logging.debug(
             f"[ENHANCE] Transfer details available: {bool(transfer_details.get('videos'))}"
         )
 
         if video_data or transfer_details.get("videos"):
-            logging.info("[ENHANCE] Processing video backup data...")
+            logging.debug("[ENHANCE] Processing video backup data...")
             # Add video backup to databases structure
             if "Video" not in databases:
                 databases["Video"] = {}
@@ -3194,7 +3194,7 @@ def _enhance_databases_with_rsync_info(
                         # Save updated cache with all current files
                         _save_video_cache(device_id, video_files, video_directory)
 
-                        logging.info(
+                        logging.debug(
                             f"[ENHANCE] Found {len(video_files)} video files via cache-aware filesystem fallback "
                             f"(cache hits: {cache_hits}, fresh scans: {new_files_found})"
                         )
@@ -3207,7 +3207,7 @@ def _enhance_databases_with_rsync_info(
             # This replaces the problematic disk_usage_bytes which was returning total directory size
             device_sizes = _get_device_backup_sizes_cached(device_id, base_directory)
 
-            logging.info(
+            logging.debug(
                 f"[ENHANCE] Device {device_id} backup sizes: "
                 f"videos={_format_bytes_simple(device_sizes['videos_size'])}, "
                 f"cache_hit={device_sizes['cache_hit']}, "

@@ -15,6 +15,7 @@ from ethoscope_node.api.bugreport_api import (
     REPORT_VERSION,
     BugReportAPI,
 )
+from ethoscope_node.scanner.ethoscope_scanner import Ethoscope
 
 
 class TestBugReportAPI(unittest.TestCase):
@@ -339,21 +340,48 @@ Buffers:         1000000 kB
             }
         }
 
-        mock_device = Mock()
+        # Reason: spec=Ethoscope, so calling a method the real device class does
+        # not have fails here too. A bare Mock() accepted device.log(), which
+        # does not exist, and every real report came back without device logs.
+        mock_device = Mock(spec=Ethoscope)
         mock_device.machine_info.return_value = {"hostname": "eth001"}
-        mock_device.log.return_value = {"log": "Some log data"}
+        mock_device.get_log.return_value = {"message": "newest\nolder\noldest\n"}
         self.api.device_scanner.get_device.return_value = mock_device
 
         errors = []
 
-        result = self.api._collect_devices_info(errors, 500)
+        result = self.api._collect_devices_info(errors, 2)
 
         self.assertIn("ETHOSCOPE_001", result)
         self.assertEqual(result["ETHOSCOPE_001"]["status"], "running")
         self.assertEqual(
             result["ETHOSCOPE_001"]["machine_info"], {"hostname": "eth001"}
         )
-        self.assertEqual(result["ETHOSCOPE_001"]["log"], "Some log data")
+        # The device sends newest first; the line budget keeps the newest.
+        self.assertEqual(result["ETHOSCOPE_001"]["log"], ["newest", "older"])
+        self.assertIsNone(result["ETHOSCOPE_001"]["error"])
+
+    def test_collect_devices_info_device_log_unavailable(self):
+        """A device that cannot serve its log is reported, not silently empty."""
+        self.api.device_scanner.get_all_devices_info.return_value = {
+            "ETHOSCOPE_001": {"status": "running", "id": "ETHOSCOPE_001"}
+        }
+        mock_device = Mock(spec=Ethoscope)
+        mock_device.machine_info.return_value = {"hostname": "eth001"}
+        mock_device.get_log.return_value = None
+        self.api.device_scanner.get_device.return_value = mock_device
+
+        result = self.api._collect_devices_info([], 500)
+
+        self.assertIsNone(result["ETHOSCOPE_001"]["log"])
+        self.assertIn("Failed to get logs", result["ETHOSCOPE_001"]["error"])
+
+    def test_device_log_lines_reports_device_error(self):
+        """An error dict from the device's error_decorator becomes an exception."""
+        with self.assertRaisesRegex(RuntimeError, "WrongMachineID"):
+            BugReportAPI._device_log_lines(
+                {"error": "Traceback ...\nWrongMachineID\n"}, 500
+            )
 
     def test_collect_devices_info_device_error(self):
         """Test device collection handles device errors."""
@@ -364,9 +392,9 @@ Buffers:         1000000 kB
             }
         }
 
-        mock_device = Mock()
+        mock_device = Mock(spec=Ethoscope)
         mock_device.machine_info.side_effect = Exception("Connection error")
-        mock_device.log.side_effect = Exception("Log error")
+        mock_device.get_log.side_effect = Exception("Log error")
         self.api.device_scanner.get_device.return_value = mock_device
 
         errors = []

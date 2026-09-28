@@ -1376,7 +1376,10 @@ class Ethoscope(BaseDevice):
                 )
                 return self._info["previous_backup_filename"]
 
-            self._logger.warning(
+            # Reason: debug, not warning. A stopped device with no database is an
+            # ordinary state, and this runs on every poll: one such device wrote
+            # a warning every 5 s and crowded everything else out of the journal.
+            self._logger.debug(
                 f"Device {self._ip}: No backup filename could be determined"
             )
             return None

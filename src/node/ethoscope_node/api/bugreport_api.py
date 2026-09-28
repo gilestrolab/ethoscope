@@ -336,6 +336,31 @@ class BugReportAPI(BaseAPI):
 
         return services
 
+    @staticmethod
+    def _device_log_lines(log_data: dict[str, Any] | None, log_lines: int) -> list[str]:
+        """
+        Trim a device's ``/data/log`` answer to the report's line budget.
+
+        The device returns every journal line since each service last started,
+        newest first, so a device up for weeks sends far more than a report can
+        carry. Keeping the head keeps the most recent lines.
+
+        Args:
+            log_data (dict | None): What ``Ethoscope.get_log()`` returned.
+            log_lines (int): Maximum number of lines to keep.
+
+        Returns:
+            list[str]: The newest ``log_lines`` lines.
+
+        Raises:
+            RuntimeError: If the device could not be reached or reported an error.
+        """
+        if not log_data:
+            raise RuntimeError("device did not answer /data/log")
+        if "error" in log_data:
+            raise RuntimeError(str(log_data["error"]).strip().splitlines()[-1])
+        return log_data.get("message", "").splitlines()[:log_lines]
+
     def _get_node_logs(self, errors: list[str], log_lines: int) -> list[str]:
         """Get recent node service logs."""
         try:
@@ -397,11 +422,9 @@ class BugReportAPI(BaseAPI):
 
                         # Get device logs
                         try:
-                            log_data = device.log(log_lines)
-                            if isinstance(log_data, dict) and "log" in log_data:
-                                device_info["log"] = log_data["log"]
-                            else:
-                                device_info["log"] = log_data
+                            device_info["log"] = self._device_log_lines(
+                                device.get_log(), log_lines
+                            )
                         except Exception as e:
                             if not device_info.get("error"):
                                 device_info["error"] = f"Failed to get logs: {e}"
