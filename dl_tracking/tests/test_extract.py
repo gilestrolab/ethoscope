@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import numpy as np
@@ -50,6 +51,16 @@ def test_extract_run_statuses(run: dict, tmp_path: Path) -> None:
     snaps = pd.read_parquet(out / "snaps" / "abc_2020-01-01_00-00-00.parquet")
     assert len(snaps) == 3 and snaps.jpeg.map(len).min() > 100
     assert not any((tmp_path / "tmp").iterdir())  # the local copy is gone
+
+
+def test_missing_roi_table_is_never_detected(run: dict, tmp_path: Path) -> None:
+    """A ROI with no table (never a single detection) is never_detected, not an error."""
+    with sqlite3.connect(run["path"]) as conn:
+        conn.execute("DROP TABLE ROI_2")
+    out = tmp_path / "out"
+    assert extract.extract_run(run, out)["error"] is None
+    labels = pd.read_parquet(out / "labels" / "abc_2020-01-01_00-00-00.parquet")
+    assert set(labels[labels.roi_idx == 2].status) == {"never_detected"}
 
 
 def test_extract_run_is_resumable(run: dict, tmp_path: Path) -> None:

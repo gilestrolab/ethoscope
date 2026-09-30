@@ -44,6 +44,22 @@ N_SIZE_SAMPLES = 2000
 TMP_DIR = Path("/mnt/cache/dl_tracking/tmp")
 
 
+def write_atomic(df: pd.DataFrame, path: Path) -> None:
+    """
+    Write a parquet file so that it either exists complete or not at all.
+
+    A run counts as finished when its labels file exists; a file cut short by an
+    interrupted write would otherwise be taken for a finished run and never redone.
+
+    Args:
+        df (pd.DataFrame): The table.
+        path (Path): Destination.
+    """
+    tmp = path.with_suffix(".parquet.tmp")
+    df.to_parquet(tmp)
+    tmp.replace(path)
+
+
 def run_id(rec: dict) -> str:
     """
     Name a run uniquely across machines.
@@ -154,9 +170,12 @@ def extract_run(rec: dict, out: Path, params: L.LabelParams = L.LabelParams()) -
                 for b in blobs
             ]
             records = []
+            tables = db_io.tables(conn)
             for idx, x0, y0, w, h in rois:
                 table = f"ROI_{int(idx)}"
-                n_rows = db_io.max_rowid(conn, table)
+                # Reason: the writer creates a ROI's table with its first row, so a
+                # fly never detected (dead from the start) has no table at all.
+                n_rows = db_io.max_rowid(conn, table) if table in tables else 0
                 for (srow, t), img, lab in zip(
                     snaps,
                     images,
@@ -182,17 +201,20 @@ def extract_run(rec: dict, out: Path, params: L.LabelParams = L.LabelParams()) -
                     )
         (out / "snaps").mkdir(parents=True, exist_ok=True)
         (out / "labels").mkdir(parents=True, exist_ok=True)
-        pd.DataFrame(
-            {"snap_rowid": snaps[:, 0], "t": snaps[:, 1], "jpeg": blobs}
-        ).to_parquet(out / "snaps" / f"{rid}.parquet")
+        write_atomic(
+            pd.DataFrame({"snap_rowid": snaps[:, 0], "t": snaps[:, 1], "jpeg": blobs}),
+            out / "snaps" / f"{rid}.parquet",
+        )
         # Reason: labels are written last, so their presence marks a finished run.
         labels = pd.DataFrame(records)
-        labels.to_parquet(out / "labels" / f"{rid}.parquet")
+        write_atomic(labels, out / "labels" / f"{rid}.parquet")
         summary.update(labels["status"].value_counts().to_dict() if len(labels) else {})
     except Exception as exc:  # noqa: BLE001 - one bad DB must not stop the batch
         summary["error"] = f"{type(exc).__name__}: {exc}"
     finally:
-        local.unlink(missing_ok=True)
+        # Reason: opening a WAL-mode DB, even read-only, creates -wal and -shm files.
+        for leftover in (local, Path(f"{local}-wal"), Path(f"{local}-shm")):
+            leftover.unlink(missing_ok=True)
     return summary
 
 

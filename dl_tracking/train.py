@@ -124,74 +124,75 @@ def evaluate(net: torch.nn.Module, loader: DataLoader, device: str) -> dict[str,
     }
 
 
-def split_rows(
-    pack: Path, runs: Path, exclude_flag: str | None = "no_ir"
-) -> dict[str, pd.DataFrame]:
+def split_rows(pack: Path, runs: Path) -> pd.DataFrame:
     """
-    Load the training rows and split them by the runs table.
+    Load the training rows with each run's split and ``no_ir`` flag.
 
     Args:
         pack (Path): Pack directory.
         runs (Path): ``runs.parquet`` from :mod:`dl_tracking.select_runs`.
-        exclude_flag (str | None): Boolean column of ``runs`` whose True runs are
-            left out (for example the runs recorded without IR), if present.
 
     Returns:
-        dict[str, pd.DataFrame]: Rows per split.
+        pd.DataFrame: Rows of :func:`dataset.training_rows` plus ``split`` and
+        ``no_ir`` (False when the runs table has no such column).
     """
     rows = D.training_rows(pd.read_parquet(pack / "labels.parquet"))
     table = pd.read_parquet(runs)
     table["run_id"] = table.machine_id + "_" + table.run_dt
-    if exclude_flag and exclude_flag in table:
-        table = table[~table[exclude_flag].astype(bool)]
-    rows = rows.merge(table[["run_id", "split"]], on="run_id")
-    return dict(tuple(rows.groupby("split")))
+    if "no_ir" not in table:
+        table["no_ir"] = False
+    return rows.merge(table[["run_id", "split", "no_ir"]], on="run_id")
 
 
-def main() -> None:
-    """Command-line entry point."""
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--pack", type=Path, required=True)
-    ap.add_argument("--runs", type=Path, required=True)
-    ap.add_argument("--variant", default="tiny", choices=list(M.VARIANTS))
-    ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--epochs", type=int, default=30)
-    ap.add_argument("--snapshots-per-batch", type=int, default=16)
-    ap.add_argument("--lr", type=float, default=3e-3)
-    ap.add_argument("--workers", type=int, default=16)
-    ap.add_argument("--max-val-snapshots", type=int, default=3000)
-    args = ap.parse_args()
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    args.out.mkdir(parents=True, exist_ok=True)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+def loader(
+    store: D.SnapshotStore,
+    rows: pd.DataFrame,
+    train: bool,
+    args,
+    max_snapshots: int | None = None,
+) -> DataLoader:
+    """
+    Build a data loader over some rows.
 
-    splits = split_rows(args.pack, args.runs)
-    store = D.SnapshotStore(args.pack)
-    train_ds = D.TubeDataset(store, splits["train"], augment=True)
-    val_rows = splits["val"]
-    keep = pd.Series(val_rows.sid.unique()).sample(
-        min(args.max_val_snapshots, val_rows.sid.nunique()), random_state=0
-    )
-    val_ds = D.TubeDataset(
-        store, val_rows[val_rows.sid.isin(keep)], augment=False, p_swap=0.5
-    )
-    logging.info(
-        "train %d snapshots / %d tubes, val %d snapshots",
-        len(train_ds),
-        len(splits["train"]),
-        len(val_ds),
-    )
-    kw = {
-        "collate_fn": D.collate,
-        "num_workers": args.workers,
-        "persistent_workers": True,
-    }
-    train_dl = DataLoader(
-        train_ds, args.snapshots_per_batch, shuffle=True, drop_last=True, **kw
-    )
-    val_dl = DataLoader(val_ds, args.snapshots_per_batch, shuffle=False, **kw)
+    Args:
+        store (D.SnapshotStore): Packed snapshots.
+        rows (pd.DataFrame): Label rows.
+        train (bool): Augment and shuffle (training) or not (evaluation, which still
+            swaps windows so that presence is measured on fly-free canvases).
+        args: Parsed command-line arguments.
+        max_snapshots (int | None): Cap on snapshots, sampled reproducibly.
 
-    net = M.build(args.variant).to(device)
+    Returns:
+        DataLoader: The loader.
+    """
+    if max_snapshots is not None and rows.sid.nunique() > max_snapshots:
+        keep = pd.Series(rows.sid.unique()).sample(max_snapshots, random_state=0)
+        rows = rows[rows.sid.isin(keep)]
+    ds = D.TubeDataset(store, rows, augment=train, p_swap=0.5)
+    return DataLoader(
+        ds,
+        args.snapshots_per_batch,
+        shuffle=train,
+        drop_last=train,
+        collate_fn=D.collate,
+        num_workers=args.workers,
+        persistent_workers=train,
+    )
+
+
+def fit(
+    net: torch.nn.Module, train_dl: DataLoader, val_dl: DataLoader, args, device: str
+) -> None:
+    """
+    Train, validating after every epoch; keep ``last.pt`` and the best ``best.pt``.
+
+    Args:
+        net (torch.nn.Module): The network.
+        train_dl (DataLoader): Training data.
+        val_dl (DataLoader): Validation data (selects the checkpoint).
+        args: Parsed command-line arguments.
+        device (str): Torch device.
+    """
     opt = torch.optim.AdamW(net.parameters(), lr=args.lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.OneCycleLR(
         opt, args.lr, total_steps=args.epochs * len(train_dl), pct_start=0.1
@@ -232,6 +233,63 @@ def main() -> None:
         if score < best:
             best = score
             torch.save(ckpt, args.out / "best.pt")
+
+
+def main() -> None:
+    """Command-line entry point."""
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--pack", type=Path, required=True)
+    ap.add_argument("--runs", type=Path, required=True)
+    ap.add_argument("--variant", default="tiny", choices=list(M.VARIANTS))
+    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--epochs", type=int, default=30)
+    ap.add_argument("--snapshots-per-batch", type=int, default=16)
+    ap.add_argument("--lr", type=float, default=3e-3)
+    ap.add_argument("--workers", type=int, default=16)
+    ap.add_argument("--max-val-snapshots", type=int, default=3000)
+    ap.add_argument(
+        "--include-flagged",
+        action="store_true",
+        help="also train on runs flagged no_ir (picamera2 tuning bug)",
+    )
+    args = ap.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    args.out.mkdir(parents=True, exist_ok=True)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    rows = split_rows(args.pack, args.runs)
+    store = D.SnapshotStore(args.pack)
+    train = rows[(rows.split == "train") & (args.include_flagged | ~rows.no_ir)]
+    # Reason: select checkpoints on unflagged validation runs in every variant, so
+    # that runs trained with and without the flagged data are compared alike.
+    val = rows[(rows.split == "val") & ~rows.no_ir]
+    logging.info(
+        "train %d snapshots / %d tubes (flagged %s), val %d snapshots",
+        train.sid.nunique(),
+        len(train),
+        "included" if args.include_flagged else "excluded",
+        val.sid.nunique(),
+    )
+    net = M.build(args.variant).to(device)
+    fit(
+        net,
+        loader(store, train, True, args),
+        loader(store, val, False, args, args.max_val_snapshots),
+        args,
+        device,
+    )
+
+    best = torch.load(args.out / "best.pt", map_location=device)
+    net.load_state_dict(best["state_dict"])
+    report = {"best_epoch": best["epoch"]}
+    for flagged in (False, True):
+        test = rows[(rows.split == "test") & (rows.no_ir == flagged)]
+        if len(test):
+            key = "test_flagged" if flagged else "test_unflagged"
+            dl = loader(store, test, False, args, args.max_val_snapshots)
+            report[key] = evaluate(net, dl, device)
+    (args.out / "final.json").write_text(json.dumps(report, indent=1))
+    logging.info("final: %s", json.dumps(report))
 
 
 if __name__ == "__main__":
