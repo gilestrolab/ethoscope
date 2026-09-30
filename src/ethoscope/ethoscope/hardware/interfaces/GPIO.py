@@ -12,6 +12,10 @@ import RPi.GPIO as GPIO
 GPIO.setmode(GPIO.BOARD)
 DEFAULT_JSON_FILE = "/etc/gpio.conf"
 
+# Seconds between two reads of a button. Press durations are compared against
+# thresholds in whole seconds, so 20 ms loses nothing, and it also debounces.
+POLL_INTERVAL = 0.02
+
 
 class Output:
     """
@@ -131,7 +135,7 @@ class Button(threading.Thread):
             self.channel, GPIO.IN, pull_up_down=GPIO.PUD_UP
         )  # Button pin set as input
 
-        self.deamon = True
+        self.daemon = True
         self.last_pressed = time.time()
 
         self.start()
@@ -146,6 +150,11 @@ class Button(threading.Thread):
 
     def run(self):
         while self._listen:
+            # Reason: without a pause this loop polls the pin as fast as Python
+            # can, pinning one core at 100% for as long as the service runs.
+            # wait_for_edge() is avoided on purpose: it blocks, so stop() could
+            # never end the thread.
+            time.sleep(POLL_INTERVAL)
             if GPIO.input(self.channel):  # button released
                 if self._pressed is True:
                     self._pressed = False
@@ -225,6 +234,9 @@ if __name__ == "__main__":
         BTNs = GPIOButtons()
 
     try:
-        pass
+        # Reason: the button threads are daemons, so the process lives only as
+        # long as the main thread waits for them.
+        for B in BTNs.BTN:
+            B.join()
     except KeyboardInterrupt:  # If CTRL+C is pressed, exit cleanly:
         BTNs.exit()
