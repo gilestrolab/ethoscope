@@ -441,45 +441,35 @@ class SQLiteResultWriter(BaseResultWriter):
                 self._write_async_command(*c_args)
 
         # Handle ROI data inserts with parameterized queries
-        for roi_id, value_list in list(self._insert_dict.items()):
-            if len(value_list) >= self._max_insert_string_len:
-                # Execute batch insert with parameterized query
-                if value_list:  # Only if we have data
-                    placeholders = ", ".join(
-                        ["?" for _ in value_list[0]]
-                    )  # Create ? placeholders
-                    command = f"INSERT INTO ROI_{roi_id} VALUES ({placeholders})"
-
-                    # Execute each row as individual parameterized query
-                    for values in value_list:
-                        self._write_async_command(command, values)
-
-                    # Clear the list after flushing
-                    self._insert_dict[roi_id] = []
+        self._write_buffered_rows(min_rows=self._max_insert_string_len)
         return False
+
+    def _write_buffered_rows(self, min_rows=1):
+        """
+        Queue the buffered rows of every ROI holding at least ``min_rows``.
+
+        Args:
+            min_rows (int): Only ROIs with this many buffered rows are written.
+
+        Returns:
+            None
+        """
+        for roi_id, value_list in list(self._insert_dict.items()):
+            if value_list and len(value_list) >= min_rows:
+                placeholders = ", ".join(["?" for _ in value_list[0]])
+                command = f"INSERT INTO ROI_{roi_id} VALUES ({placeholders})"
+                for values in value_list:
+                    self._write_async_command(command, values)
+                self._insert_dict[roi_id] = []
 
     def close(self):
         """
-        Close the writer and flush any remaining data.
+        Write every buffered row, however few. Called by ``__exit__``.
 
-        Ensures all accumulated data is written before shutdown.
+        During the run rows are only written in full batches (see ``flush``);
+        without this the last partial batch of each ROI would be lost at stop.
         """
-        # Final flush of any remaining data
-        for roi_id, value_list in list(self._insert_dict.items()):
-            if value_list:  # Only if we have data
-                placeholders = ", ".join(
-                    ["?" for _ in value_list[0]]
-                )  # Create ? placeholders
-                command = f"INSERT INTO ROI_{roi_id} VALUES ({placeholders})"
-
-                # Execute each row as individual parameterized query
-                for values in value_list:
-                    self._write_async_command(command, values)
-
-                # Clear the list after flushing
-                self._insert_dict[roi_id] = []
-
-        # Call parent close method
+        self._write_buffered_rows()
         super().close()
 
     def _create_all_tables(self):

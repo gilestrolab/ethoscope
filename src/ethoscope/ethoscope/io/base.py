@@ -405,16 +405,17 @@ class BaseResultWriter:
         """
         logging.info("Closing result writer...")
         for k, v in list(self._insert_dict.items()):
-            # Check if v is a string (command) or a list (data)
-            if isinstance(v, str):
-                # Original behavior for string commands
+            # String buffers (MySQL) are a ready-made INSERT; list buffers
+            # (SQLite) are written by the subclass's close() below.
+            if isinstance(v, str) and v:
                 self._write_async_command(v)
                 self._insert_dict[k] = ""
-            elif isinstance(v, list):
-                # For list-based data (e.g., SQLiteResultWriter), do nothing here
-                # The subclass should handle flushing lists appropriately
-                pass
         try:
+            # Reason: rows are only written in full batches during the run, so
+            # whatever is still buffered must be drained here - before the stop
+            # timestamp and before the queue is shut down - or every recording
+            # loses its tail.
+            self.close()
             command = "INSERT INTO METADATA VALUES (%s, %s)"
             self._write_async_command(
                 command, ("stop_date_time", str(int(time.time())))
@@ -446,7 +447,12 @@ class BaseResultWriter:
         return self.get_last_timestamp()
 
     def close(self):
-        """Placeholder close method."""
+        """
+        Write any rows still buffered. Called by ``__exit__`` before shutdown.
+
+        The base class buffers ready-made INSERT strings, which ``__exit__``
+        writes itself, so there is nothing to do here.
+        """
         pass
 
     def __getstate__(self):

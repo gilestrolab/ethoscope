@@ -917,3 +917,81 @@ class TestDiagnosticsTemperature(unittest.TestCase):
         conn.close()
 
         self.assertAlmostEqual(temp, 57.5, places=2)
+
+
+class TestSQLiteResultWriterExitFlush(unittest.TestCase):
+    """Leaving the ``with`` block writes every buffered row.
+
+    Rows are buffered per ROI and only written in batches of
+    ``_max_insert_string_len``; whatever is left in the buffer at stop must
+    still reach the database, otherwise every recording loses its last few
+    minutes and every ROI table ends at a multiple of the batch size.
+    """
+
+    def setUp(self):
+        self.db_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.db_fd)
+        self.rois = [
+            ROI(polygon=((0, 0), (100, 0), (100, 100), (0, 100)), idx=i, value=i)
+            for i in (1, 2, 3)
+        ]
+
+    def tearDown(self):
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def _row(self, x):
+        from ethoscope.core.data_point import DataPoint
+        from ethoscope.core.variables import XPosVariable, YPosVariable
+
+        return DataPoint([XPosVariable(x), YPosVariable(x)])
+
+    def _count(self, table):
+        conn = sqlite3.connect(self.db_path)
+        try:
+            return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        finally:
+            conn.close()
+
+    def test_exit_writes_partial_batches(self):
+        """Rows below and above one batch are all written at exit."""
+        writer = SQLiteResultWriter(
+            db_credentials={"name": self.db_path},
+            rois=self.rois,
+            metadata={"machine_name": "t", "machine_id": "T"},
+            erase_old_db=True,
+        )
+        batch = writer._max_insert_string_len
+        # Reason: ROI 1 never fills a batch; ROI 2 fills one and leaves a
+        # remainder, so both the "never flushed" and "flushed, then leftover"
+        # paths are covered. ROI 3 gets nothing.
+        expected = {1: 250, 2: batch + 250}
+        with writer as rw:
+            for i in range(max(expected.values())):
+                for roi in self.rois[:2]:
+                    if i < expected[roi.idx]:
+                        rw.write(i * 100, roi, [self._row(i % 100)])
+                rw.flush(i * 100)
+
+        self.assertEqual(self._count("ROI_1"), expected[1])
+        self.assertEqual(self._count("ROI_2"), expected[2])
+
+    def test_exit_with_no_rows_still_records_stop_time(self):
+        """An empty run exits cleanly and still writes stop_date_time."""
+        writer = SQLiteResultWriter(
+            db_credentials={"name": self.db_path},
+            rois=self.rois,
+            metadata={"machine_name": "t", "machine_id": "T"},
+            erase_old_db=True,
+        )
+        with writer:
+            pass
+
+        conn = sqlite3.connect(self.db_path)
+        try:
+            rows = conn.execute(
+                "SELECT value FROM METADATA WHERE field='stop_date_time'"
+            ).fetchall()
+        finally:
+            conn.close()
+        self.assertEqual(len(rows), 1)
