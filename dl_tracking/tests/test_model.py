@@ -82,6 +82,7 @@ def test_decode_reads_the_peak_cell() -> None:
 
 def test_fold_batchnorm_preserves_outputs() -> None:
     """Folding BN into the convolutions changes nothing numerically."""
+    torch.manual_seed(0)
     net = M.build("tiny")
     net.train()
     with torch.no_grad():  # give BN non-trivial statistics
@@ -97,6 +98,7 @@ def test_fold_batchnorm_preserves_outputs() -> None:
 
 def test_onnx_parity_with_cv2_dnn(tmp_path: Path) -> None:
     """cv2.dnn runs the export, at the training width and at a 10-tube width."""
+    torch.manual_seed(0)  # an unseeded random net can have a flat, undecidable heatmap
     net = M.build("tiny")
     net.train()
     with torch.no_grad():

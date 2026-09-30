@@ -80,6 +80,23 @@ def test_metadata_parsing(db_path: Path) -> None:
     assert db_io.experimental_info({"experimental_info": "not a dict {"}) == {}
 
 
+def test_selected_classes_reads_both_reprs() -> None:
+    """Dict-style and OrderedDict-of-pairs reprs give the same classes."""
+    cls = "[<class 'ethoscope.trackers.adaptive_bg_tracker.AdaptiveBGModel'>]"
+    one = "<class 'ethoscope.trackers.adaptive_bg_tracker.AdaptiveBGModel'>"
+    as_dict = (
+        f"OrderedDict({{'tracker': {{'possible_classes': {cls}, 'class': {one}}}}})"
+    )
+    as_pairs = (
+        f"OrderedDict([('tracker', {{'possible_classes': {cls}, 'class': {one}}})])"
+    )
+    assert (
+        db_io.selected_classes(as_dict)
+        == db_io.selected_classes(as_pairs)
+        == {"tracker": "AdaptiveBGModel"}
+    )
+
+
 def test_snapshots(db_path: Path) -> None:
     """Snapshot times are listed without image data and decode as grey images."""
     with db_io.connect(db_path) as conn:

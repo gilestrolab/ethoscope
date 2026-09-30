@@ -169,11 +169,20 @@ def main() -> None:
         "--out", type=Path, default=Path("/mnt/cache/dl_tracking/runs.parquet")
     )
     parser.add_argument("--per-group-year", type=int, default=3)
+    parser.add_argument(
+        "--flagged",
+        type=Path,
+        default=None,
+        help="CSV from dl_tracking.flag_no_ir; its runs get no_ir = True",
+    )
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     runs = select(pd.read_parquet(args.census), args.per_group_year, args.seed)
+    flagged = set(pd.read_csv(args.flagged).path) if args.flagged else set()
+    runs["no_ir"] = runs.path.isin(flagged)
     runs.to_parquet(args.out)
+    logging.info("%d runs flagged no_ir (kept out of training)", runs.no_ir.sum())
     logging.info("%d runs, %d groups", len(runs), runs.group.nunique())
     logging.info("by split:\n%s", runs.split.value_counts().to_string())
     logging.info("by year:\n%s", runs.year.value_counts().sort_index().to_string())

@@ -22,8 +22,10 @@ RESULTS_ROOTS = (
     Path("/mnt/archive/Archive/ethoscope_results/results"),
 )
 ROI_COLUMNS = ("t", "x", "y", "w", "h", "phi", "xy_dist_log10x1000", "is_inferred")
+# Reason: selected_options is a repr, written either as a dict ('tracker': {...}) or,
+# by some 2025-2026 versions, as an OrderedDict of pairs (('tracker', {...}).
 _CLASS_RE = re.compile(
-    r"'(\w+)': \{'possible_classes': \[.*?\], 'class': <class '([\w\.]+)'>"
+    r"'(\w+)'[:,] \{'possible_classes': \[.*?\], 'class': <class '([\w\.]+)'>"
 )
 
 

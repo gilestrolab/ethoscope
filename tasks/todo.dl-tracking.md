@@ -165,13 +165,20 @@ on the same frames:
 - [ ] Verify that `rowid` is monotonic in `t` in each era, so bisection is safe.
 - [ ] Summarise the machines, eras and lighting clusters to drive the stratification
       and the splits.
-- [ ] **Flag the no-IR runs.** A camera-settings bug once left IR mode off, giving very
-      dark snapshots (Giorgio, 2026-09-30). Find them from `snap_lum`, check whether
-      they cluster by date and `version` (commit), and write the list of affected
-      experiments (device, date, user, path) to
-      `/mnt/cache/dl_tracking/flagged_no_ir_runs.csv` for future reconsideration.
-      Flag them in `runs.parquet`, keep them out of the first training round, and use
-      them as a separate stress test.
+- [x] **Flag the no-IR runs.** A camera-settings bug once left IR mode off, giving very
+      dark snapshots (Giorgio, 2026-09-30). Done by image signature, since neither the
+      code history nor the dates pin the bug: 941 runs (143 machines) whose darkest
+      census sample is below 40% of their brightest (with working IR the backlight
+      keeps nights nearly as bright as days). The list, with commit, commit date and
+      user, is `/mnt/cache/dl_tracking/flagged_no_ir_runs.csv`; 168 of the selected
+      runs carry `no_ir = True` in `runs.parquet` and are kept out of training.
+      Clusters: (A) 246 runs Sept 2023 – March 2024, 245 of them one user's
+      (`lblackhurst`, ETHOSCOPE_030–034, AGO experiments), possibly that rig's
+      lighting rather than the bug; (B) 82 runs on 17 machines with Oct–Dec 2022
+      commits; the other 613 are scattered from 2016 to 2026. The NoIR-tuning code
+      window (Sept 2025 – Aug 2026) is **not** enriched (4.4% dark nights against 4.6%
+      before it). **Ask Giorgio roughly when the bug was**, so the flag can be
+      narrowed to it.
 
 ### Phase 2: dataset builder
 - [x] `labels.py`: pure functions for the confident-positive filter, the trajectory
@@ -310,7 +317,14 @@ Sketch, not to be implemented under this plan:
 - **Machine ids are not unique.** Cloned SD images share an id (for example
   `0001eeee…` appears as ETHOSCOPE_033 and others). Split groups are therefore the
   connected components of (machine_id, machine_name) pairs.
-- 0-byte DB files exist; the census records them as `empty file`.
+- 0-byte DB files exist; the census records them as `empty file` (569 of 21,840).
+- **Two `selected_options` formats.** Some 2025–2026 versions write it as an
+  OrderedDict of pairs, `(('tracker', {...`, not a dict. The first parser missed them,
+  which silently dropped 763 recent runs; both forms are now parsed. The 342 runs
+  from 2015 predate `selected_options` and stay excluded.
+- **Census totals.** 21,840 DBs, 14,402 usable tube-layout runs (66%), 290 device
+  groups (1,172 machine ids for 291 names: cards get re-flashed). Selection at 3 runs
+  per group and year: 2,768 runs (1.57 TB), 2,081 train / 260 val / 427 test.
 - **Some DBs hold their run twice.** 2.8% of the 2020–2023 DBs have ROI tables where
   `t` runs to the end and then restarts. They cluster in Feb–Mar 2022, which looks
   like a backup that appended its dump a second time. Excluded (`monotonic == 0`),
