@@ -696,9 +696,16 @@ class PiFrameGrabber2(PiFrameGrabber):
     # bright light. Frames in excess of the tracking cap are dropped in software.
     _MIN_FRAME_DURATION_US = 33333
 
-    def __init__(self, *args, **kwargs):
+    # [v3] Sensor name reported by libcamera for the Raspberry Pi Camera Module 3
+    # [v3] (also matches imx708_noir, imx708_wide and imx708_wide_noir).
+    _CAMERA_V3_MODEL = "imx708"
+
+    def __init__(self, *args, bitrate=None, **kwargs):
         """
         Initialize PiFrameGrabber2 with configurable gain from system settings.
+
+        :param bitrate: [v3] optional H.264 bitrate in bits/s. When given it
+            overrides the per-camera defaults (camera_v2_bitrate / camera_v3_bitrate).
         """
         # Get gain from system setting
         self._gain = pi.get_gain_setting()
@@ -711,6 +718,21 @@ class PiFrameGrabber2(PiFrameGrabber):
         self.no_camera_detected = False
         # Throttles the live gain poll in the capture loop.
         self._last_gain_poll = 0.0
+
+        # [v3] H.264 bitrate (bits/s) per camera generation. camera_v2_bitrate
+        # [v3] keeps the value previously hardcoded in the encoder.
+        self.camera_v2_bitrate = 10_000_000
+        self.camera_v3_bitrate = 2_000_000
+        self._bitrate_override = bitrate
+        self.video_bitrate = None  # [v3] resolved in run()
+
+        # [v3] Camera Module 3 specifics. Set in run() from the attached-camera probe.
+        self.camera_v3 = False
+        self._camera_model = "unknown"
+        self.camera_v3_res = (1920, 1080)  # [v3] used only when recording video
+        self.camera_v3_manual_focus = 9.5  # [v3] LensPosition in dioptres (~10.5 cm)
+        self.camera_v3_buffer_count = 4  # [v3] more buffers for 1080p encoding
+
         super().__init__(*args, **kwargs)
 
     # How often the gain setting file is re-read, in seconds. A stat() at this
@@ -752,6 +774,80 @@ class PiFrameGrabber2(PiFrameGrabber):
         except Exception as e:
             # Never let a settings poll interrupt acquisition.
             logging.warning(f"Could not apply a live gain change: {e}")
+
+    def _detect_camera_model(self, attached):
+        """
+        [v3] Identify the sensor from the attached-camera probe done in run().
+
+        Uses the list already returned by ``Picamera2.global_camera_info()``, so
+        the camera is not opened a second time.
+
+        Args:
+            attached: the list returned by ``Picamera2.global_camera_info()``.
+        """
+        try:
+            self._camera_model = str(attached[0].get("Model", "unknown")).lower()
+        except Exception as e:
+            logging.warning(f"Could not read the camera model: {e}")
+            self._camera_model = "unknown"
+
+        self.camera_v3 = self._camera_model.startswith(self._CAMERA_V3_MODEL)
+        logging.info(
+            f"Detected camera model: {self._camera_model} "
+            f"({'Camera Module 3' if self.camera_v3 else 'Camera Module v2 / other'})"
+        )
+
+    def _resolve_video_bitrate(self):
+        """
+        [v3] Pick the H.264 bitrate: explicit override first, then per-camera default.
+
+        Returns:
+            int: bitrate in bits/s.
+        """
+        if self._bitrate_override:
+            return int(self._bitrate_override)
+        if self.camera_v3:
+            return int(self.camera_v3_bitrate)
+        return int(self.camera_v2_bitrate)
+
+    def _add_focus_controls(self, capture, controls):
+        """
+        [v3] Add manual-focus controls when the sensor has a motorised lens.
+
+        Only the Camera Module 3 advertises AfMode/LensPosition. The v2 has a
+        fixed-focus lens and rejects these controls ("Control AfMode is not
+        advertised by libcamera"), so they are added only when advertised.
+
+        Args:
+            capture: the open Picamera2 instance.
+            controls: the dict returned by ``_build_camera_controls()``.
+
+        Returns:
+            dict: the same dict, with focus controls added when supported.
+        """
+        if libcamera_controls is None:
+            return controls
+
+        try:
+            available = capture.camera_controls
+        except Exception as e:
+            logging.warning(f"Could not read the camera controls: {e}")
+            return controls
+
+        if "AfMode" not in available or "LensPosition" not in available:
+            return controls
+
+        lo, hi, _ = available["LensPosition"]
+        position = float(self.camera_v3_manual_focus)
+        if lo is not None:
+            position = max(position, lo)
+        if hi is not None:
+            position = min(position, hi)
+
+        controls["AfMode"] = libcamera_controls.AfModeEnum.Manual
+        controls["LensPosition"] = position
+        logging.info(f"Manual focus: LensPosition={position} (range {lo}-{hi})")
+        return controls
 
     def _build_camera_controls(self):
         """
@@ -954,6 +1050,9 @@ class PiFrameGrabber2(PiFrameGrabber):
                 self._queue.put(None)
                 return
 
+            # [v3] Identify v2 / v3 from the probe we already have (no second open).
+            self._detect_camera_model(attached)
+
         # A camera really is attached, so a tuning complaint now points at the
         # tuning rather than away from a missing sensor.
         if tuning_problem:
@@ -994,6 +1093,15 @@ class PiFrameGrabber2(PiFrameGrabber):
                 # With IMX219 640x480 will not return the full FoV. 960x720 does.
                 # See https://picamera.readthedocs.io/en/release-1.13/fov.html for a full description
 
+                # [v3] Camera Module 3 records at its wide 1080p frame; tracking and
+                # [v3] the v2 keep the requested resolution. _target_resolution is
+                # [v3] updated so the chunk filenames report the real resolution.
+                if self.camera_v3 and self._record_video:
+                    self._target_resolution = tuple(self.camera_v3_res)
+                    buffer_count = self.camera_v3_buffer_count
+                else:
+                    buffer_count = 2
+
                 w, h = self._target_resolution
                 logging.info(
                     f"Configuring camera with resolution: {w}x{h}, fps: {self._target_fps}"
@@ -1006,13 +1114,16 @@ class PiFrameGrabber2(PiFrameGrabber):
                 # video mode the exact frame rate is pinned. See issue #222.
                 camera_controls = self._build_camera_controls()
 
+                # [v3] Manual focus on the Camera Module 3; skipped on fixed-focus v2.
+                camera_controls = self._add_focus_controls(capture, camera_controls)
+
                 # Note: Automatic tuning detection allows libcamera to choose optimal settings
                 # for current illumination conditions (day/night, visible/IR light)
 
                 config = capture.create_video_configuration(
                     main={"size": (w, h), "format": "YUV420"},
                     raw=None,  # Explicitly disable raw stream to prevent dual-stream issues
-                    buffer_count=2,  # Still image capture normally configures only a single buffer, as this is all you need. But if you're doing some form of burst capture, increasing the buffer count may enable the application to receive images more quickly.
+                    buffer_count=buffer_count,  # Still image capture normally configures only a single buffer, as this is all you need. But if you're doing some form of burst capture, increasing the buffer count may enable the application to receive images more quickly.
                     controls=camera_controls,
                 )
                 logging.info("Camera configuration created successfully")
@@ -1041,7 +1152,14 @@ class PiFrameGrabber2(PiFrameGrabber):
                 if self._record_video:
                     from picamera2.encoders import H264Encoder
 
-                    encoder = H264Encoder(bitrate=10000000)
+                    # [v3] Bitrate comes from camera_v3_bitrate / camera_v2_bitrate
+                    # [v3] (or the bitrate= override) instead of a hardcoded value.
+                    self.video_bitrate = self._resolve_video_bitrate()
+                    logging.info(
+                        f"Recording H.264 {w}x{h}@{self._target_fps}fps, "
+                        f"bitrate {self.video_bitrate / 1e6:.1f} Mbit/s"
+                    )
+                    encoder = H264Encoder(bitrate=self.video_bitrate)
 
                     self._video_time = time.time()
                     self._refresh_interval = time.time()
@@ -1172,7 +1290,6 @@ class PiFrameGrabber2(PiFrameGrabber):
             except ValueError:
                 pass
             logging.warning("Camera Frame grabber stopped acquisition cleanly.")
-
 
 class OurPiCameraAsync(BaseCamera):
     _description = {
