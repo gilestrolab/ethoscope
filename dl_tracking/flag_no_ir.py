@@ -1,16 +1,21 @@
-"""Flag runs whose night snapshots are far darker than their day snapshots.
+"""Flag runs recorded while picamera2 ran NoIR cameras on the default colour tuning.
 
-Giorgio reported (2026-09-30) that a camera-settings bug once kept IR mode from
-being used, leaving very dark images. Under working IR the backlight keeps night
-frames nearly as bright as day frames; a run whose darkest census luminance sample
-is below ``RATIO_MAX`` of its brightest has dark nights. The census holds four
-samples per run, so a run whose samples all fell in daylight is missed.
+Giorgio (2026-09-30): the camera problem started when the repository moved to
+picamera2. The history bounds it. ``370c9491`` (2024-02-02) moved to picamera2,
+which runs libcamera's default *colour* tuning on NoIR sensors. NoIR tuning became
+an option defaulting to off (``faf84b46``), became unconditional (``217084d9``), and
+was actually applied only from ``766de9ab`` (2026-08-26), whose message measures the
+effect: frames about three times too dark under IR.
 
-The flag is the image signature, not a date range: the repository's history does
-not pin the bug. The strongest cluster in the data is commits 028bfb56..e87e6c53
-(Sept 2023 - March 2024; about half of those runs, on 26 machines), gone from
-aaa462e6 (June 2024). Each flagged run is written with its commit and commit date,
-so that the period can be confirmed by eye.
+A run is affected when its software commit (METADATA ``version``) lies in
+[370c9491, 766de9ab) **and** the device ran picamera2. The device loads legacy
+``picamera`` whenever it imports, so the OS image decides: Arch Linux ARM kernels
+(``*-rpi-ARCH``) kept legacy picamera; Raspberry Pi OS kernels (``+rpt``, ``-v8``)
+have only picamera2. The kernel is read from ``hardware_info`` in METADATA.
+
+Brightness alone does not find these runs: auto-exposure mostly compensated (window
+picamera2 runs have a median night luminance of 78 against 89 for legacy picamera),
+so the dark-night ratio is reported alongside, not used to flag.
 
 Usage::
 
@@ -21,97 +26,139 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import subprocess  # nosec B404 - fixed git command on hashes read from our own DBs
+import re
+import subprocess  # nosec B404 - fixed git commands on hashes read from our own DBs
 from functools import cache
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from . import db_io
 from .select_runs import _seq
 
-RATIO_MAX = 0.4
+WINDOW_START = "370c9491"  # 2024-02-02: picamera2, default colour tuning
+WINDOW_END = "766de9ab"  # 2026-08-26: NoIR tuning actually applied
 REPO = Path(__file__).resolve().parents[1]
+_KERNEL_RE = re.compile(r"'kernel': '([^']+)'")
+
+
+def _git(*args: str) -> subprocess.CompletedProcess:
+    """Run a read-only git command in this repository."""
+    return subprocess.run(  # nosec B603 B607 - no shell; callers pass validated hashes
+        ["git", "-C", str(REPO), *args], capture_output=True, text=True, check=False
+    )
 
 
 @cache
-def commit_date(version: str | None) -> str | None:
+def code_window(version: str | None) -> str:
     """
-    Return the date of a recording's software commit, if this clone has it.
+    Place a recording's software commit relative to the affected window.
 
     Args:
         version (str | None): METADATA ``version`` (a commit hash).
 
     Returns:
-        str | None: ``YYYY-MM-DD``, or None for a missing, malformed or unknown hash.
+        str: ``before``, ``window``, ``fixed`` or ``unknown`` (no hash, or one this
+        clone does not have).
     """
     if not isinstance(version, str) or not version.isalnum():
-        return None
-    res = subprocess.run(  # nosec B603 B607 - no shell; the hash is alphanumeric
-        [
-            "git",
-            "-C",
-            str(REPO),
-            "show",
-            "-s",
-            "--format=%ad",
-            "--date=short",
-            f"{version}^{{commit}}",
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return (res.stdout.strip() or None) if res.returncode == 0 else None
+        return "unknown"
+    if _git("cat-file", "-e", f"{version}^{{commit}}").returncode:
+        return "unknown"
+    if _git("merge-base", "--is-ancestor", WINDOW_END, version).returncode == 0:
+        return "fixed"
+    if _git("merge-base", "--is-ancestor", WINDOW_START, version).returncode == 0:
+        return "window"
+    return "before"
 
 
-def luminance(census: pd.DataFrame) -> pd.DataFrame:
+def camera_stack(kernel: str | None) -> str:
     """
-    Summarise each run's snapshot luminance samples (1/4-scale means).
+    Tell which camera library a device used, from its kernel string.
+
+    Args:
+        kernel (str | None): ``hardware_info['kernel']``.
+
+    Returns:
+        str: ``picamera`` (Arch Linux ARM image), ``picamera2`` (Raspberry Pi OS)
+        or ``unknown``.
+    """
+    if not isinstance(kernel, str):
+        return "unknown"
+    if "rpi-ARCH" in kernel:
+        return "picamera"
+    if "+rpt" in kernel or kernel.endswith(("-v8", "-2712")):
+        return "picamera2"
+    return "unknown"
+
+
+def read_kernel(path: str) -> str | None:
+    """
+    Read the kernel string from a run's METADATA ``hardware_info``.
+
+    Args:
+        path (str): The DB.
+
+    Returns:
+        str | None: The kernel, or None if not recorded or unreadable.
+    """
+    try:
+        with db_io.connect(Path(path)) as conn:
+            hw = db_io.read_metadata(conn).get("hardware_info", "")
+    except Exception:  # noqa: BLE001 - a flag pass must survive any bad file
+        return None
+    match = _KERNEL_RE.search(hw)
+    return match.group(1) if match else None
+
+
+def night_day_ratio(census: pd.DataFrame) -> pd.Series:
+    """
+    Darkest over brightest census luminance sample, per run (NaN without samples).
 
     Args:
         census (pd.DataFrame): The census table.
 
     Returns:
-        pd.DataFrame: ``lum_min``, ``lum_median``, ``lum_max`` and
-        ``night_day_ratio`` (min / max); NaN without samples.
+        pd.Series: The ratio.
     """
-    stats = census.snap_lum.map(
+    return census.snap_lum.map(
         lambda v: (
-            (np.min(s), np.median(s), np.max(s)) if (s := _seq(v)) else (np.nan,) * 3
+            float(np.min(s) / np.max(s)) if (s := _seq(v)) and np.max(s) > 0 else np.nan
         )
     )
-    out = pd.DataFrame(
-        stats.tolist(), index=census.index, columns=["lum_min", "lum_median", "lum_max"]
-    )
-    out["night_day_ratio"] = out.lum_min / out.lum_max
-    return out
 
 
-def flag(census: pd.DataFrame, ratio_max: float = RATIO_MAX) -> pd.DataFrame:
+def flag(census: pd.DataFrame, kernel_of=read_kernel) -> pd.DataFrame:
     """
-    Return the runs with dark nights, with their commit and its date.
+    Return the runs recorded with window code on picamera2 (or an unknown stack).
 
     Args:
         census (pd.DataFrame): The census table.
-        ratio_max (float): Flag runs whose night/day luminance ratio is below this.
+        kernel_of: Function from a DB path to its kernel string (injectable for tests).
 
     Returns:
-        pd.DataFrame: Flagged runs, sorted by date and machine.
+        pd.DataFrame: One row per run with ``certainty`` = ``picamera2`` (affected)
+        or ``stack unknown`` (window code, no kernel recorded).
     """
-    df = census[census.error.isna()].join(luminance(census))
-    df = df[df.night_day_ratio < ratio_max].copy()
-    df["commit_date"] = df.version.map(commit_date)
+    df = census[census.error.isna()].copy()
+    df["code_window"] = df.version.map(code_window)
+    df = df[df.code_window == "window"].copy()
+    df["kernel"] = df.path.map(kernel_of)
+    df["camera_stack"] = df.kernel.map(camera_stack)
+    df = df[df.camera_stack != "picamera"].copy()
+    df["certainty"] = np.where(
+        df.camera_stack == "picamera2", "picamera2", "stack unknown"
+    )
+    df["night_day_ratio"] = night_day_ratio(df).round(3)
     cols = [
         "machine_name",
         "machine_id",
         "run_dt",
         "user",
         "version",
-        "commit_date",
-        "lum_min",
-        "lum_median",
-        "lum_max",
+        "kernel",
+        "certainty",
         "night_day_ratio",
         "n_snap",
         "path",
@@ -130,14 +177,22 @@ def main() -> None:
         type=Path,
         default=Path("/mnt/cache/dl_tracking/flagged_no_ir_runs.csv"),
     )
-    ap.add_argument("--ratio-max", type=float, default=RATIO_MAX)
     args = ap.parse_args()
-    flagged = flag(pd.read_parquet(args.census), args.ratio_max)
-    flagged.round(3).to_csv(args.out, index=False)
+    flagged = flag(pd.read_parquet(args.census))
+    flagged.to_csv(args.out, index=False)
     print(
         f"{len(flagged)} runs on {flagged.machine_name.nunique()} machines -> {args.out}"
     )
-    print(flagged.run_dt.str[:4].value_counts().sort_index().to_string())
+    print(
+        flagged.groupby("certainty")
+        .agg(
+            runs=("path", "size"),
+            machines=("machine_name", "nunique"),
+            first=("run_dt", "min"),
+            last=("run_dt", "max"),
+        )
+        .to_string()
+    )
 
 
 if __name__ == "__main__":

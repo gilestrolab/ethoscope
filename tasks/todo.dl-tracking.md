@@ -165,20 +165,26 @@ on the same frames:
 - [ ] Verify that `rowid` is monotonic in `t` in each era, so bisection is safe.
 - [ ] Summarise the machines, eras and lighting clusters to drive the stratification
       and the splits.
-- [x] **Flag the no-IR runs.** A camera-settings bug once left IR mode off, giving very
-      dark snapshots (Giorgio, 2026-09-30). Done by image signature, since neither the
-      code history nor the dates pin the bug: 941 runs (143 machines) whose darkest
-      census sample is below 40% of their brightest (with working IR the backlight
-      keeps nights nearly as bright as days). The list, with commit, commit date and
-      user, is `/mnt/cache/dl_tracking/flagged_no_ir_runs.csv`; 168 of the selected
-      runs carry `no_ir = True` in `runs.parquet` and are kept out of training.
-      Clusters: (A) 246 runs Sept 2023 – March 2024, 245 of them one user's
-      (`lblackhurst`, ETHOSCOPE_030–034, AGO experiments), possibly that rig's
-      lighting rather than the bug; (B) 82 runs on 17 machines with Oct–Dec 2022
-      commits; the other 613 are scattered from 2016 to 2026. The NoIR-tuning code
-      window (Sept 2025 – Aug 2026) is **not** enriched (4.4% dark nights against 4.6%
-      before it). **Ask Giorgio roughly when the bug was**, so the flag can be
-      narrowed to it.
+- [x] **Flag the no-IR runs.** Giorgio: the camera problem started with the move to
+      picamera2. The history bounds it: `370c9491` (2024-02-02) moved to picamera2,
+      which runs libcamera's default *colour* tuning on NoIR sensors; NoIR tuning was
+      an option defaulting to off (`faf84b46`), then unconditional (`217084d9`), and
+      actually applied only from `766de9ab` (2026-08-26). A run is affected when its
+      commit is in [370c9491, 766de9ab) **and** the device ran picamera2, which the
+      kernel in `hardware_info` tells: Arch Linux ARM (`*-rpi-ARCH`) kept legacy
+      picamera, Raspberry Pi OS (`+rpt`, `-v8`) has only picamera2.
+      Result, `/mnt/cache/dl_tracking/flagged_no_ir_runs.csv`: **691 runs on 57
+      machines (2024-11-08 → 2026-08-26)**, plus 204 "stack unknown" (window code, no
+      kernel recorded). Brightness does not find them: auto-exposure mostly
+      compensated (median night luminance 78 against 89 for legacy-picamera runs of
+      the same period; fixed runs are brighter, ~122). An earlier luminance-only flag
+      (dark nights) was dropped: its largest cluster was one user's AGO rig
+      (`lblackhurst`, ETHOSCOPE_030–034, 2023–24), not this bug.
+- [ ] **Train with and without the flagged runs.** 214 selected runs are flagged,
+      including 34 of the 86 train runs from 2025 and 101 of the 132 from 2026, which is
+      nearly all the recent data and all of the picamera2 camera stack. The plan said
+      to keep them out of round 1; with this many, v1 is trained both ways and
+      scored on the flagged test runs and the rest separately.
 
 ### Phase 2: dataset builder
 - [x] `labels.py`: pure functions for the confident-positive filter, the trajectory
