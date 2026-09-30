@@ -117,3 +117,27 @@ def test_pack_and_items(packed: Path) -> None:
     assert torch.all(item["present"] == 1)
     batch = D.collate([ds[0], ds[1]])
     assert batch["x"].shape[0] == 4 and batch["heat"].shape == (4, D.OUT_H, D.OUT_W)
+
+
+def test_match_gain_recovers_gain_and_offset() -> None:
+    """A known gain and offset is undone; a flat source keeps unit gain."""
+    rng = np.random.default_rng(3)
+    src = rng.integers(40, 200, (32, 20)).astype(np.uint8)
+    dst = np.clip(1.3 * src.astype(float) - 10, 0, 255)
+    a, b = D.match_gain(src, dst)
+    assert a == pytest.approx(1.3, abs=0.01) and b == pytest.approx(-10, abs=1.5)
+    a, b = D.match_gain(
+        np.full((32, 20), 90, np.uint8), np.full((32, 20), 100, np.uint8)
+    )
+    assert (a, b) == (1.0, 10.0)
+
+
+def test_items_survive_flat_canvases(packed: Path) -> None:
+    """Swaps between flat (featureless) snapshots never raise."""
+    store = D.SnapshotStore(packed)
+    rows = D.training_rows(
+        pd.read_parquet(packed / "labels.parquet").assign(contrast=50.0)
+    )
+    ds = D.TubeDataset(store, rows, augment=True, p_swap=1.0)
+    for k in range(len(ds)):
+        assert ds[k]["x"].shape[1:] == (1, P.CANVAS_H, P.CANVAS_W)

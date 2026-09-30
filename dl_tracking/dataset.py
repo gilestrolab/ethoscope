@@ -268,6 +268,25 @@ def flip(canvas: np.ndarray, t: Target, horizontal: bool, vertical: bool):
 # ---------------------------------------------------------------- dataset
 
 
+def match_gain(src: np.ndarray, dst: np.ndarray) -> tuple[float, float]:
+    """
+    Return the gain and offset that give ``src`` the mean and spread of ``dst``.
+
+    Args:
+        src (np.ndarray): Pixels to be corrected.
+        dst (np.ndarray): Reference pixels (same region in the other image).
+
+    Returns:
+        tuple[float, float]: ``(a, b)`` with ``a * src + b`` matching ``dst``. A flat
+        ``src`` (spread under one grey level) gets unit gain, so noise is not
+        amplified.
+    """
+    s, d = src.astype(np.float64), dst.astype(np.float64)
+    spread = s.std()
+    a = d.std() / spread if spread >= 1.0 else 1.0
+    return a, d.mean() - a * s.mean()
+
+
 class TubeDataset(Dataset):
     """One item per snapshot: canvases and targets for its labelled tubes."""
 
@@ -384,11 +403,10 @@ class TubeDataset(Dataset):
         alpha = np.clip((SWAP_HALF_WIDTH - dist) / 4, 0, 1)[None]
         # Reason: two snapshots with the same overall brightness still differ
         # locally (IR drift, exposure), so a raw paste shows as a bright or dark band.
-        # Fit src to c on the columns just outside the window and correct it.
+        # Match src to c on the columns just outside the window. A mean-and-spread
+        # match has a closed form; np.polyfit failed to converge on flat rings.
         ring = (dist > SWAP_HALF_WIDTH) & (dist <= SWAP_HALF_WIDTH + 10)
-        a, b = np.polyfit(
-            src[:, ring].ravel().astype(float), c[:, ring].ravel().astype(float), 1
-        )
+        a, b = match_gain(src[:, ring], c[:, ring])
         if not 0.5 < a < 2.0:
             return c, t
         mixed = (1 - alpha) * c + alpha * np.clip(a * src.astype(float) + b, 0, 255)

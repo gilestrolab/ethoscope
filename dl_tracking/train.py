@@ -14,6 +14,7 @@ import logging
 import time
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pandas as pd
 import torch
@@ -144,6 +145,20 @@ def split_rows(pack: Path, runs: Path) -> pd.DataFrame:
     return rows.merge(table[["run_id", "split", "no_ir"]], on="run_id")
 
 
+def _one_thread_per_worker(_worker_id: int) -> None:
+    """
+    Keep each data-loader worker to one thread.
+
+    Reason: OpenCV and torch default to a thread per core in every worker; with a
+    dozen workers per run the machine thrashed and an epoch took ten times longer.
+
+    Args:
+        _worker_id (int): Worker index (unused).
+    """
+    cv2.setNumThreads(1)
+    torch.set_num_threads(1)
+
+
 def loader(
     store: D.SnapshotStore,
     rows: pd.DataFrame,
@@ -177,6 +192,7 @@ def loader(
         collate_fn=D.collate,
         num_workers=args.workers,
         persistent_workers=train,
+        worker_init_fn=_one_thread_per_worker,
     )
 
 
