@@ -1,7 +1,7 @@
 # Learned per-tube fly locator (`dl-tracking`)
 
 Date: 2026-09-30
-Status: **Approved 2026-09-30.** Phase 0 done; Phase 1 running.
+Status: **Approved 2026-09-30.** Phases 0–2 done; review round 1 open; v1 training running.
 Origin: brief from the ethoscopy session on jenner (ethoscopy-36), agreed with Giorgio.
 Background numbers: `turing:/mnt/cache/claude_motion_calibration/README.md`.
 
@@ -277,7 +277,18 @@ Sketch, not to be implemented under this plan:
 
 ## Discovered During Work
 
-- **Code so far** (`dl_tracking/`, 56 tests): `db_io` (read-only access, rowid
+- **Extraction and pack (2026-09-30).** 2,768 runs extracted (1 malformed DB),
+  69,125 snapshots (3.7 GB), 896,596 training positives (891,746 confident, 4,850 gap
+  fills after the contrast filter), 1,258 never-detected tubes in 346 runs, and
+  144,723 `missed` crops for round 2. Review round 1 (200 tubes × 4 strips + 250
+  audits) is served from turing on port 8765 (token in
+  `/mnt/cache/dl_tracking/review/token`). v1 (tiny, 30 epochs) trains with and
+  without the flagged runs, in tmux `dl_train_excl` / `dl_train_incl`; epoch 0
+  already gave 0.98 px median error and 94% detection on validation machines.
+- **Two training crashes fixed.** `np.polyfit` failed to converge on flat pixel rings
+  in the swap gain match (now a closed-form mean-and-spread match), and unpinned
+  OpenCV/torch threads in 24 loader workers made epochs ten times slower.
+- **Code so far** (`dl_tracking/`, 69 tests): `db_io` (read-only access, rowid
   bisection), `census`, `select_runs` (machine-grouped splits), `labels`, `extract`,
   `preprocess` (the canvas geometry and normalisation; one path for training and
   device, to move into the device package with the tracker), `model`, `dataset`
