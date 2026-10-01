@@ -218,6 +218,18 @@ on the same frames:
       dead, and dead flies dehydrate and change shape with time. Propagation over
       each tube's other snapshots gives 5,226 human labels (469 fly, 4,757 empty);
       the test split holds 774 verified empty crops and 53 dead-fly crops.
+- **Human labels fix empty tubes.** On 774 verified-empty test crops (32 tubes),
+  false presence at 0.5 was 56.5% (tiny_v2) and 55.3% (tiny_s2_v2), and 13.3% for
+  tiny_s2_v3; on validation (300 crops, 12 tubes) 3.7%. A 0.9 threshold gave 0.8% on
+  test but cost dead flies on validation (84% found), so no threshold is chosen yet.
+  The remaining false detections sit in a few tubes: dark end caps at the ROI ends,
+  ROIs not on a tube (a cable, a blank area), reflections in dark frames.
+- [ ] **Round 3 queued** (2026-10-01): 100 of the 1,058 unreviewed never-detected
+      tubes where v3 sees a fly somewhere, plus 20 it calls empty; four strips each.
+- [ ] **Soak test** of tiny_s2_v3 on ETHOSCOPE000 (240 min static + 60 min camera,
+      from 12:31). The bench PSU sags under 4-thread load (0x50005, ARM at 600 MHz
+      while scaling_cur_freq said 1200), so analyse by throttle bits; a production
+      ethoscope with its normal supply is the deciding test.
 - [ ] **v3** (tiny_s2, chosen on the Pi timings): `python -m dl_tracking.review.ingest`, then train v3
       (`train.py` picks up `review/human_labels.parquet`): human answers override
       automatic labels and verified empty tubes become negatives; `final.json`
