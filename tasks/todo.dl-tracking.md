@@ -319,6 +319,26 @@ Sketch, not to be implemented under this plan:
   twitches with no centroid displacement, which the pixel-motion variable is for.
   `xy_dist` should be computed on the device from float positions (before the
   SMALLINT rounding); no +1 px correction is needed.
+- **e044, 47 h, dim IR, test machine (2026-10-01).** 1.04 M frames, pixel truth at
+  the noise-scaled level (`evaluate --level auto`, = eval_long.py). Locator tracks
+  use only frames where it reports a fly (scoring every frame had inflated false
+  movement).
+
+  | | detect | still → moving @0.52 / 1 / 2 px | moving detected @1 / 2 px |
+  |---|---|---|---|
+  | v2 tiny | 93.4% | 20.6% / 2.0% / 0.3% | 66.4% / 58.3% |
+  | v2 mid | 92.9% | 20.4% / 2.2% / 0.4% | 66.5% / 58.2% |
+  | AdaptiveBGModel | 78.2% | 44.5% / 44.5% / 1.4% | 86.6% / 61.6% |
+
+  The detection gap is concentrated in tubes 14 (55%) and 11 (69%): for hours the
+  fly sits at the very end of the tube, half outside the ROI box. The model's peak
+  is on it but presence stays near 0.05; AdaptiveBGModel loses it too (48%). To do:
+  train with flies partly cut off by the canvas edge (still present), and check
+  whether a slightly wider canvas can reach the tube ends without seeing the
+  neighbouring tube across the divider. tiny and mid perform alike, so tiny (2.9 M
+  MACs) is the candidate unless the Pi has room to spare.
+- [ ] **Partly visible flies at tube ends** (above): augmentation, then re-check
+      e044 tubes 11 and 14.
 - **Pi benchmark** bundle at `turing:/mnt/cache/dl_tracking/pi_bench/` (numpy +
   OpenCV only); request sent to the ethoscopy session on 2026-10-01, no reply yet.
 - **Two training crashes fixed.** `np.polyfit` failed to converge on flat pixel rings
