@@ -280,6 +280,20 @@ on the same frames:
       for rsync.
 
 ### Phase 6: device integration (design only, then a separate approval)
+Constraints measured so far (2026-10-01):
+- **Cap the tracker's frame rate** (≈ 8–10 fps). At full speed a Pi 3 in its
+  enclosure (ETHOSCOPE_380, healthy supply) went 58 → 82.7 °C in ~80 min, hit the
+  soft limit and was frequency-capped (0x70002; 44.9 → 49.1 ms per frame).
+  At ~50 ms per frame, 10 fps is half load, still twice AdaptiveBGModel's 4–5 fps.
+- **cv2.setNumThreads(4)** on d960edb9 and later (cores − 1 on older code, where
+  the GPIO listener busy-loops a core).
+- **The model must stay within ops every fleet OpenCV runs** (4.7 to 4.14): Conv,
+  Relu, GlobalMaxPool, GlobalAveragePool, Concat, Flatten. Check new exports with
+  `pi_parity.py` on a 4.7 device.
+- **Do not assume a fixed frame interval**: under-voltage throttling (common in the
+  lab) moves a frame between ~45 and ~75 ms.
+- `xy_dist` from float positions before the SMALLINT rounding.
+
 Sketch, not to be implemented under this plan:
 - `trackers/cnn_tracker.py`, a BaseTracker subclass. The Monitor calls `track()` once
   per ROI, so a shared per-frame inference object runs one batched forward pass on the
