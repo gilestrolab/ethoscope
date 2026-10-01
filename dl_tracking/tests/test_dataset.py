@@ -159,3 +159,66 @@ def test_canvas_contrast_measures_every_labelled_canvas(packed: Path) -> None:
     labels = pd.read_parquet(packed / "labels.parquet")
     assert len(std) == len(labels) and (std.canvas_std < D.MIN_CANVAS_STD).all()
     assert (packed / "canvas_std.parquet").exists()
+
+
+def test_train_cli_runs_end_to_end(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One epoch through train.main(): catches options parsed but not wired up."""
+    import sys
+
+    from dl_tracking import extract
+    from dl_tracking import train as T
+
+    from .conftest import make_db, still_rows
+
+    monkeypatch.setattr(extract, "TMP_DIR", tmp_path)
+    out = tmp_path / "out"
+    for mid in ("abc", "def"):
+        path = tmp_path / "src" / mid / "E1" / "2020-01-01_00-00-00" / "r.db"
+        make_db(
+            path,
+            {
+                1: still_rows(0, 1_200_000, 1000, 100, 30),
+                2: still_rows(0, 1_200_000, 1000, 300, 30),
+            },
+            [700_000, 800_000, 900_000],
+        )
+        extract.extract_run(
+            {"path": str(path), "machine_id": mid, "run_dt": "2020-01-01_00-00-00"}, out
+        )
+    D.pack(out)
+    runs = pd.DataFrame(
+        {
+            "machine_id": ["abc", "def"],
+            "split": ["train", "val"],
+            "run_dt": ["2020-01-01_00-00-00"] * 2,
+        }
+    )
+    runs.to_parquet(tmp_path / "runs.parquet")
+    run = tmp_path / "run"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "train",
+            "--pack",
+            str(out / "pack"),
+            "--runs",
+            str(tmp_path / "runs.parquet"),
+            "--out",
+            str(run),
+            "--epochs",
+            "1",
+            "--workers",
+            "0",
+            "--snapshots-per-batch",
+            "2",
+            "--variant",
+            "tiny_s2",
+            "--human",
+            str(tmp_path / "no_human_labels.parquet"),
+        ],
+    )
+    T.main()
+    assert (run / "best.pt").exists() and (run / "final.json").exists()

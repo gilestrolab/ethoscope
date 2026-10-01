@@ -212,7 +212,7 @@ def loader(
         drop_last=train,
         collate_fn=D.collate,
         num_workers=args.workers,
-        persistent_workers=train,
+        persistent_workers=train and args.workers > 0,
         worker_init_fn=_one_thread_per_worker,
     )
 
@@ -284,6 +284,12 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=3e-3)
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--max-val-snapshots", type=int, default=3000)
+    ap.add_argument(
+        "--human",
+        type=Path,
+        default=Path("/mnt/cache/dl_tracking/review/human_labels.parquet"),
+        help="human labels from review.ingest (used if the file exists)",
+    )
     ap.add_argument(
         "--include-flagged",
         action="store_true",
