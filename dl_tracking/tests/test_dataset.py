@@ -222,3 +222,34 @@ def test_train_cli_runs_end_to_end(
     )
     T.main()
     assert (run / "best.pt").exists() and (run / "final.json").exists()
+
+
+def test_dense_offsets_point_every_neighbour_at_the_centre() -> None:
+    """All 9 cells around the fly carry offsets that decode to the same centre."""
+    t = D.Target(True, u=161.3, v=14.8, w=28, h=11, phi=0, shape_ok=True)
+    enc = D.encode(t)
+    i, j = enc["cell"]
+    assert (
+        enc["offmask"].sum() == 9 and enc["offmask"][i - 1 : i + 2, j - 1 : j + 2].all()
+    )
+    for ii in range(i - 1, i + 2):
+        for jj in range(j - 1, j + 2):
+            u = P.STRIDE * (jj + enc["off"][0, ii, jj]) - 0.5
+            v = P.STRIDE * (ii + enc["off"][1, ii, jj]) - 0.5
+            assert (u, v) == pytest.approx((161.3, 14.8), abs=1e-4)
+    # A network that learned these targets decodes the same point whichever cell wins.
+    maps = np.full((1, 7, D.OUT_H, D.OUT_W), -9.0, np.float32)
+    maps[0, 1:3] = enc["off"]
+    maps[0, 0, i, j], maps[0, 0, i, j + 1] = 2.0, 1.9
+    a = P.decode(maps, np.zeros((1, 1)))[0, :2]
+    maps[0, 0, i, j + 1] = 2.1
+    b = P.decode(maps, np.zeros((1, 1)))[0, :2]
+    assert a == pytest.approx(b, abs=1e-4)
+    assert a == pytest.approx((161.3, 14.8), abs=1e-4)
+
+
+def test_dense_offsets_at_the_grid_edge_and_absent() -> None:
+    """Neighbours outside the grid are skipped; an absent fly has no offsets."""
+    enc = D.encode(D.Target(True, u=1.0, v=1.0, w=28, h=11))
+    assert enc["offmask"].sum() == 4
+    assert D.encode(D.Target(False))["offmask"].sum() == 0

@@ -250,11 +250,15 @@ def encode(t: Target) -> dict[str, np.ndarray]:
     Returns:
         dict[str, np.ndarray]: ``heat`` (OUT_H x OUT_W), ``cell`` (i, j),
         ``reg`` (offset x/y, log w/h, sin/cos 2phi), and 0/1 masks ``pos``
-        (position heads) and ``shape`` (size and angle heads), plus ``present``.
+        (position heads) and ``shape`` (size and angle heads), plus ``present``;
+        and ``off`` (2 x OUT_H x OUT_W) with mask ``offmask``: the offset from
+        each cell of the fly's 3x3 neighbourhood to its centre.
     """
     heat = np.zeros((OUT_H, OUT_W), np.float32)
     reg = np.zeros(6, np.float32)
     cell = np.zeros(2, np.int64)
+    off = np.zeros((2, OUT_H, OUT_W), np.float32)
+    offmask = np.zeros((OUT_H, OUT_W), np.float32)
     pos = shape = 0.0
     cx, cy = (t.u + 0.5) / P.STRIDE, (t.v + 0.5) / P.STRIDE
     j, i = int(np.floor(cx)), int(np.floor(cy))
@@ -277,6 +281,15 @@ def encode(t: Target) -> dict[str, np.ndarray]:
         )
         cell[:] = (i, j)
         pos, shape = 1.0, float(t.shape_ok)
+        # Reason: trained only at the centre cell, a neighbour's offset is an
+        # untrained extrapolation; a fly near a cell boundary then got two
+        # estimates 1.9 px apart, and logit noise moved a dead fly by ~1 px.
+        # Training every cell of the 3x3 neighbourhood to point at the same
+        # centre (offsets in [-1, 2]) makes adjacent cells agree.
+        for ii in range(max(i - 1, 0), min(i + 2, OUT_H)):
+            for jj in range(max(j - 1, 0), min(j + 2, OUT_W)):
+                off[:, ii, jj] = (cx - jj, cy - ii)
+                offmask[ii, jj] = 1.0
     present = float(t.present and pos > 0)
     return {
         "heat": heat,
@@ -285,6 +298,8 @@ def encode(t: Target) -> dict[str, np.ndarray]:
         "pos": np.float32(pos),
         "shape": np.float32(shape),
         "present": np.float32(present),
+        "off": off,
+        "offmask": offmask,
     }
 
 

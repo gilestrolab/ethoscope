@@ -62,7 +62,7 @@ def losses(
     """
     n = maps.shape[0]
     at = maps[torch.arange(n), :, b["cell"][:, 0], b["cell"][:, 1]]  # (n, 7)
-    pos, shape = b["pos"], b["shape"]
+    shape = b["shape"]
 
     def masked_l1(
         pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
@@ -72,7 +72,9 @@ def losses(
 
     out = {
         "heat": focal_loss(maps[:, 0], b["heat"]),
-        "offset": masked_l1(at[:, 1:3], b["reg"][:, 0:2], pos),
+        # Dense: every cell around the fly is trained to point at its centre.
+        "offset": ((maps[:, 1:3] - b["off"]).abs().sum(dim=1) * b["offmask"]).sum()
+        / b["offmask"].sum().clamp(min=1),
         "size": masked_l1(at[:, 3:5], b["reg"][:, 2:4], shape),
         "angle": masked_l1(at[:, 5:7], b["reg"][:, 4:6], shape),
         "presence": F.binary_cross_entropy_with_logits(presence[:, 0], b["present"]),
