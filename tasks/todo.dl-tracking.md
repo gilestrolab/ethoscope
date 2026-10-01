@@ -349,8 +349,25 @@ Sketch, not to be implemented under this plan:
   MACs) is the candidate unless the Pi has room to spare.
 - [ ] **Partly visible flies at tube ends** (above): augmentation, then re-check
       e044 tubes 11 and 14.
-- **Pi benchmark** bundle at `turing:/mnt/cache/dl_tracking/pi_bench/` (numpy +
-  OpenCV only); request sent to the ethoscopy session on 2026-10-01, no reply yet.
+- **Pi 3 timing (ETHOSCOPE000, by the ethoscopy session, 2026-10-01).** Full device
+  path, 20 tubes, median ms per frame (forward | total → fps), untrained variants:
+
+  | variant | MACs | 3 threads | 4 threads |
+  |---|---|---|---|
+  | tiny (v1/v2 architecture) | 2.89 M | 67.7 \| 75.2 → 13.3 | 91.6 \| 100.4 → 10.0 |
+  | **tiny_s2** (stride-2 stem) | 2.05 M | **51.0 \| 58.9 → 17.0** | 69.0 \| 79.4 → 12.6 |
+  | tiny_d24 (two dilated blocks) | 2.44 M | 62.8 \| 70.3 → 14.2 | 82.2 \| 90.5 → 11.1 |
+  | tiny_s2k5 | 2.71 M | 74.1 \| 81.6 → 12.2 | 92.5 \| 100.0 → 10.0 |
+  | tiny_k5 (5×5 depthwise) | 3.56 M | 91.0 \| 98.6 → 10.1 | 114.2 \| 122.2 → 8.2 |
+
+  Dilated depthwise convolutions cost 20–27% of the forward pass in cv2.dnn there,
+  and 5×5 kernels are slower still. 3 threads beat 4 for every variant, and are far
+  steadier, because the GPIO listener busy-loops a core: the device default should
+  be `cores - 1` until that is fixed. 60 → 75 °C over 15 min (no throttling during
+  the run, past under-voltage in `vcgencmd get_throttled` = 0x50000), so a long
+  soak test is needed before multi-day use. Normalise dropped 6 → 3–4 ms with
+  cv2.meanStdDev; the blended decode cost 2.5–3.6 ms there and was then halved.
+  tiny_s2 and tiny_d24 are training on the v2 data.
 - **Two training crashes fixed.** `np.polyfit` failed to converge on flat pixel rings
   in the swap gain match (now a closed-form mean-and-spread match), and unpinned
   OpenCV/torch threads in 24 loader workers made epochs ten times slower.
