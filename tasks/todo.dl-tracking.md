@@ -242,6 +242,13 @@ on the same frames:
       cases are again dead bodies). Where a fly was present v3's ring was within
       4 px of the click in 185 of 186 strips; its "empty everywhere" tubes were all
       empty. Human labels now 7,876 (1,376 fly, 6,500 empty); v4 trains on them.
+- [x] **Round 4 (2026-10-01).** 67 more never-detected tubes where v3 saw a fly: 19
+      immobile at every time (dead flies, or pupae: Giorgio, "all those cases are
+      immobile targets, scored as dead", so calling them a fly costs nothing), 22
+      with a live fly that moved between times (a whole tube of data AdaptiveBGModel
+      lost, <1,000 detections in the run), 8 seen in some strips, 18 empty. Rings
+      within 4 px of the click in 178 of 179 strips. Human labels: 8,977 (2,010 fly,
+      6,967 empty).
 - **Production fleet (2026-10-01, stopped devices via ssh through node, cleared by
   Giorgio).** All stopped devices are Pi 3 (B or B+), on dev d960edb9, but with
   **OpenCV 4.7.0, 4.9.0, 4.11.0 and 4.13.0**. On 4.7.0 the presence output was
