@@ -83,3 +83,90 @@ def test_audit_answer_records_the_correction(review_dir: Path, packed: Path) -> 
     review.record([{"id": item.item_id, "state": "fly", "ix": ix, "iy": iy}])
     rec = json.loads((review_dir / "answers.jsonl").read_text().splitlines()[-1])
     assert rec["moved_px"] == pytest.approx(50.0)
+
+
+def test_model_items_ask_only_about_uncertain_crops() -> None:
+    """Uncertain crops are queued in full; confident calls only as small audits."""
+    rng = np.random.default_rng(0)
+    n = 300
+    scored = pd.DataFrame(
+        {
+            "run_id": [f"r{i % 7}" for i in range(n)],
+            "roi_idx": np.arange(n) % 20 + 1,
+            "sid": np.arange(n),
+            "t": 0,
+            "roi_x": 40,
+            "roi_y": 100,
+            "roi_w": 560,
+            "roi_h": 60,
+            "px": 100.0,
+            "py": 30.0,
+            "presence": rng.uniform(0, 1, n),
+        }
+    )
+    q = Q.model_items(scored, n_unsure=10, n_conf=5, n_none=5)
+    assert q.kind.value_counts().to_dict() == {
+        "model_unsure": 10,
+        "model_conf": 5,
+        "model_none": 5,
+    }
+    assert q[q.kind == "model_none"].px.isna().all()  # no ring on confident-empty
+    assert q[q.kind == "model_conf"].px.notna().all()
+    assert q.item_id.is_unique and q.group.nunique() == 4  # blocks of 5
+
+
+def test_ingest_answers_to_labels_and_audit(review_dir: Path, packed: Path) -> None:
+    """Fly clicks become positives, 'no fly' negatives, unsure is dropped; audits scored."""
+    from dl_tracking.review import ingest as I
+
+    review = S.Review(review_dir, packed)
+    nd = review.queue[review.queue.kind == "never_detected"].item_id.tolist()
+    audit = review.queue[review.queue.kind == "audit_confident"].iloc[0]
+    ix, iy = S.to_display(audit.px + 10, audit.py)  # moved 10 px: the label was wrong
+    review.record(
+        [
+            {"id": nd[0], "state": "fly", "ix": 300.0, "iy": 70.0},
+            {"id": nd[1], "state": "empty", "ix": None, "iy": None},
+            {"id": nd[2], "state": "unsure", "ix": None, "iy": None},
+            {"id": audit.item_id, "state": "fly", "ix": ix, "iy": iy},
+        ]
+    )
+    answers = I.latest_answers(review_dir / "answers.jsonl")
+    labels = I.human_labels(review.queue, answers)
+    assert sorted(labels.status) == ["human_empty", "human_fly", "human_fly"]
+    assert labels[labels.status == "human_empty"].x.isna().all()
+    rep = I.audit_report(review.queue, answers)
+    assert rep["audit_confident"]["wrong_rate"] == 1.0
+    assert rep["never_detected"] == {
+        "answered": 3,
+        "unsure": 1,
+        "fly": 1,
+        "empty": 1,
+        "wrong_rate": 0.5,
+    }
+
+
+def test_human_labels_override_and_add_negatives(
+    review_dir: Path, packed: Path, tmp_path: Path
+) -> None:
+    """In training rows, a human answer replaces the automatic label for that crop."""
+    from dl_tracking import train as T
+    from dl_tracking.review import ingest as I
+
+    review = S.Review(review_dir, packed)
+    audit = review.queue[review.queue.kind == "audit_confident"].iloc[0]
+    review.record([{"id": audit.item_id, "state": "empty", "ix": None, "iy": None}])
+    labels = I.human_labels(
+        review.queue, I.latest_answers(review_dir / "answers.jsonl")
+    )
+    labels.to_parquet(tmp_path / "human.parquet")
+    runs = pd.DataFrame(
+        {"machine_id": ["abc"], "run_dt": ["2020-01-01_00-00-00"], "split": ["train"]}
+    )
+    runs.to_parquet(tmp_path / "runs.parquet")
+    # Reason: the synthetic snapshots are flat, so drop the canvas filter here.
+    (packed / "canvas_std.parquet").unlink(missing_ok=True)
+    rows = T.split_rows(packed, tmp_path / "runs.parquet", tmp_path / "human.parquet")
+    same = rows[(rows.sid == audit.sid) & (rows.roi_idx == audit.roi_idx)]
+    assert len(same) == 1 and not same.present.item()
+    assert rows.present.sum() == len(rows) - 1

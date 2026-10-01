@@ -113,10 +113,11 @@ def evaluate(net: torch.nn.Module, loader: DataLoader, device: str) -> dict[str,
             pres_neg.append(dec[~present, 6])
     net.train()
     e, pp, pn = (np.concatenate(x) for x in (errs, pres_pos, pres_neg))
+    has = len(e) > 0  # a set of human-verified empty tubes has no flies at all
     return {
-        "err_median": float(np.median(e)),
-        "err_p95": float(np.percentile(e, 95)),
-        "detect_rate": float(np.mean(e <= 4)),
+        "err_median": float(np.median(e)) if has else float("nan"),
+        "err_p95": float(np.percentile(e, 95)) if has else float("nan"),
+        "detect_rate": float(np.mean(e <= 4)) if has else float("nan"),
         "presence_fly": float(pp.mean()) if len(pp) else float("nan"),
         "presence_empty": float(pn.mean()) if len(pn) else float("nan"),
         "false_presence": float(np.mean(pn > 0.5)) if len(pn) else float("nan"),
@@ -125,28 +126,44 @@ def evaluate(net: torch.nn.Module, loader: DataLoader, device: str) -> dict[str,
     }
 
 
-def split_rows(pack: Path, runs: Path) -> pd.DataFrame:
+def split_rows(pack: Path, runs: Path, human: Path | None = None) -> pd.DataFrame:
     """
     Load the training rows with each run's split and ``no_ir`` flag.
+
+    Human labels (:mod:`dl_tracking.review.ingest`), when given, replace any
+    automatic label for the same snapshot and tube, and add human-verified empty
+    tubes as negatives (``present`` False).
 
     Args:
         pack (Path): Pack directory.
         runs (Path): ``runs.parquet`` from :mod:`dl_tracking.select_runs`.
+        human (Path | None): ``human_labels.parquet``, if any.
 
     Returns:
-        pd.DataFrame: Rows of :func:`dataset.training_rows` plus ``split`` and
-        ``no_ir`` (False when the runs table has no such column).
+        pd.DataFrame: Rows of :func:`dataset.training_rows` (plus human rows) with
+        ``split``, ``no_ir`` (False when the runs table has none) and ``present``.
     """
     std_path = pack / "canvas_std.parquet"
     canvas_std = pd.read_parquet(std_path) if std_path.exists() else None
     rows = D.training_rows(
         pd.read_parquet(pack / "labels.parquet"), canvas_std=canvas_std
     )
+    rows["present"] = True
+    if human is not None and human.exists():
+        hl = pd.read_parquet(human)
+        key = ["sid", "roi_idx"]
+        rows = rows.merge(hl[key].assign(_h=1), on=key, how="left")
+        rows = pd.concat(
+            [rows[rows._h.isna()].drop(columns="_h"), hl], ignore_index=True
+        )
+        rows = rows.sort_values(key)
     table = pd.read_parquet(runs)
     table["run_id"] = table.machine_id + "_" + table.run_dt
     if "no_ir" not in table:
         table["no_ir"] = False
-    return rows.merge(table[["run_id", "split", "no_ir"]], on="run_id")
+    rows = rows.merge(table[["run_id", "split", "no_ir"]], on="run_id")
+    rows["present"] = rows.present.astype(bool)
+    return rows
 
 
 def _one_thread_per_worker(_worker_id: int) -> None:
@@ -277,7 +294,7 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    rows = split_rows(args.pack, args.runs)
+    rows = split_rows(args.pack, args.runs, args.human)
     store = D.SnapshotStore(args.pack)
     train = rows[(rows.split == "train") & (args.include_flagged | ~rows.no_ir)]
     # Reason: select checkpoints on unflagged validation runs in every variant, so
@@ -302,11 +319,18 @@ def main() -> None:
     best = torch.load(args.out / "best.pt", map_location=device)
     net.load_state_dict(best["state_dict"])
     report = {"best_epoch": best["epoch"]}
-    for flagged in (False, True):
-        test = rows[(rows.split == "test") & (rows.no_ir == flagged)]
-        if len(test):
-            key = "test_flagged" if flagged else "test_unflagged"
-            dl = loader(store, test, False, args, args.max_val_snapshots)
+    test = rows[rows.split == "test"]
+    human = test.status.isin(["human_fly", "human_empty"])
+    sets = {
+        "test_unflagged": test[~test.no_ir & ~human],
+        "test_flagged": test[test.no_ir & ~human],
+        # Reason: the acceptance target for false detections is about real empty
+        # tubes, which only the human review provides.
+        "test_human": test[human],
+    }
+    for key, sub in sets.items():
+        if len(sub):
+            dl = loader(store, sub, False, args, args.max_val_snapshots)
             report[key] = evaluate(net, dl, device)
     (args.out / "final.json").write_text(json.dumps(report, indent=1))
     logging.info("final: %s", json.dumps(report))

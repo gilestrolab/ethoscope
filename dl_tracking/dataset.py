@@ -439,10 +439,15 @@ class TubeDataset(Dataset):
                     origin[0] + int(rng.integers(-12, 13)),
                     origin[1] + int(rng.integers(-2, 3)),
                 )
-            u, v = P.full_to_canvas(r.roi_x + r.x, r.roi_y + r.y, origin)
-            t = Target(True, u, v, r.w, r.h, r.phi, bool(r.shape_ok))
+            # Reason: human-verified empty tubes arrive as rows with present=False.
+            present = bool(getattr(r, "present", True))
+            if present:
+                u, v = P.full_to_canvas(r.roi_x + r.x, r.roi_y + r.y, origin)
+                t = Target(True, u, v, r.w, r.h, r.phi, bool(r.shape_ok))
+            else:
+                t = Target(False)
             c = P.cut(half, *origin, P.CANVAS_W, P.CANVAS_H).copy()
-            if half2 is not None and rng.random() < self.p_swap:
+            if present and half2 is not None and rng.random() < self.p_swap:
                 c, t = self._swap(c, t, half2, origin, other, r, rng)
             if self.augment:
                 c, t = flip(c, t, rng.random() < 0.5, rng.random() < 0.5)
