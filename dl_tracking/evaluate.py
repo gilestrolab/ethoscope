@@ -31,6 +31,7 @@ from . import db_io
 WINDOW_S = 10.0
 LEVELS = (5, 8, 12, 20)  # grey-level columns of the pixel-motion parquet
 NOISE_MULT = 14  # see auto_levels()
+SLEEP_WINDOWS = 30  # sleep = 5 min of still 10-s windows, the ethoscope definition
 MIN_PIXELS = 3
 CUTS_PX = (0.52, 1.0, 2.0)  # 0.52 px is what a corrected velocity of 1.0 means today
 PRESENT = 0.5
@@ -166,6 +167,56 @@ def window_calls(df: pd.DataFrame, disp: pd.Series, cut: float) -> pd.Series:
     return (disp >= cut).groupby([df.roi_idx, win]).any()
 
 
+def sleep_from_still(still: pd.Series, n: int = SLEEP_WINDOWS) -> pd.Series:
+    """
+    Mark sleep: runs of at least ``n`` consecutive still windows in a tube.
+
+    Args:
+        still (pd.Series): Boolean, indexed by (roi_idx, win).
+        n (int): Minimum run length in windows (30 x 10 s = 5 min).
+
+    Returns:
+        pd.Series: Boolean sleep, same index (sorted).
+    """
+    s = still.sort_index()
+    roi = s.index.get_level_values(0).to_numpy()
+    win = s.index.get_level_values(1).to_numpy()
+    v = s.to_numpy()
+    # A run breaks at a new tube, a gap in windows, or a change of state.
+    brk = np.r_[
+        True, (roi[1:] != roi[:-1]) | (win[1:] != win[:-1] + 1) | (v[1:] != v[:-1])
+    ]
+    run = np.cumsum(brk)
+    length = np.bincount(run)[run]
+    return pd.Series(v & (length >= n), index=s.index)
+
+
+def sleep_metrics(called_moving: pd.Series, truth_moving: pd.Series) -> dict:
+    """
+    Compare sleep derived from a tracker's movement calls with pixel-truth sleep.
+
+    Args:
+        called_moving (pd.Series): Tracker's moving calls per (roi_idx, win).
+        truth_moving (pd.Series): Pixel-truth moving per (roi_idx, win).
+
+    Returns:
+        dict: Sleep fraction, window-level sensitivity (truth sleep found) and
+        precision (called sleep that is truth sleep), and the mean absolute error
+        of per-tube sleep fractions.
+    """
+    pred = sleep_from_still(~called_moving)
+    true = sleep_from_still(~truth_moving).reindex(pred.index)
+    per_tube = pd.DataFrame({"pred": pred, "true": true}).groupby(level=0).mean()
+    return {
+        "sleep_fraction": round(float(pred.mean()), 4),
+        "sensitivity": round(float(pred[true].mean()), 4) if true.any() else None,
+        "precision": round(float(true[pred].mean()), 4) if pred.any() else None,
+        "per_tube_abs_error": round(
+            float((per_tube.pred - per_tube.true).abs().mean()), 4
+        ),
+    }
+
+
 def evaluate(
     cnn: pd.DataFrame,
     abg: pd.DataFrame,
@@ -240,13 +291,20 @@ def evaluate(
         "cnn_rounded": (found, displacement(found, rounded=True)),
         "abg": (abg, displacement(abg)),
     }
+    sleep = {
+        "pixel_truth_sleep_fraction": round(float(sleep_from_still(~truth).mean()), 4)
+    }
     for name, (df, disp) in tracks.items():
         for cut in CUTS_PX:
+            # Reason: a window with no detection counts as still, as in ethoscopy;
+            # that is how flies AdaptiveBGModel loses get scored as sleeping.
             called = window_calls(df, disp, cut).reindex(truth.index, fill_value=False)
             calls[f"{name}@{cut}"] = {
                 "false_moving_on_still": round(float(called[~truth].mean()), 4),
                 "detected_on_moving": round(float(called[truth].mean()), 4),
             }
+            sleep[f"{name}@{cut}"] = sleep_metrics(called, truth)
+    report["sleep"] = sleep
     report["windows"] = {
         "n_still": int((~truth).sum()),
         "n_moving": int(truth.sum()),

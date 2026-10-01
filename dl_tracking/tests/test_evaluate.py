@@ -134,3 +134,30 @@ def test_frames_without_a_fly_do_not_count_as_movement() -> None:
     pix = pd.DataFrame({"t": t / 1000, "roi": 1, "fly_20": 0})
     rep = E.evaluate(cnn, abg, pix, still_tubes=[1])
     assert rep["windows"]["cnn_float@2.0"]["false_moving_on_still"] == 0
+
+
+def test_sleep_needs_thirty_consecutive_still_windows() -> None:
+    """Sleep = runs of >= 30 still windows; runs break at gaps and new tubes."""
+    idx = pd.MultiIndex.from_tuples(
+        [(1, w) for w in range(40)]
+        + [(2, w) for w in range(20)]
+        + [(2, w) for w in range(25, 50)],
+        names=["roi_idx", "win"],
+    )
+    still = pd.Series(True, index=idx)
+    still[(1, 35)] = False  # tube 1: 35 still windows, then a move
+    s = E.sleep_from_still(still)
+    assert s.loc[1].sum() == 35 and not s[(1, 35)]
+    assert s.loc[2].sum() == 0  # 20 + 25 windows either side of a gap: no run of 30
+
+
+def test_sleep_metrics_against_truth() -> None:
+    """A tracker that misses movement over-calls sleep; precision drops."""
+    idx = pd.MultiIndex.from_tuples(
+        [(1, w) for w in range(60)], names=["roi_idx", "win"]
+    )
+    truth = pd.Series(False, index=idx)
+    truth[(1, 30)] = True  # one move splits 60 windows into 30 + 29: 30 sleep
+    m = E.sleep_metrics(pd.Series(False, index=idx), truth)  # never sees the move
+    assert m["sleep_fraction"] == 1.0 and m["sensitivity"] == 1.0
+    assert m["precision"] == pytest.approx(0.5)
