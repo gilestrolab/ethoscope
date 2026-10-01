@@ -204,6 +204,16 @@ on the same frames:
       disagreements between the network and the tracker.
 - [ ] Report the auto-label error rate per source and era.
 
+- [x] Round 2 queued after round 1 (2026-10-01): tiny_v2 scored the 104,165 crops
+      AdaptiveBGModel missed in the train split (62,300 confident fly, 9,161
+      confident empty, 32,704 in between). Queued: 100 uncertain (presence
+      0.15–0.85, mostly tube ends and empty-looking tubes), 40 confident-fly and
+      20 confident-empty audits. Queue total 1,110 crops.
+- [ ] **After Giorgio's review**: `python -m dl_tracking.review.ingest`, then train v3
+      (`train.py` picks up `review/human_labels.parquet`): human answers override
+      automatic labels and verified empty tubes become negatives; `final.json`
+      reports `test_human`, the false-detection measure for real empty tubes.
+
 ### Phase 4: train and export
 - [x] `model.py`: tiny (2.9 M MACs), mid (3.9 M), small (6.1 M); dilated context blocks give a 65 px (half-res) receptive field. `train.py`: focal loss on the heatmap, L1 on
       offset, size and angle at the true centre, BCE on presence.
