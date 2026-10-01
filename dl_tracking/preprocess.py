@@ -22,6 +22,7 @@ import numpy as np
 CANVAS_H = 32  # half-resolution pixels
 CANVAS_W = 288
 STRIDE = 4  # network output stride, in half-resolution pixels
+BLEND_LOGITS = 1.0  # see decode(): margin over which a competing neighbour fades out
 
 
 def canvas_origin(x0: int, y0: int, w: int, h: int) -> tuple[int, int]:
@@ -149,28 +150,63 @@ def normalise(canvases: np.ndarray) -> np.ndarray:
     return ((x - mean) / (std + 1.0))[:, None]
 
 
-def decode(maps: np.ndarray, presence: np.ndarray) -> np.ndarray:
+def decode(
+    maps: np.ndarray, presence: np.ndarray, blend_logits: float = BLEND_LOGITS
+) -> np.ndarray:
     """
     Turn network outputs into one position per canvas (argmax, no NMS).
+
+    A fly whose centre lies on a cell boundary gives two cells almost the same
+    heatmap logit, and the argmax flips between them from frame to frame. Each
+    cell's own estimate (cell + offset) is steady but the two disagree slightly, so
+    a still fly appeared to jump by ~1 px. The position is therefore a mixture of
+    the peak cell and its strongest 8-neighbour, weighted by
+    ``w = 0.5 * max(0, 1 - margin / blend_logits)`` for the neighbour. At a tie
+    the mixture is 50/50 whichever cell wins, so it is continuous across a flip;
+    one ``blend_logits`` below the peak the neighbour has no say, so a clean single
+    peak decodes exactly as before and a separate second blob is never averaged in.
 
     Args:
         maps (np.ndarray): ``(n, 7, h, w)``: heatmap logit, offset x/y, log w/h,
             sin/cos of twice the angle.
         presence (np.ndarray): ``(n, 1)`` presence logits.
+        blend_logits (float): Logit margin over which the neighbour's weight goes
+            from 0.5 to 0; 0 disables blending.
 
     Returns:
         np.ndarray: ``(n, 8)``: u, v (canvas), w, h (full resolution), phi
         (degrees, 0-180), peak probability, presence probability, peak index.
     """
     n, _, h, w = maps.shape
+    rows = np.arange(n)
     flat = maps[:, 0].reshape(n, -1)
     idx = flat.argmax(axis=1)
     i, j = np.divmod(idx, w)
-    at = maps[np.arange(n), :, i, j]  # (n, 7)
+    at = maps[rows, :, i, j]  # (n, 7)
     u = STRIDE * (j + at[:, 1]) - 0.5
     v = STRIDE * (i + at[:, 2]) - 0.5
+    if blend_logits > 0:
+        # The strongest of the 8 neighbours (padding with -inf keeps edges out).
+        heat = np.pad(maps[:, 0], ((0, 0), (1, 1), (1, 1)), constant_values=-np.inf)
+        di, dj = np.meshgrid([-1, 0, 1], [-1, 0, 1], indexing="ij")
+        di, dj = (
+            di.ravel()[[0, 1, 2, 3, 5, 6, 7, 8]],
+            dj.ravel()[[0, 1, 2, 3, 5, 6, 7, 8]],
+        )
+        nb = heat[rows[:, None], i[:, None] + 1 + di, j[:, None] + 1 + dj]  # (n, 8)
+        k = nb.argmax(axis=1)
+        ni, nj = i + di[k], j + dj[k]
+        margin = flat[rows, idx] - nb[rows, k]
+        wn = 0.5 * np.clip(1 - margin / blend_logits, 0, 1)
+        ok = wn > 0
+        if ok.any():
+            nat = maps[rows[ok], :, ni[ok], nj[ok]]
+            un = STRIDE * (nj[ok] + nat[:, 1]) - 0.5
+            vn = STRIDE * (ni[ok] + nat[:, 2]) - 0.5
+            u[ok] = (1 - wn[ok]) * u[ok] + wn[ok] * un
+            v[ok] = (1 - wn[ok]) * v[ok] + wn[ok] * vn
     fw, fh = np.exp(at[:, 3]), np.exp(at[:, 4])
     phi = np.degrees(np.arctan2(at[:, 5], at[:, 6]) / 2) % 180
-    peak = 1 / (1 + np.exp(-flat[np.arange(n), idx]))
+    peak = 1 / (1 + np.exp(-flat[rows, idx]))
     pres = 1 / (1 + np.exp(-presence[:, 0]))
     return np.column_stack([u, v, fw, fh, phi, peak, pres, idx]).astype(np.float64)

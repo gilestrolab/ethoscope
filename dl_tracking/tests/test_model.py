@@ -80,6 +80,38 @@ def test_decode_reads_the_peak_cell() -> None:
     assert out[5] > 0.99 and out[6] > 0.95
 
 
+def _two_cell_maps(margin: float) -> np.ndarray:
+    """A fly on the boundary of cells (3, 40) and (4, 40), the lower one ``margin`` weaker."""
+    maps = np.full((1, M.N_MAPS, 8, 72), -9.0, np.float32)
+    maps[0, 0, 3, 40], maps[0, 0, 4, 40] = 2.0, 2.0 - margin
+    maps[0, 1:3, 3, 40] = (0.30, 0.95)  # v = 4 * 3.95 - 0.5 = 15.3
+    maps[0, 1:3, 4, 40] = (0.34, 0.05)  # v = 4 * 4.05 - 0.5 = 15.7
+    maps[0, 3], maps[0, 4] = np.log(28.0), np.log(11.0)
+    return maps
+
+
+def test_decode_is_continuous_across_a_cell_flip() -> None:
+    """Either cell winning a near-tie gives nearly the same position."""
+    pres = np.zeros((1, 1))
+    just_above = P.decode(_two_cell_maps(0.01), pres)[0, 1]
+    just_below = P.decode(_two_cell_maps(-0.01), pres)[0, 1]  # the other cell now wins
+    assert abs(just_above - just_below) < 0.01
+    assert just_above == pytest.approx(15.5, abs=0.01)
+    hard_above = P.decode(_two_cell_maps(0.01), pres, blend_logits=0)[0, 1]
+    hard_below = P.decode(_two_cell_maps(-0.01), pres, blend_logits=0)[0, 1]
+    assert abs(hard_above - hard_below) == pytest.approx(0.4, abs=1e-3)  # the old jump
+
+
+def test_decode_ignores_weak_or_distant_competitors() -> None:
+    """A neighbour a full margin below, or a peak two cells away, has no say."""
+    pres = np.zeros((1, 1))
+    assert P.decode(_two_cell_maps(1.5), pres)[0, 1] == pytest.approx(15.3, abs=1e-4)
+    maps = _two_cell_maps(0.0)
+    maps[0, :, 4, 40], maps[0, 0, 4, 40] = 0.0, -9.0
+    maps[0, 0, 3, 42] = 2.0  # a second blob two cells to the right
+    assert P.decode(maps, pres)[0, 0] == pytest.approx(4 * 40.30 - 0.5, abs=1e-4)
+
+
 def test_fold_batchnorm_preserves_outputs() -> None:
     """Folding BN into the convolutions changes nothing numerically."""
     torch.manual_seed(0)
