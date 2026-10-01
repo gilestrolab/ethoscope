@@ -23,6 +23,16 @@ VARIANTS = {
     "tiny": {"chans": (8, 16, 24, 24), "dilations": (1, 2, 4)},  # 2.9 M
     "mid": {"chans": (8, 16, 32, 32), "dilations": (1, 2, 4)},  # 3.9 M
     "small": {"chans": (12, 24, 40, 40), "dilations": (1, 2, 4)},  # 6.1 M
+    # Cheaper context for the Pi 3, where dilated depthwise convolutions are slow:
+    "tiny_k5": {"chans": (8, 16, 24, 24), "dilations": (1, 1, 1), "ctx_kernel": 5},
+    "tiny_s2": {"chans": (8, 16, 24, 24), "dilations": (1, 2, 4), "stem_stride": 2},
+    "tiny_d24": {"chans": (8, 16, 24, 24), "dilations": (2, 4)},  # one block fewer
+    "tiny_s2k5": {
+        "chans": (8, 16, 24, 24),
+        "dilations": (1, 1, 1),
+        "ctx_kernel": 5,
+        "stem_stride": 2,
+    },
 }
 N_MAPS = 7
 
@@ -52,21 +62,24 @@ def conv_bn(
     )
 
 
-def separable(cin: int, cout: int, stride: int = 1, dilation: int = 1) -> nn.Sequential:
+def separable(
+    cin: int, cout: int, stride: int = 1, dilation: int = 1, k: int = 3
+) -> nn.Sequential:
     """
-    Depthwise 3x3 followed by pointwise 1x1, each with batch norm and ReLU.
+    Depthwise k x k followed by pointwise 1x1, each with batch norm and ReLU.
 
     Args:
         cin (int): Input channels.
         cout (int): Output channels.
         stride (int): Depthwise stride.
         dilation (int): Depthwise dilation.
+        k (int): Depthwise kernel size.
 
     Returns:
         nn.Sequential: The block.
     """
     return nn.Sequential(
-        conv_bn(cin, cin, 3, stride, dilation, cin), conv_bn(cin, cout, 1)
+        conv_bn(cin, cin, k, stride, dilation, cin), conv_bn(cin, cout, 1)
     )
 
 
@@ -77,21 +90,34 @@ class FlyLocator(nn.Module):
         self,
         chans: tuple[int, int, int, int] = (8, 16, 32, 32),
         dilations: tuple[int, ...] = (1, 2, 4),
+        ctx_kernel: int = 3,
+        stem_stride: int = 1,
     ) -> None:
         """
         Build the network.
 
         Args:
-            chans (tuple[int, int, int, int]): Channels of the stem, the two strided
-                blocks, and the context blocks.
+            chans (tuple[int, int, int, int]): Channels of the stem, the two
+                downsampling blocks, and the context blocks.
             dilations (tuple[int, ...]): One context block per dilation.
+            ctx_kernel (int): Depthwise kernel of the context blocks; 5 with no
+                dilation buys context without dilated convolutions, which cv2.dnn
+                runs slowly on a Pi 3 (~20-27% of the forward pass).
+            stem_stride (int): 2 moves the first downsampling into the stem, the
+                most expensive layer at full canvas resolution; the output stride
+                stays 4 because the second block then keeps stride 1.
         """
         super().__init__()
         c0, c1, c2, c3 = chans
-        layers = [conv_bn(1, c0, 3), separable(c0, c1, 2), separable(c1, c2, 2)]
+        second = 1 if stem_stride == 2 else 2
+        layers = [
+            conv_bn(1, c0, 3, stem_stride),
+            separable(c0, c1, 2),
+            separable(c1, c2, second),
+        ]
         cin = c2
         for d in dilations:
-            layers.append(separable(cin, c3, 1, d))
+            layers.append(separable(cin, c3, 1, d, ctx_kernel))
             cin = c3
         self.body = nn.Sequential(*layers)
         self.maps = nn.Conv2d(c3, N_MAPS, 1)

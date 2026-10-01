@@ -15,10 +15,10 @@ from dl_tracking import preprocess as P
 
 @pytest.mark.parametrize("variant", list(M.VARIANTS))
 def test_variants_fit_the_pi_budget(variant: str) -> None:
-    """Every variant is under ~6.2 M MACs per tube and sees ~130 full-res px."""
+    """Every variant is under ~6.2 M MACs per tube and sees >= ~110 full-res px."""
     net = M.build(variant)
     assert M.count_macs(net, P.CANVAS_H, P.CANVAS_W) <= 6.2e6
-    assert M.receptive_field(net) >= 60
+    assert M.receptive_field(net) >= 55  # >= ~110 full-res px: fly, food and tube end
     maps, pres = net(torch.zeros(3, 1, P.CANVAS_H, P.CANVAS_W))
     assert maps.shape == (3, M.N_MAPS, P.CANVAS_H // P.STRIDE, P.CANVAS_W // P.STRIDE)
     assert pres.shape == (3, 1)

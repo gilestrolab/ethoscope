@@ -132,7 +132,7 @@ def canvases_from_frame(
 
 def normalise(canvases: np.ndarray) -> np.ndarray:
     """
-    Standardise each canvas to zero mean and unit spread, as one vectorised step.
+    Standardise each canvas to zero mean and unit spread.
 
     The fly covers ~1% of a canvas, so the mean and standard deviation describe the
     tube's lighting rather than the fly; the ``+ 1`` keeps a flat, dark canvas from
@@ -144,10 +144,14 @@ def normalise(canvases: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: ``(n, 1, h, w)`` float32, ready for the network.
     """
+    # Reason: numpy's std() made this 6 ms of a Pi 3 frame (several passes and
+    # temporaries); cv2.meanStdDev per canvas and in-place arithmetic do the same
+    # (population statistics, ddof = 0) in a fraction of that.
+    stats = np.array([cv2.meanStdDev(c) for c in canvases]).reshape(len(canvases), 2)
     x = canvases.astype(np.float32)
-    mean = x.mean(axis=(1, 2), keepdims=True)
-    std = x.std(axis=(1, 2), keepdims=True)
-    return ((x - mean) / (std + 1.0))[:, None]
+    x -= stats[:, 0, None, None].astype(np.float32)
+    x *= (1.0 / (stats[:, 1] + 1.0))[:, None, None].astype(np.float32)
+    return x[:, None]
 
 
 def decode(
