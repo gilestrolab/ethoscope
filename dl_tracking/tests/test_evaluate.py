@@ -161,3 +161,35 @@ def test_sleep_metrics_against_truth() -> None:
     m = E.sleep_metrics(pd.Series(False, index=idx), truth)  # never sees the move
     assert m["sleep_fraction"] == 1.0 and m["sensitivity"] == 1.0
     assert m["precision"] == pytest.approx(0.5)
+
+
+def test_sustained_truth_lets_twitches_stay_still() -> None:
+    """One moving frame in a 10-s window is strict movement but not sustained."""
+    t = np.arange(0, 20, 0.2)  # 5 fps, two windows
+    hits = np.zeros(len(t), int)
+    hits[3] = 5  # window 0: a single twitch
+    hits[50:60] = 5  # window 1: 2 s of movement
+    w = E.pixel_windows(pd.DataFrame({"t": t, "roi": 1, "fly_20": hits})).set_index(
+        "win"
+    )
+    assert w.moving.tolist() == [True, True]
+    assert w.sustained.tolist() == [False, True]
+
+
+def test_auto_level_without_light_phases_uses_the_level_it_reports() -> None:
+    """No lit column: one phase; the reported level is the one actually applied."""
+    pix = pd.DataFrame(
+        {
+            "t": [1.0, 2.0],
+            "roi": 1,
+            "ctl_noise": [0.2, 0.2],
+            "fly_5": [4, 0],
+            "fly_8": [0, 0],
+            "fly_12": [0, 0],
+            "fly_20": [0, 0],
+        }
+    )
+    assert E.auto_levels(pix) == {"all": "fly_5"}
+    assert E.pixel_windows(pix, "auto").moving.tolist() == [
+        True
+    ]  # moves at level 5 only

@@ -96,6 +96,16 @@ def displacement(df: pd.DataFrame, rounded: bool = False) -> pd.Series:
     return d.reindex(df.index)
 
 
+def _phases(pix: pd.DataFrame) -> pd.Series:
+    """
+    Light phase per pixel-motion row, or the single phase "all" when unknown.
+
+    Reason: an all-None phase column grouped to a NaN key, which then matched
+    nothing, so "auto" silently fell back to level 20 while reporting another.
+    """
+    return pix.lit if "lit" in pix else pd.Series("all", index=pix.index)
+
+
 def auto_levels(pix: pd.DataFrame) -> dict:
     """
     Pick the pixel-motion level per light phase, scaled to that phase's noise.
@@ -110,10 +120,10 @@ def auto_levels(pix: pd.DataFrame) -> dict:
             light phases are known.
 
     Returns:
-        dict: Phase (True = lit, False = dark, None = unknown) to column name.
+        dict: Phase (True = lit, False = dark, "all" when phases are unknown) to
+        column name.
     """
-    phases = pix.lit if "lit" in pix else pd.Series(None, index=pix.index)
-    noise = pix.ctl_noise.groupby(phases, dropna=False).median()
+    noise = pix.ctl_noise.groupby(_phases(pix)).median()
     return {
         ph: f"fly_{next((lv for lv in LEVELS if lv >= NOISE_MULT * n), LEVELS[-1])}"
         for ph, n in noise.items()
@@ -135,12 +145,9 @@ def pixel_windows(pix: pd.DataFrame, level: str = "fly_20") -> pd.DataFrame:
         ``BRIEF_S`` seconds of frames with motion, so twitches count as still).
     """
     if level == "auto":
-        cols = auto_levels(pix)
-        phases = pix.lit if "lit" in pix else pd.Series(None, index=pix.index)
+        cols, phases = auto_levels(pix), _phases(pix)
         counts = np.select(
-            [phases == ph for ph in cols if ph is not None],
-            [pix[c] for ph, c in cols.items() if ph is not None],
-            default=pix[cols.get(None, "fly_20")],
+            [phases == ph for ph in cols], [pix[c] for c in cols.values()]
         )
     else:
         counts = pix[level]
