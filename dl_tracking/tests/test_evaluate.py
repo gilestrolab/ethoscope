@@ -102,3 +102,35 @@ def test_load_abg_keeps_only_the_declared_segment(tmp_path: Path) -> None:
         )
     abg = E.load_abg(path)
     assert abg.t.min() == 5000 and abg.t.max() == 14_000 and len(abg) == 10
+
+
+def test_auto_levels_scale_with_noise_per_phase() -> None:
+    """Dim, quiet nights get a lower pixel level than noisy, bright days."""
+    pix = pd.DataFrame(
+        {
+            "t": [1.0, 2.0, 3.0, 4.0],
+            "roi": 1,
+            "lit": [True, True, False, False],
+            "ctl_noise": [1.3, 1.3, 0.3, 0.3],
+            "fly_5": [9, 9, 3, 0],
+            "fly_8": [5, 5, 0, 0],
+            "fly_12": [1, 1, 0, 0],
+            "fly_20": [0, 0, 0, 0],
+        }
+    )
+    assert E.auto_levels(pix) == {True: "fly_20", False: "fly_5"}
+    w = E.pixel_windows(pix, "auto")
+    assert w.moving.tolist() == [True]  # the dark frame at t=3 moves at level 5
+
+
+def test_frames_without_a_fly_do_not_count_as_movement() -> None:
+    """Absent frames (presence < 0.5) drop out of the track instead of jumping."""
+    t = np.arange(0, 20_000, 250)
+    x = np.full(len(t), 100.0)
+    pres = np.full(len(t), 0.99)
+    x[10], pres[10] = 400.0, 0.1  # one frame where the fly is not seen
+    cnn = pd.DataFrame({"t": t, "roi_idx": 1, "x": x, "y": 30.0, "presence": pres})
+    abg = pd.DataFrame({"t": t, "roi_idx": 1, "x": 100.0, "y": 30.0})
+    pix = pd.DataFrame({"t": t / 1000, "roi": 1, "fly_20": 0})
+    rep = E.evaluate(cnn, abg, pix, still_tubes=[1])
+    assert rep["windows"]["cnn_float@2.0"]["false_moving_on_still"] == 0

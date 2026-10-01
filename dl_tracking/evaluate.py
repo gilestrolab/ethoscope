@@ -29,6 +29,8 @@ import pandas as pd
 from . import db_io
 
 WINDOW_S = 10.0
+LEVELS = (5, 8, 12, 20)  # grey-level columns of the pixel-motion parquet
+NOISE_MULT = 14  # see auto_levels()
 MIN_PIXELS = 3
 CUTS_PX = (0.52, 1.0, 2.0)  # 0.52 px is what a corrected velocity of 1.0 means today
 PRESENT = 0.5
@@ -92,18 +94,53 @@ def displacement(df: pd.DataFrame, rounded: bool = False) -> pd.Series:
     return d.reindex(df.index)
 
 
+def auto_levels(pix: pd.DataFrame) -> dict:
+    """
+    Pick the pixel-motion level per light phase, scaled to that phase's noise.
+
+    The rule of the ethoscopy session's ``eval_long.py``: the smallest of the
+    recorded levels that is at least ``NOISE_MULT`` times the median empty-tube
+    noise (``ctl_noise``). Alice's dead flies validated 20 grey levels at ~14x the
+    noise of her bright IR; dimmer videos need a lower level to see real movement.
+
+    Args:
+        pix (pd.DataFrame): Pixel-motion rows, with a boolean ``lit`` column if the
+            light phases are known.
+
+    Returns:
+        dict: Phase (True = lit, False = dark, None = unknown) to column name.
+    """
+    phases = pix.lit if "lit" in pix else pd.Series(None, index=pix.index)
+    noise = pix.ctl_noise.groupby(phases, dropna=False).median()
+    return {
+        ph: f"fly_{next((lv for lv in LEVELS if lv >= NOISE_MULT * n), LEVELS[-1])}"
+        for ph, n in noise.items()
+    }
+
+
 def pixel_windows(pix: pd.DataFrame, level: str = "fly_20") -> pd.DataFrame:
     """
     Label each tube's 10-s windows still or moving from pixel motion.
 
     Args:
         pix (pd.DataFrame): Pixel-motion rows (``t`` in s, ``roi``, level columns).
-        level (str): Which grey-level column to use.
+        level (str): The grey-level column to use, or ``auto`` for
+            :func:`auto_levels`.
 
     Returns:
         pd.DataFrame: ``roi_idx``, ``win``, ``moving`` (bool).
     """
-    w = pix.assign(win=(pix.t // WINDOW_S).astype(int), hit=pix[level] >= MIN_PIXELS)
+    if level == "auto":
+        cols = auto_levels(pix)
+        phases = pix.lit if "lit" in pix else pd.Series(None, index=pix.index)
+        counts = np.select(
+            [phases == ph for ph in cols if ph is not None],
+            [pix[c] for ph, c in cols.items() if ph is not None],
+            default=pix[cols.get(None, "fly_20")],
+        )
+    else:
+        counts = pix[level]
+    w = pix.assign(win=(pix.t // WINDOW_S).astype(int), hit=counts >= MIN_PIXELS)
     return (
         w.groupby(["roi", "win"])
         .hit.any()
@@ -130,7 +167,11 @@ def window_calls(df: pd.DataFrame, disp: pd.Series, cut: float) -> pd.Series:
 
 
 def evaluate(
-    cnn: pd.DataFrame, abg: pd.DataFrame, pix: pd.DataFrame, still_tubes: list[int]
+    cnn: pd.DataFrame,
+    abg: pd.DataFrame,
+    pix: pd.DataFrame,
+    still_tubes: list[int],
+    level: str = "fly_20",
 ) -> dict:
     """
     Compute detection, agreement, still-fly jitter and window-level movement calls.
@@ -140,6 +181,8 @@ def evaluate(
         abg (pd.DataFrame): AdaptiveBGModel real rows.
         pix (pd.DataFrame): Pixel-motion rows.
         still_tubes (list[int]): Tubes holding dead or immobile flies.
+        level (str): Pixel-motion level for the window truth (see
+            :func:`pixel_windows`).
 
     Returns:
         dict: The report.
@@ -172,7 +215,10 @@ def evaluate(
         },
         "per_tube": per_tube.round(4).to_dict("index"),
     }
-    still = cnn[cnn.roi_idx.isin(still_tubes)]
+    # Reason: like AdaptiveBGModel's real rows, the locator's track holds only the
+    # frames where it reports a fly; elsewhere its argmax lands anywhere, and the
+    # jump back would count as movement.
+    still = found[found.roi_idx.isin(still_tubes)]
     jit = {}
     for name, rounded in (("float", False), ("rounded", True)):
         d = displacement(still, rounded).dropna()
@@ -184,11 +230,14 @@ def evaluate(
         }
     report["still_fly_jitter_px"] = jit
 
-    truth = pixel_windows(pix).set_index(["roi_idx", "win"]).moving
+    truth = pixel_windows(pix, level).set_index(["roi_idx", "win"]).moving
+    report["pixel_level"] = (
+        {str(k): v for k, v in auto_levels(pix).items()} if level == "auto" else level
+    )
     calls = {}
     tracks = {
-        "cnn_float": (cnn, displacement(cnn)),
-        "cnn_rounded": (cnn, displacement(cnn, rounded=True)),
+        "cnn_float": (found, displacement(found)),
+        "cnn_rounded": (found, displacement(found, rounded=True)),
         "abg": (abg, displacement(abg)),
     }
     for name, (df, disp) in tracks.items():
@@ -221,13 +270,31 @@ def main() -> None:
         "--pixel", type=Path, nargs="+", required=True, help="pixel-motion parquet(s)"
     )
     ap.add_argument("--still-tubes", type=int, nargs="*", default=[])
+    ap.add_argument("--level", default="fly_20", help="pixel level column, or 'auto'")
+    ap.add_argument(
+        "--lum",
+        type=Path,
+        default=None,
+        help="CSV with t_s and lum per minute; lit when lum > 70",
+    )
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
+    pix = pd.concat([pd.read_parquet(p) for p in args.pixel], ignore_index=True)
+    if args.lum:
+        # Reason: the same phase rule as eval_long.py (lit when lum > 70).
+        lum = pd.read_csv(args.lum).sort_values("t_s")
+        i = np.clip(
+            np.searchsorted(lum.t_s.to_numpy(), pix.t.to_numpy(), "right") - 1,
+            0,
+            len(lum) - 1,
+        )
+        pix["lit"] = lum.lum.to_numpy()[i] > 70
     report = evaluate(
         pd.read_parquet(args.cnn),
         pd.concat([load_abg(db) for db in args.abg], ignore_index=True),
-        pd.concat([pd.read_parquet(p) for p in args.pixel], ignore_index=True),
+        pix,
         args.still_tubes,
+        args.level,
     )
     text = json.dumps(report, indent=1)
     print(text)
