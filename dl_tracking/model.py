@@ -15,6 +15,7 @@ are used, all of which ``cv2.dnn`` runs.
 from __future__ import annotations
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 # MACs per 32 x 288 canvas. The Pi 3 ran 2.1 M in 44.5 ms and 6.2 M in 96 ms for
@@ -140,12 +141,11 @@ class FlyLocator(nn.Module):
             presence logits ``(n, 1)``.
         """
         f = self.body(x)
+        # Reason: amax/mean export as ReduceMax/ReduceMean, which OpenCV 4.7's
+        # cv2.dnn (still on part of the fleet) evaluates to NaN; global pooling
+        # exports as GlobalMaxPool/GlobalAveragePool, which every version runs.
         pooled = torch.cat(
-            [
-                torch.amax(f, dim=(2, 3), keepdim=True),
-                torch.mean(f, dim=(2, 3), keepdim=True),
-            ],
-            dim=1,
+            [F.adaptive_max_pool2d(f, 1), F.adaptive_avg_pool2d(f, 1)], dim=1
         )
         return self.maps(f), self.presence(pooled).flatten(1)
 
