@@ -285,6 +285,42 @@ Sketch, not to be implemented under this plan:
   `/mnt/cache/dl_tracking/review/token`). v1 (tiny, 30 epochs) trains with and
   without the flagged runs, in tmux `dl_train_excl` / `dl_train_incl`; epoch 0
   already gave 0.98 px median error and 94% detection on validation machines.
+- **v1 → v2 (2026-10-01).** Test machines (errors against tracker labels; false
+  presence on swapped fly-free canvases):
+
+  | | p95 err, unflagged | detect, unflagged | p95 err, flagged | detect, flagged |
+  |---|---|---|---|---|
+  | v1 tiny, without flagged | 2.93 px | 96.2% | 4.07 px | 94.9% |
+  | v1 tiny, with flagged | 2.95 px | 96.1% | 3.73 px | 95.3% |
+  | v2 tiny (no gap fills, no flat canvases) | 2.65 px | 96.4% | 1.80 px | 98.0% |
+  | v2 mid | 2.49 px | 96.6% | 1.68 px | 98.1% |
+
+  Training with the flagged picamera2 runs helps on them and costs nothing elsewhere,
+  so they stay in. Most remaining test "misses" are label problems (gap fills on
+  tube-end objects, two fly-like objects in a tube, flat canvases), not model errors.
+- **Gap fills were 75% wrong.** The rule "lost and found again in the same place"
+  is equally true of a static dark object at a tube end (end cap, ROI edge), which
+  AdaptiveBGModel picks up about once a day. Gap fills are off by default; to
+  reinstate them, require the fly to be seen walking into or out of the spot.
+- **Cell-boundary flips.** v2 made a dead fly jump ~0.9 px in a quarter of frames:
+  its centre sat on the boundary of two heatmap cells (logit margin 0.09), and each
+  cell's estimate was steady but they disagreed. `decode()` now blends the peak
+  with its strongest neighbour (weight 0.5 at a tie, 0 one logit below), which is
+  continuous across a flip. On `alice_012`, blended decode:
+
+  | | detect all / dead | dead-fly jitter p95 | still windows called moving @1 px | moving windows detected @1 px |
+  |---|---|---|---|---|
+  | AdaptiveBGModel | 72.1% / 0.1% | — | 30.6% | 95.7% |
+  | v1 tiny | 99.8% / 100% | 0.30 px | 0.6% | 74.3% |
+  | v2 tiny | 99.9% / 100% | 0.39 px | 1.3% | 75.1% |
+  | v2 mid | 99.9% / 100% | 0.35 px | 0.7% | 74.5% |
+
+  The jitter target (p95 < 0.5 px) is met. Movement windows missed at 1 px are mostly
+  twitches with no centroid displacement, which the pixel-motion variable is for.
+  `xy_dist` should be computed on the device from float positions (before the
+  SMALLINT rounding); no +1 px correction is needed.
+- **Pi benchmark** bundle at `turing:/mnt/cache/dl_tracking/pi_bench/` (numpy +
+  OpenCV only); request sent to the ethoscopy session on 2026-10-01, no reply yet.
 - **Two training crashes fixed.** `np.polyfit` failed to converge on flat pixel rings
   in the swap gain match (now a closed-form mean-and-spread match), and unpinned
   OpenCV/torch threads in 24 loader workers made epochs ten times slower.
