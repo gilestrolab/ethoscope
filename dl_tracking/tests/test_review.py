@@ -170,3 +170,77 @@ def test_human_labels_override_and_add_negatives(
     same = rows[(rows.sid == audit.sid) & (rows.roi_idx == audit.roi_idx)]
     assert len(same) == 1 and not same.present.item()
     assert rows.present.sum() == len(rows) - 1
+
+
+def test_propagate_dead_flies_and_empty_tubes() -> None:
+    """Empty-at-every-time tubes stay empty; a still fly is interpolated between clicks."""
+    from dl_tracking.review import ingest as I
+
+    box = {"roi_x": 40, "roi_y": 100, "roi_w": 560, "roi_h": 60}
+    pack = pd.DataFrame(
+        [
+            {
+                "run_id": "r",
+                "roi_idx": roi,
+                "sid": s,
+                "t": 1000 * s,
+                "status": "never_detected",
+                **box,
+            }
+            for roi in (1, 2)
+            for s in range(10)
+        ]
+    )
+    shown = [0, 3, 6, 9]
+    queue = pd.DataFrame(
+        [
+            {
+                "item_id": f"{roi}:{s}",
+                "kind": "never_detected",
+                "run_id": "r",
+                "roi_idx": roi,
+                "sid": s,
+            }
+            for roi in (1, 2)
+            for s in shown
+        ]
+    )
+    labels = pd.DataFrame(
+        [
+            {
+                "run_id": "r",
+                "roi_idx": 1,
+                "sid": s,
+                "t": 1000 * s,
+                "present": False,
+                "x": np.nan,
+                "y": np.nan,
+                **box,
+            }
+            for s in shown
+        ]
+        + [
+            {
+                "run_id": "r",
+                "roi_idx": 2,
+                "sid": s,
+                "t": 1000 * s,
+                "present": p,
+                "x": x,
+                "y": 30.0,
+                **box,
+            }
+            for s, p, x in (
+                (0, True, 100.0),
+                (3, True, 106.0),
+                (6, True, 300.0),
+                (9, False, np.nan),
+            )
+        ]
+    )
+    new = I.propagate(labels, queue, pack)
+    empty = new[new.roi_idx == 1]
+    assert sorted(empty.sid) == [1, 2, 4, 5, 7, 8] and not empty.present.any()
+    fly = new[new.roi_idx == 2]  # only between the two clicks 6 px apart
+    assert sorted(fly.sid) == [1, 2] and fly.present.all()
+    assert fly.sort_values("sid").x.tolist() == pytest.approx([102.0, 104.0])

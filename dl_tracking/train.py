@@ -19,7 +19,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from . import dataset as D
 from . import model as M
@@ -205,10 +205,19 @@ def loader(
         keep = pd.Series(rows.sid.unique()).sample(max_snapshots, random_state=0)
         rows = rows[rows.sid.isin(keep)]
     ds = D.TubeDataset(store, rows, augment=train, p_swap=0.5)
+    sampler = None
+    weight = getattr(args, "human_weight", 1.0)
+    if train and weight != 1.0:
+        # Reason: human labels are <1% of training tubes but sit exactly where the
+        # model fails (empty tubes, dead flies); draw their snapshots more often.
+        human = set(rows.sid[rows.status.isin(["human_fly", "human_empty"])])
+        w = np.where([sid in human for sid in ds.sids], weight, 1.0)
+        sampler = WeightedRandomSampler(torch.as_tensor(w), len(ds), replacement=True)
     return DataLoader(
         ds,
         args.snapshots_per_batch,
-        shuffle=train,
+        shuffle=train and sampler is None,
+        sampler=sampler,
         drop_last=train,
         collate_fn=D.collate,
         num_workers=args.workers,
@@ -289,6 +298,12 @@ def main() -> None:
         type=Path,
         default=Path("/mnt/cache/dl_tracking/review/human_labels.parquet"),
         help="human labels from review.ingest (used if the file exists)",
+    )
+    ap.add_argument(
+        "--human-weight",
+        type=float,
+        default=5.0,
+        help="how much more often snapshots with human labels are drawn",
     )
     ap.add_argument(
         "--include-flagged",
