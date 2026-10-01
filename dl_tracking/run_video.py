@@ -6,7 +6,8 @@ video. Positions are ROI-relative and at full resolution, as in the DBs.
 
 Usage::
 
-    python -m dl_tracking.run_video VIDEO ROI_DB CKPT OUT.parquet [--start S --end S]
+    python -m dl_tracking.run_video VIDEO ROI_DB --model CKPT OUT.parquet \\
+        [--model CKPT2 OUT2.parquet] [--start S --end S]
 """
 
 from __future__ import annotations
@@ -79,20 +80,21 @@ def locate(
 def run(
     video: Path,
     roi_db: Path,
-    ckpt: Path,
-    out: Path,
+    models: list[tuple[Path, Path]],
     start_s: float = 0.0,
     end_s: float | None = None,
     device: str = "cuda",
 ) -> int:
     """
-    Process a video (or a time segment of it) and write the positions to parquet.
+    Process a video (or a time segment of it) with one or more models.
+
+    Decoding the video dominates the cost, so every model sees each frame from a
+    single decode, and each writes its own parquet.
 
     Args:
         video (Path): The video file.
         roi_db (Path): A tracking DB of the same video, for its ROI_MAP.
-        ckpt (Path): Model checkpoint.
-        out (Path): Output parquet.
+        models (list[tuple[Path, Path]]): ``(checkpoint, output parquet)`` pairs.
         start_s (float): Segment start, seconds of video time.
         end_s (float | None): Segment end (exclusive), or None for the end.
         device (str): Torch device.
@@ -102,29 +104,27 @@ def run(
     """
     with db_io.connect(roi_db) as conn:
         rois = db_io.roi_map(conn)
-    net = load_net(ckpt, device)
+    nets = [load_net(ckpt, device) for ckpt, _ in models]
     cap = cv2.VideoCapture(str(video))
     fps = cap.get(cv2.CAP_PROP_FPS)
     cap.set(cv2.CAP_PROP_POS_FRAMES, int(start_s * fps))
-    parts, frames, stamps, n = [], [], [], 0
+    parts: list[list[pd.DataFrame]] = [[] for _ in models]
+    frames, stamps, n = [], [], 0
+    cols = ["x", "y", "w", "h", "phi", "peak", "presence"]
 
     def flush() -> None:
-        res = locate(net, frames, rois, device)
         t = np.repeat(np.array(stamps), len(rois))
-        parts.append(
-            pd.DataFrame(
-                {
-                    "t": t,
-                    "roi_idx": np.tile(rois[:, 0], len(frames)),
-                    **{
-                        c: res[..., i].ravel()
-                        for i, c in enumerate(
-                            ["x", "y", "w", "h", "phi", "peak", "presence"]
-                        )
-                    },
-                }
+        for net, out in zip(nets, parts, strict=True):
+            res = locate(net, frames, rois, device)
+            out.append(
+                pd.DataFrame(
+                    {
+                        "t": t,
+                        "roi_idx": np.tile(rois[:, 0], len(frames)),
+                        **{c: res[..., i].ravel() for i, c in enumerate(cols)},
+                    }
+                )
             )
-        )
         frames.clear()
         stamps.clear()
 
@@ -144,7 +144,8 @@ def run(
                 logging.info("%d frames, t = %.0f s", n, t_ms / 1000)
     if frames:
         flush()
-    pd.concat(parts, ignore_index=True).to_parquet(out)
+    for (_, path), out in zip(models, parts, strict=True):
+        pd.concat(out, ignore_index=True).to_parquet(path)
     return n
 
 
@@ -153,16 +154,22 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("video", type=Path)
     ap.add_argument("roi_db", type=Path)
-    ap.add_argument("ckpt", type=Path)
-    ap.add_argument("out", type=Path)
+    ap.add_argument(
+        "--model",
+        nargs=2,
+        action="append",
+        type=Path,
+        required=True,
+        metavar=("CKPT", "OUT"),
+        help="checkpoint and output; repeatable",
+    )
     ap.add_argument("--start", type=float, default=0.0)
     ap.add_argument("--end", type=float, default=None)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-    n = run(
-        args.video, args.roi_db, args.ckpt, args.out, args.start, args.end, args.device
-    )
+    models = [(Path(c), Path(o)) for c, o in args.model]
+    n = run(args.video, args.roi_db, models, args.start, args.end, args.device)
     logging.info("done: %d frames", n)
 
 

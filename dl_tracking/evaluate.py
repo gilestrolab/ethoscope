@@ -13,7 +13,8 @@ and rounded to whole pixels as the device's SMALLINT columns would store it.
 
 Usage::
 
-    python -m dl_tracking.evaluate CNN.parquet ABG.db PIXEL.parquet --still-tubes 6 9 11 17 20
+    python -m dl_tracking.evaluate CNN.parquet --abg ABG.db [...] --pixel PIX.parquet [...] \\
+        --still-tubes 6 9 11 17 20
 """
 
 from __future__ import annotations
@@ -37,6 +38,11 @@ def load_abg(db: Path) -> pd.DataFrame:
     """
     Load every ROI's real (non-inferred) AdaptiveBGModel rows.
 
+    A DB made by tracking one segment of a long video records that segment in
+    METADATA (``experimental_info = {'segment': [start_s, end_s]}``) and also holds
+    a warm-up before it; only rows inside the segment are kept, so the DBs of
+    consecutive segments can be concatenated without overlap.
+
     Args:
         db (Path): Offline tracking DB.
 
@@ -45,13 +51,15 @@ def load_abg(db: Path) -> pd.DataFrame:
     """
     parts = []
     with db_io.connect(db) as conn:
+        segment = db_io.experimental_info(db_io.read_metadata(conn)).get("segment")
+        lo, hi = (1000 * segment[0], 1000 * segment[1]) if segment else (-1, 2**62)
         tables = db_io.tables(conn)
         for idx in db_io.roi_map(conn)[:, 0]:
             # Reason: the writer creates a ROI's table with its first row, so a fly
             # that was never detected (a dead one) has no table at all.
             if f"ROI_{idx}" not in tables:
                 continue
-            rows = db_io.rows_between(conn, f"ROI_{idx}", -1, 2**62)
+            rows = db_io.rows_between(conn, f"ROI_{idx}", int(lo), int(hi))
             real = rows[rows[:, -1] == 0]
             parts.append(
                 pd.DataFrame(
@@ -201,16 +209,24 @@ def evaluate(
 def main() -> None:
     """Command-line entry point."""
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cnn", type=Path)
-    ap.add_argument("abg_db", type=Path)
-    ap.add_argument("pixel", type=Path)
+    ap.add_argument("cnn", type=Path, help="locator output (parquet)")
+    ap.add_argument(
+        "--abg",
+        type=Path,
+        nargs="+",
+        required=True,
+        help="AdaptiveBGModel DB(s); segment DBs keep only their segment",
+    )
+    ap.add_argument(
+        "--pixel", type=Path, nargs="+", required=True, help="pixel-motion parquet(s)"
+    )
     ap.add_argument("--still-tubes", type=int, nargs="*", default=[])
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     report = evaluate(
         pd.read_parquet(args.cnn),
-        load_abg(args.abg_db),
-        pd.read_parquet(args.pixel),
+        pd.concat([load_abg(db) for db in args.abg], ignore_index=True),
+        pd.concat([pd.read_parquet(p) for p in args.pixel], ignore_index=True),
         args.still_tubes,
     )
     text = json.dumps(report, indent=1)

@@ -86,3 +86,19 @@ def test_locate_returns_roi_relative_positions() -> None:
     # Untrained: positions are arbitrary but must lie within each canvas.
     assert np.all(out[..., 0] > -20) and np.all(out[..., 0] < 600)
     assert np.all((out[..., 6] >= 0) & (out[..., 6] <= 1))
+
+
+def test_load_abg_keeps_only_the_declared_segment(tmp_path: Path) -> None:
+    """A segment DB's warm-up rows are dropped, so segments concatenate cleanly."""
+    path = make_db(
+        tmp_path / "a" / "E" / "d" / "seg.db",
+        {1: still_rows(0, 20_000, 1000, 7, 8)},
+        [],
+    )
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "UPDATE METADATA SET value = ? WHERE field = 'experimental_info'",
+            ("{'segment': [5.0, 15.0]}",),
+        )
+    abg = E.load_abg(path)
+    assert abg.t.min() == 5000 and abg.t.max() == 14_000 and len(abg) == 10
