@@ -23,6 +23,8 @@ CANVAS_H = 32  # half-resolution pixels
 CANVAS_W = 288
 STRIDE = 4  # network output stride, in half-resolution pixels
 BLEND_LOGITS = 1.0  # see decode(): margin over which a competing neighbour fades out
+_NEIGHBOUR_DI = np.array([-1, -1, -1, 0, 0, 1, 1, 1])  # the 8 neighbours of a cell
+_NEIGHBOUR_DJ = np.array([-1, 0, 1, -1, 1, -1, 0, 1])
 
 
 def canvas_origin(x0: int, y0: int, w: int, h: int) -> tuple[int, int]:
@@ -190,14 +192,16 @@ def decode(
     u = STRIDE * (j + at[:, 1]) - 0.5
     v = STRIDE * (i + at[:, 2]) - 0.5
     if blend_logits > 0:
-        # The strongest of the 8 neighbours (padding with -inf keeps edges out).
-        heat = np.pad(maps[:, 0], ((0, 0), (1, 1), (1, 1)), constant_values=-np.inf)
-        di, dj = np.meshgrid([-1, 0, 1], [-1, 0, 1], indexing="ij")
-        di, dj = (
-            di.ravel()[[0, 1, 2, 3, 5, 6, 7, 8]],
-            dj.ravel()[[0, 1, 2, 3, 5, 6, 7, 8]],
-        )
-        nb = heat[rows[:, None], i[:, None] + 1 + di, j[:, None] + 1 + dj]  # (n, 8)
+        # The strongest of the 8 neighbours; out-of-grid ones are masked out.
+        # Reason: indexing them directly avoids padding a copy of every heatmap,
+        # which made this the slowest step after the network on a Pi 3.
+        di, dj = _NEIGHBOUR_DI, _NEIGHBOUR_DJ
+        ni_all, nj_all = i[:, None] + di, j[:, None] + dj
+        inside = (ni_all >= 0) & (ni_all < h) & (nj_all >= 0) & (nj_all < w)
+        nb = maps[
+            rows[:, None], 0, np.clip(ni_all, 0, h - 1), np.clip(nj_all, 0, w - 1)
+        ]
+        nb = np.where(inside, nb, -np.inf)  # (n, 8)
         k = nb.argmax(axis=1)
         ni, nj = i + di[k], j + dj[k]
         margin = flat[rows, idx] - nb[rows, k]
