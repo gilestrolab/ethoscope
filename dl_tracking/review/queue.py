@@ -8,6 +8,10 @@ Round 1 holds two kinds of item:
 - ``audit_confident`` / ``audit_gapfill``: a small random sample of automatic
   labels, shown with their marker, to measure how often they are wrong.
 
+Round 2 (``--round2``, appended after round 1) holds crops AdaptiveBGModel missed,
+as a trained locator sees them: the uncertain ones, and small audits of its
+confident calls either way (:func:`model_items`).
+
 Usage::
 
     python -m dl_tracking.review.queue --pack /mnt/cache/dl_tracking/data/pack \\
@@ -26,6 +30,7 @@ from .. import dataset as D
 
 N_TIMES = 4
 AUDIT_BLOCK = 5
+UNSURE = (0.15, 0.85)  # locator presence band that round 2 asks a person about
 COLUMNS = [
     "item_id",
     "group",
@@ -101,6 +106,59 @@ def audit_items(rows: pd.DataFrame, status: str, n: int, seed: int) -> pd.DataFr
     )
 
 
+def model_items(
+    scored: pd.DataFrame,
+    n_unsure: int = 100,
+    n_conf: int = 40,
+    n_none: int = 20,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """
+    Round 2: crops AdaptiveBGModel missed, as a trained locator sees them.
+
+    ``scored`` holds the locator's position (``px``, ``py``, ROI-relative) and
+    ``presence`` for each missed crop. Only the uncertain ones (presence within
+    ``UNSURE``) need a person; small random samples of the confident calls either
+    way measure how often those are wrong. A ring is shown wherever the locator
+    leans towards a fly (presence at or above the lower bound).
+
+    Args:
+        scored (pd.DataFrame): Missed crops with ``px``, ``py``, ``presence``.
+        n_unsure (int): Uncertain crops to review (spread over runs).
+        n_conf (int): Confident-fly crops to audit.
+        n_none (int): Confident-empty crops to audit.
+        seed (int): Sampling seed.
+
+    Returns:
+        pd.DataFrame: Queue rows.
+    """
+    lo, hi = UNSURE
+    parts = []
+    for kind, sel, n in (
+        ("model_unsure", scored.presence.between(lo, hi), n_unsure),
+        ("model_conf", scored.presence > hi, n_conf),
+        ("model_none", scored.presence < lo, n_none),
+    ):
+        pool = scored[sel].sample(frac=1.0, random_state=seed)
+        pool = pool.assign(rank=pool.groupby("run_id").cumcount())
+        pick = pool.sort_values("rank", kind="stable").head(n)
+        show = pick.presence >= lo
+        block = np.arange(len(pick)) // AUDIT_BLOCK
+        parts.append(
+            pick.assign(
+                kind=kind,
+                px=pick.px.where(show),
+                py=pick.py.where(show),
+                group=[f"m:{kind}:{b}" for b in block],
+            )
+        )
+    q = pd.concat(parts, ignore_index=True)
+    q["item_id"] = (
+        q.run_id + ":" + q.roi_idx.astype(str) + ":" + q.sid.astype(int).astype(str)
+    )
+    return q[COLUMNS]
+
+
 def build(
     labels: pd.DataFrame,
     runs: pd.DataFrame | None,
@@ -146,10 +204,21 @@ def main() -> None:
     ap.add_argument("--runs", type=Path, default=None)
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--max-tubes", type=int, default=300)
+    ap.add_argument(
+        "--round2",
+        type=Path,
+        default=None,
+        help="scored missed crops; appends round-2 items to the queue",
+    )
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     runs = pd.read_parquet(args.runs) if args.runs else None
-    q = build(pd.read_parquet(args.pack / "labels.parquet"), runs, args.max_tubes)
+    if args.round2:
+        q = pd.read_parquet(args.out / "queue.parquet")
+        new = model_items(pd.read_parquet(args.round2))
+        q = pd.concat([q, new[~new.item_id.isin(q.item_id)]], ignore_index=True)
+    else:
+        q = build(pd.read_parquet(args.pack / "labels.parquet"), runs, args.max_tubes)
     q.to_parquet(args.out / "queue.parquet")
     print(q.kind.value_counts().to_string())
 

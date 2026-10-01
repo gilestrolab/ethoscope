@@ -30,7 +30,8 @@
           padding: 10px 12px 12px; margin: 12px 0; }
   .ask { font-weight: 600; margin: 0 0 8px; }
   .strip { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
-  .pic { position: relative; flex: 1; cursor: crosshair; line-height: 0; }
+  .pic { position: relative; flex: 1; cursor: crosshair; line-height: 0; overflow: hidden;
+         border-radius: 4px; }
   .pic img { width: 100%; height: auto; border-radius: 4px; user-select: none;
              -webkit-user-drag: none; }
   .ring { display: none; position: absolute; width: 54px; height: 54px; border: 2px solid var(--ring);
@@ -74,6 +75,9 @@ const ASK = {
   never_detected: "Same tube at four times. Click the fly wherever you see one.",
   audit_confident: "Is each ring on the fly? Fix only the wrong ones.",
   audit_gapfill: "Is each ring on the fly? Fix only the wrong ones.",
+  model_unsure: "Is there a fly? Ring on it if so, no ring if the tube is empty.",
+  model_conf: "Is each ring on the fly? Fix only the wrong ones.",
+  model_none: "These should be empty. Click a fly if you see one.",
 };
 let items = [];  // {id, state, ix, iy, prev, el}
 
