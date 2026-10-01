@@ -279,6 +279,9 @@ def encode(t: Target) -> dict[str, np.ndarray]:
             np.sin(a),
             np.cos(a),
         )
+        # Reason: a click gives a position but no size or angle (NaN); the shape
+        # mask is 0 there, but NaN * 0 is NaN and made every logged loss NaN.
+        reg[:] = np.nan_to_num(reg)
         cell[:] = (i, j)
         pos, shape = 1.0, float(t.shape_ok)
         # Reason: trained only at the centre cell, a neighbour's offset is an

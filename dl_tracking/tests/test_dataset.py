@@ -253,3 +253,9 @@ def test_dense_offsets_at_the_grid_edge_and_absent() -> None:
     enc = D.encode(D.Target(True, u=1.0, v=1.0, w=28, h=11))
     assert enc["offmask"].sum() == 4
     assert D.encode(D.Target(False))["offmask"].sum() == 0
+
+
+def test_click_labels_without_size_give_finite_targets() -> None:
+    """A human click (no size or angle) yields finite targets, size heads masked."""
+    enc = D.encode(D.Target(True, u=100.0, v=15.0, w=np.nan, h=np.nan, phi=np.nan))
+    assert np.isfinite(enc["reg"]).all() and enc["shape"] == 0 and enc["pos"] == 1
