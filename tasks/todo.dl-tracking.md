@@ -290,6 +290,15 @@ Constraints measured so far (2026-10-01):
 - **The model must stay within ops every fleet OpenCV runs** (4.7 to 4.14): Conv,
   Relu, GlobalMaxPool, GlobalAveragePool, Concat, Flatten. Check new exports with
   `pi_parity.py` on a 4.7 device.
+- **Weak supplies can brown out under camera + CPU load.** In the production soak
+  (tiny_s2_v3, 4 threads, full speed; 120 min static then 30 min live camera),
+  ETHOSCOPE_380 (healthy supply) held 49.1 ms per frame static and 66.9 ms with
+  capture (~15 fps), thermally capped at up to 83.8 °C, with no stalls.
+  ETHOSCOPE_301 (under-voltage even at idle, 600 MHz) held 72.9 ms static at 47 °C,
+  then **rebooted ~10 min into the camera phase** (boot 15:58:11; no persistent
+  journal, so the cause is inferred). Its overnight recording the night before also
+  failed ("Could not get frame from camera"). The frame-rate cap is therefore also
+  a current cap; consider 3 threads on devices that report under-voltage.
 - **Do not assume a fixed frame interval**: under-voltage throttling (common in the
   lab) moves a frame between ~45 and ~75 ms.
 - `xy_dist` from float positions before the SMALLINT rounding.
