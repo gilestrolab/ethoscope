@@ -32,6 +32,7 @@ WINDOW_S = 10.0
 LEVELS = (5, 8, 12, 20)  # grey-level columns of the pixel-motion parquet
 NOISE_MULT = 14  # see auto_levels()
 SLEEP_WINDOWS = 30  # sleep = 5 min of still 10-s windows, the ethoscope definition
+BRIEF_S = 0.5  # up to this much movement in a window is a twitch (sustained truth)
 MIN_PIXELS = 3
 CUTS_PX = (0.52, 1.0, 2.0)  # 0.52 px is what a corrected velocity of 1.0 means today
 PRESENT = 0.5
@@ -129,7 +130,9 @@ def pixel_windows(pix: pd.DataFrame, level: str = "fly_20") -> pd.DataFrame:
             :func:`auto_levels`.
 
     Returns:
-        pd.DataFrame: ``roi_idx``, ``win``, ``moving`` (bool).
+        pd.DataFrame: ``roi_idx``, ``win``, ``moving`` (bool: any frame with
+        motion, the strict truth), ``sustained`` (bool: more than
+        ``BRIEF_S`` seconds of frames with motion, so twitches count as still).
     """
     if level == "auto":
         cols = auto_levels(pix)
@@ -142,13 +145,13 @@ def pixel_windows(pix: pd.DataFrame, level: str = "fly_20") -> pd.DataFrame:
     else:
         counts = pix[level]
     w = pix.assign(win=(pix.t // WINDOW_S).astype(int), hit=counts >= MIN_PIXELS)
-    return (
-        w.groupby(["roi", "win"])
-        .hit.any()
-        .rename("moving")
-        .reset_index()
-        .rename(columns={"roi": "roi_idx"})
-    )
+    g = w.groupby(["roi", "win"]).hit.agg(["sum", "size"])
+    # Reason: "brief" = up to BRIEF_S of moving frames (eval_long.py allows 3
+    # frames at 6 fps); scale to this video's frame rate.
+    fps = float(g["size"].median()) / WINDOW_S
+    brief = max(1, round(BRIEF_S * fps))
+    out = pd.DataFrame({"moving": g["sum"] > 0, "sustained": g["sum"] > brief})
+    return out.reset_index().rename(columns={"roi": "roi_idx"})
 
 
 def window_calls(df: pd.DataFrame, disp: pd.Series, cut: float) -> pd.Series:
@@ -281,7 +284,8 @@ def evaluate(
         }
     report["still_fly_jitter_px"] = jit
 
-    truth = pixel_windows(pix, level).set_index(["roi_idx", "win"]).moving
+    pw = pixel_windows(pix, level).set_index(["roi_idx", "win"])
+    truth, sustained = pw.moving, pw.sustained
     report["pixel_level"] = (
         {str(k): v for k, v in auto_levels(pix).items()} if level == "auto" else level
     )
@@ -291,8 +295,14 @@ def evaluate(
         "cnn_rounded": (found, displacement(found, rounded=True)),
         "abg": (abg, displacement(abg)),
     }
+    # Reason: two references. Strict counts any pixel motion (a twitch, grooming)
+    # as waking, as eval_long.py does; sustained lets brief twitches stay asleep,
+    # which is what sleep scored from positions can be expected to match.
     sleep = {
-        "pixel_truth_sleep_fraction": round(float(sleep_from_still(~truth).mean()), 4)
+        "truth_sleep_fraction_strict": round(float(sleep_from_still(~truth).mean()), 4),
+        "truth_sleep_fraction_sustained": round(
+            float(sleep_from_still(~sustained).mean()), 4
+        ),
     }
     for name, (df, disp) in tracks.items():
         for cut in CUTS_PX:
@@ -303,7 +313,10 @@ def evaluate(
                 "false_moving_on_still": round(float(called[~truth].mean()), 4),
                 "detected_on_moving": round(float(called[truth].mean()), 4),
             }
-            sleep[f"{name}@{cut}"] = sleep_metrics(called, truth)
+            sleep[f"{name}@{cut}"] = {
+                "strict": sleep_metrics(called, truth),
+                "sustained": sleep_metrics(called, sustained),
+            }
     report["sleep"] = sleep
     report["windows"] = {
         "n_still": int((~truth).sum()),
@@ -328,6 +341,13 @@ def main() -> None:
         "--pixel", type=Path, nargs="+", required=True, help="pixel-motion parquet(s)"
     )
     ap.add_argument("--still-tubes", type=int, nargs="*", default=[])
+    ap.add_argument(
+        "--tubes",
+        type=int,
+        nargs="*",
+        default=None,
+        help="score only these ROIs (e.g. the single-fly tubes)",
+    )
     ap.add_argument("--level", default="fly_20", help="pixel level column, or 'auto'")
     ap.add_argument(
         "--lum",
@@ -347,13 +367,14 @@ def main() -> None:
             len(lum) - 1,
         )
         pix["lit"] = lum.lum.to_numpy()[i] > 70
-    report = evaluate(
-        pd.read_parquet(args.cnn),
-        pd.concat([load_abg(db) for db in args.abg], ignore_index=True),
-        pix,
-        args.still_tubes,
-        args.level,
-    )
+    cnn = pd.read_parquet(args.cnn)
+    abg = pd.concat([load_abg(db) for db in args.abg], ignore_index=True)
+    if args.tubes:
+        # Reason: both trackers assume one fly per tube; tubes holding two flies
+        # (e.g. half of the 2019 ETHOSCOPE_109 recording) say nothing about either.
+        cnn, abg = cnn[cnn.roi_idx.isin(args.tubes)], abg[abg.roi_idx.isin(args.tubes)]
+        pix = pix[pix.roi.isin(args.tubes)]
+    report = evaluate(cnn, abg, pix, args.still_tubes, args.level)
     text = json.dumps(report, indent=1)
     print(text)
     if args.out:
