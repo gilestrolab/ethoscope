@@ -236,6 +236,22 @@ on the same frames:
       from 12:31). The bench PSU sags under 4-thread load (0x50005, ARM at 600 MHz
       while scaling_cur_freq said 1200), so analyse by throttle bits; a production
       ethoscope with its normal supply is the deciding test.
+- [x] **Round 3 (2026-10-01).** Of the 100 tubes where v3 saw something: 49 empty
+      throughout (its false detections), 29 dead flies (same place at every time),
+      13 flies that moved, 9 seen only in some strips (Giorgio: the controversial
+      cases are again dead bodies). Where a fly was present v3's ring was within
+      4 px of the click in 185 of 186 strips; its "empty everywhere" tubes were all
+      empty. Human labels now 7,876 (1,376 fly, 6,500 empty); v4 trains on them.
+- **Production fleet (2026-10-01, stopped devices via ssh through node, cleared by
+  Giorgio).** All stopped devices are Pi 3 (B or B+), on dev d960edb9, but with
+  **OpenCV 4.7.0, 4.9.0, 4.11.0 and 4.13.0**. On 4.7.0 the presence output was
+  NaN (ReduceMax/ReduceMean); fixed by global pooling, then parity within 1e-5 on
+  every version. Full path, tiny_s2_v3, 20 tubes, 4 threads: ETHOSCOPE_380 44.9 ms
+  (22.3 fps), ETHOSCOPE_025 (3B+, 4.7) 52.1 ms (19.2 fps), ETHOSCOPE_301 73.3 ms
+  (13.6 fps) at 600 MHz because its supply is under-voltage even at idle (0x50005
+  on 301, 310 and 359; Giorgio: PSU problems are common and must be lived with).
+  4 threads beats 3 everywhere. Soak tests (120 min static + 30 min camera) on 380
+  and 301 from 13:48.
 - [ ] **v3** (tiny_s2, chosen on the Pi timings): `python -m dl_tracking.review.ingest`, then train v3
       (`train.py` picks up `review/human_labels.parquet`): human answers override
       automatic labels and verified empty tubes become negatives; `final.json`
