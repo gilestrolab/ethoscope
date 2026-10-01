@@ -422,6 +422,72 @@ Sketch, not to be implemented under this plan:
   MACs) is the candidate unless the Pi has room to spare.
 - [ ] **Partly visible flies at tube ends** (above): augmentation, then re-check
       e044 tubes 11 and 14.
+- **ETHOSCOPE_109, 22.8 h legacy video (2019-11-22, 25 fps), 10 single-fly tubes
+  (2026-10-01).** From `/mnt/archive/_rescued/legacy_ethoscope_video`; work in
+  `/mnt/cache/dl_tracking/eval/legacy/` (scripts in `analysis/`). The locator runs on
+  every frame; AdaptiveBGModel on every 4th (6.25 fps, as e044).
+
+  **The rig's camera shakes.** In bursts, the whole image moves ~1–1.5 px vertically
+  on alternate frames, beating slowly, as a ~12.5 Hz vibration (half the frame rate)
+  would; sampled peaks reach 6 px. 1.3% of frames move ≥ 0.3 px, spread evenly over
+  the 23 h; 99.6% of those steps are vertical. Found because 4,767 windows the pixel
+  truth called moving had no locator step ≥ 1 px: at their peak frames the image moved
+  1.34 px (median), against 0.03 px at walking peaks and 0.013 px on still frames.
+  alice_012 and e044 show nothing like it (0.05 and 0.10 px at their busiest frames).
+  - The shake reached everything. 18% of pixel-truth hits fell on shaken frames, and as
+    each hit breaks a 5-min bout, sustained truth sleep goes from **18.3% to 85.3%**
+    once they are dropped. Every tracker reports the shake as movement unless its
+    sampling interval is an even number of frames, where the alternation cancels: the
+    raw locator called 3% sleep at 25 fps and 82% at 12.5 fps.
+  - Measuring it: phase correlation pixel-locks on these smooth frames (a 0.5 px
+    synthetic shift read as 0.24–0.81 px), and against a fixed reference frame its
+    response decays to noise within a minute (H.264 noise is shared only by
+    consecutive frames). `analysis/lkshift.py` fits one translation per frame pair by
+    Lucas–Kanade instead: within 0.09 px on synthetic shifts of 0.25–1.5 px.
+  - **The locator sees the shake exactly.** Its per-frame median displacement over the
+    20 tubes follows the measured image shift with correlation 0.95, slope 0.96 and
+    0.08 px residual (p95, 41k frames). Tubes move 0.85–1.13 × the image, with no
+    trend in height (no rolling-shutter wobble to model).
+  - So a device can remove it without image work: subtract each frame's median step
+    over all tubes (common mode), and ignore steps on frames whose common mode is
+    ≥ 0.3 px (0.8–1.7% of steps). The gate is needed because the largest shakes leave
+    ~1 px after subtraction.
+
+  Clean truth (shaken frames dropped), 1 px cut, v5:
+
+  | | sleep (truth 85.3%) | per-tube sleep error | moving windows found | still → moving |
+  |---|---|---|---|---|
+  | locator 25 fps, common mode + gate | 78.8% | 6.4% | 89.9% | 0.6% |
+  | locator 12.5 fps, common mode + gate | 82.0% | 3.3% | 93.1% | 0.8% |
+  | locator 8.3 fps, common mode + gate | 78.4% | 6.8% | 94.2% | 1.1% |
+  | locator 6.25 fps, common mode + gate | 79.2% | 6.0% | 94.5% | 1.4% |
+  | locator 6.25 fps, raw | 70.5% | 14.8% | 94.8% | 2.0% |
+  | AdaptiveBGModel 6.25 fps @0.52 px (default) | 17.0% | 68.3% | 99.9% | 50.3% |
+  | AdaptiveBGModel 6.25 fps @2 px | 51.0% | 34.3% | 90.0% | 3.6% |
+
+  Per tube (6.25 fps, common mode), the locator is 2–15 points under the truth in all
+  ten tubes (no dead flies here); AdaptiveBGModel at 2 px is 13–52 points under. v3 is
+  a little worse than v5 (per-tube error 8.0% against 6.3% at 6.25 fps). Common mode
+  does nothing for AdaptiveBGModel, whose integer positions jitter by more than the
+  shake.
+- **v6 (all four review rounds) does not beat v5 (2026-10-01).** Snapshot test sets
+  alike (median error 0.62 against 0.60 px, p95 2.67 against 2.66). Per-tube sleep
+  error against pixel truth, 1 px cut:
+
+  | | alice_012 | e044 | ETHOSCOPE_109 clean, 6.25 / 12.5 fps (common mode + gate) |
+  |---|---|---|---|
+  | v3 | 3.9% | 6.3% | 7.6% / 4.8% |
+  | v5 | 3.8% | 6.4% | 6.0% / 3.3% |
+  | v6 | 6.1% | 6.6% | 6.4% / 4.1% |
+
+  e044 is a tie. v6 detects least there (91.0%, against 92.0% for v5 and 92.9% for
+  v3) and jitters more on alice_012's dead flies (p99 0.57 against 0.49 px). The
+  round-4 tubes (dead flies, pupae) were already found by v3/v5 and matter little to
+  centroids, so **v5 stays the candidate**.
+- [ ] **Common-mode correction on the device** (Phase 6 design): median step over
+      tubes, gate at 0.3 px, needs ≥ 5 tubes with a fly. Check on the fleet whether
+      other rigs shake (cross-tube synchrony of pixel motion at lag 0 against lag 1 is
+      the cheap test).
 - **Pi 3 timing (ETHOSCOPE000, by the ethoscopy session, 2026-10-01).** Full device
   path, 20 tubes, median ms per frame (forward | total → fps), untrained variants:
 
