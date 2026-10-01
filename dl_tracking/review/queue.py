@@ -63,22 +63,99 @@ def never_detected_items(
         pd.DataFrame: Queue rows without a proposal.
     """
     nd = labels[labels.status == "never_detected"]
-    tubes = (
-        nd[["run_id", "roi_idx"]].drop_duplicates().sample(frac=1.0, random_state=seed)
+    tubes = nd[["run_id", "roi_idx"]].drop_duplicates()
+    picked = _tube_strips(nd, _spread_over_runs(tubes, max_tubes, seed))
+    return (
+        picked.assign(
+            group="nd:" + picked.run_id + ":" + picked.roi_idx.astype(str),
+            kind="never_detected",
+            px=np.nan,
+            py=np.nan,
+        )
+        if len(picked)
+        else pd.DataFrame(columns=COLUMNS)
     )
-    # Reason: spread the budget over runs before taking a second tube from any run.
-    tubes["rank"] = tubes.groupby("run_id").cumcount()
-    tubes = tubes.sort_values("rank", kind="stable").head(max_tubes)
+
+
+def _spread_over_runs(tubes: pd.DataFrame, n: int, seed: int) -> pd.DataFrame:
+    """
+    Take ``n`` tubes at random, one per run before a second from any run.
+
+    Args:
+        tubes (pd.DataFrame): Candidate ``run_id``, ``roi_idx`` pairs.
+        n (int): How many to take.
+        seed (int): Sampling seed.
+
+    Returns:
+        pd.DataFrame: The chosen pairs.
+    """
+    tubes = tubes.sample(frac=1.0, random_state=seed)
+    tubes = tubes.assign(rank=tubes.groupby("run_id").cumcount())
+    return tubes.sort_values("rank", kind="stable").head(n)[["run_id", "roi_idx"]]
+
+
+def _tube_strips(rows: pd.DataFrame, tubes: pd.DataFrame) -> pd.DataFrame:
+    """
+    For each tube, ``N_TIMES`` of its snapshots spread evenly over its run.
+
+    Args:
+        rows (pd.DataFrame): One row per (snapshot, tube), with ``t``.
+        tubes (pd.DataFrame): ``run_id``, ``roi_idx`` pairs to pick for.
+
+    Returns:
+        pd.DataFrame: The picked rows.
+    """
     out = []
-    for rid, roi in tubes[["run_id", "roi_idx"]].itertuples(index=False):
-        rows = nd[(nd.run_id == rid) & (nd.roi_idx == roi)].sort_values("t")
-        pick = rows.iloc[np.unique(np.linspace(0, len(rows) - 1, N_TIMES).astype(int))]
-        out.append(
-            pick.assign(
-                group=f"nd:{rid}:{roi}", kind="never_detected", px=np.nan, py=np.nan
+    for rid, roi in tubes.itertuples(index=False):
+        g = rows[(rows.run_id == rid) & (rows.roi_idx == roi)].sort_values("t")
+        out.append(g.iloc[np.unique(np.linspace(0, len(g) - 1, N_TIMES).astype(int))])
+    return pd.concat(out) if out else rows.iloc[:0]
+
+
+def tube_model_items(
+    scored: pd.DataFrame, n_seen: int = 100, n_none: int = 20, seed: int = 0
+) -> pd.DataFrame:
+    """
+    Round 3: never-detected tubes as a trained locator sees them, four times each.
+
+    Tubes where the locator sees a fly somewhere (presence above ``UNSURE[1]`` in
+    any snapshot) hold both its false detections and the dead flies; a small
+    sample of tubes it calls empty throughout checks that call. A ring is shown
+    wherever the locator leans towards a fly.
+
+    Args:
+        scored (pd.DataFrame): Never-detected crops with ``px``, ``py``, ``presence``.
+        n_seen (int): Tubes where the locator sees something.
+        n_none (int): Tubes it calls empty everywhere.
+        seed (int): Sampling seed.
+
+    Returns:
+        pd.DataFrame: Queue rows.
+    """
+    lo, hi = UNSURE
+    peak = scored.groupby(["run_id", "roi_idx"]).presence.max().reset_index()
+    parts = []
+    for kind, sel, n in (
+        ("tube_model_seen", peak.presence > hi, n_seen),
+        ("tube_model_none", peak.presence < lo, n_none),
+    ):
+        picked = _tube_strips(
+            scored, _spread_over_runs(peak[sel][["run_id", "roi_idx"]], n, seed)
+        )
+        show = picked.presence >= lo
+        parts.append(
+            picked.assign(
+                kind=kind,
+                px=picked.px.where(show),
+                py=picked.py.where(show),
+                group="t:" + picked.run_id + ":" + picked.roi_idx.astype(str),
             )
         )
-    return pd.concat(out) if out else pd.DataFrame(columns=COLUMNS)
+    q = pd.concat(parts, ignore_index=True)
+    q["item_id"] = (
+        q.run_id + ":" + q.roi_idx.astype(str) + ":" + q.sid.astype(int).astype(str)
+    )
+    return q[COLUMNS]
 
 
 def audit_items(rows: pd.DataFrame, status: str, n: int, seed: int) -> pd.DataFrame:
@@ -210,12 +287,19 @@ def main() -> None:
         default=None,
         help="scored missed crops; appends round-2 items to the queue",
     )
+    ap.add_argument(
+        "--round3",
+        type=Path,
+        default=None,
+        help="scored never-detected crops; appends round-3 tubes to the queue",
+    )
     args = ap.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     runs = pd.read_parquet(args.runs) if args.runs else None
-    if args.round2:
+    if args.round2 or args.round3:
         q = pd.read_parquet(args.out / "queue.parquet")
-        new = model_items(pd.read_parquet(args.round2))
+        scored = pd.read_parquet(args.round2 or args.round3)
+        new = model_items(scored) if args.round2 else tube_model_items(scored)
         q = pd.concat([q, new[~new.item_id.isin(q.item_id)]], ignore_index=True)
     else:
         q = build(pd.read_parquet(args.pack / "labels.parquet"), runs, args.max_tubes)

@@ -244,3 +244,35 @@ def test_propagate_dead_flies_and_empty_tubes() -> None:
     fly = new[new.roi_idx == 2]  # only between the two clicks 6 px apart
     assert sorted(fly.sid) == [1, 2] and fly.present.all()
     assert fly.sort_values("sid").x.tolist() == pytest.approx([102.0, 104.0])
+
+
+def test_tube_model_items_show_whole_tubes_with_rings() -> None:
+    """Round 3: whole tubes, four strips each, rings where the locator leans to a fly."""
+    rows = []
+    for tube in range(30):
+        seen = tube < 20
+        for s in range(10):
+            p = 0.95 if (seen and s == 5) else (0.4 if seen else 0.05)
+            rows.append(
+                {
+                    "run_id": f"r{tube % 6}",
+                    "roi_idx": tube,
+                    "sid": 100 * tube + s,
+                    "t": 1000 * s,
+                    "roi_x": 40,
+                    "roi_y": 100,
+                    "roi_w": 560,
+                    "roi_h": 60,
+                    "px": 200.0,
+                    "py": 30.0,
+                    "presence": p,
+                }
+            )
+    q = Q.tube_model_items(pd.DataFrame(rows), n_seen=5, n_none=3)
+    assert q.groupby("kind").group.nunique().to_dict() == {
+        "tube_model_none": 3,
+        "tube_model_seen": 5,
+    }
+    assert (q.groupby("group").size() == Q.N_TIMES).all()
+    assert q[q.kind == "tube_model_none"].px.isna().all()
+    assert q[q.kind == "tube_model_seen"].px.notna().all()  # 0.4 >= lower bound

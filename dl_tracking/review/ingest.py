@@ -22,6 +22,8 @@ import pandas as pd
 
 MOVED_PX = 4.0  # an audited ring moved further than this was wrong
 STILL_PX = 10.0  # a dead fly's clicks agree to within this (it shifts as it dries)
+# Review kinds that show one never-detected tube at several times (rounds 1 and 3).
+TUBE_KINDS = ("never_detected", "tube_model_seen", "tube_model_none")
 KEEP = ["run_id", "sid", "roi_idx", "t", "roi_x", "roi_y", "roi_w", "roi_h"]
 
 
@@ -90,7 +92,7 @@ def propagate(
         that were not themselves answered.
     """
     queue = queue.reset_index(drop=True)
-    nd = queue[queue.kind == "never_detected"][["run_id", "roi_idx", "sid"]]
+    nd = queue[queue.kind.isin(TUBE_KINDS)][["run_id", "roi_idx", "sid"]]
     shown = labels.merge(nd, on=["run_id", "roi_idx", "sid"])
     answered = set(zip(labels.sid, labels.roi_idx, strict=True))
     tubes = pack_labels[pack_labels.status == "never_detected"]
