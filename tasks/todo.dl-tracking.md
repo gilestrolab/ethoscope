@@ -224,6 +224,12 @@ on the same frames:
   test but cost dead flies on validation (84% found), so no threshold is chosen yet.
   The remaining false detections sit in a few tubes: dark end caps at the ROI ends,
   ROIs not on a tube (a cable, a blank area), reflections in dark frames.
+- **tiny_s2_v3 on the videos** (blended decode, tracks only where a fly is reported).
+  alice_012: detect 99.8%, dead flies 100%, dead-fly jitter p95 0.30 px, still
+  windows called moving 6.0% / 0.6% / 0.0% at 0.52 / 1 / 2 px. e044: detect 92.9%,
+  still → moving 17.1% / 1.7% / 0.3% (AdaptiveBGModel 44.5% / 44.5% / 1.4%). It
+  matches or beats tiny_v2 and mid_v2 everywhere and is the fastest on the Pi 3:
+  **the current candidate**. e044 tubes 14 and 11 (58%, 63%) remain the tube-end gap.
 - [ ] **Round 3 queued** (2026-10-01): 100 of the 1,058 unreviewed never-detected
       tubes where v3 sees a fly somewhere, plus 20 it calls empty; four strips each.
 - [ ] **Soak test** of tiny_s2_v3 on ETHOSCOPE000 (240 min static + 60 min camera,
