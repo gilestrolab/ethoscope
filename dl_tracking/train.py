@@ -137,7 +137,11 @@ def split_rows(pack: Path, runs: Path) -> pd.DataFrame:
         pd.DataFrame: Rows of :func:`dataset.training_rows` plus ``split`` and
         ``no_ir`` (False when the runs table has no such column).
     """
-    rows = D.training_rows(pd.read_parquet(pack / "labels.parquet"))
+    std_path = pack / "canvas_std.parquet"
+    canvas_std = pd.read_parquet(std_path) if std_path.exists() else None
+    rows = D.training_rows(
+        pd.read_parquet(pack / "labels.parquet"), canvas_std=canvas_std
+    )
     table = pd.read_parquet(runs)
     table["run_id"] = table.machine_id + "_" + table.run_dt
     if "no_ir" not in table:

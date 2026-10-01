@@ -15,6 +15,7 @@ same seams, and a seam tells the network nothing.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from multiprocessing import get_context
 from pathlib import Path
 
 import cv2
@@ -30,6 +31,7 @@ SIGMA_CELLS = (1.0, 0.7)  # heatmap Gaussian (x, y); a fly is ~3 x 1.3 cells
 SWAP_HALF_WIDTH = 20  # half-res px on each side of the fly
 SWAP_MIN_DISTANCE = 35  # half-res px between the two flies for a clean swap
 MAX_LUM_RATIO = 1.15  # snapshots this close in mean brightness may be mixed
+MIN_CANVAS_STD = 2.0  # grey levels; flatter canvases show nothing
 
 
 # ---------------------------------------------------------------- packing
@@ -38,7 +40,8 @@ MAX_LUM_RATIO = 1.15  # snapshots this close in mean brightness may be mixed
 def pack(data: Path) -> None:
     """
     Concatenate the extracted snapshots into ``pack/snaps.bin`` plus an index, and
-    all labels into ``pack/labels.parquet`` (with a ``sid`` column).
+    all labels into ``pack/labels.parquet`` (with a ``sid`` column). Run
+    :func:`canvas_contrast` afterwards.
 
     Args:
         data (Path): Extraction output root (``snaps/`` and ``labels/``).
@@ -115,33 +118,110 @@ def fits_canvas(labels: pd.DataFrame) -> pd.Series:
 
 def training_rows(
     labels: pd.DataFrame,
+    use_gapfill: bool = False,
+    canvas_std: pd.DataFrame | None = None,
+    min_canvas_std: float = MIN_CANVAS_STD,
     gap_contrast_ratio: float = 0.4,
     gap_contrast_floor: float = 10.0,
 ) -> pd.DataFrame:
     """
     Select the label rows usable as positives and mark which heads they train.
 
-    ``confident`` rows train every head. ``gapfill`` rows train position only, and
-    only when the label point is dark: at least ``gap_contrast_ratio`` of the
-    median contrast of the same fly's confident labels (or ``gap_contrast_floor``
-    grey levels when it has none). QA showed gap fills with negative contrast were
-    flies that had moved and come back, or labels on the food.
+    ``confident`` rows train every head. ``gapfill`` rows are off by default: the
+    v1 model disagreed with 75% of them, and contact sheets showed why. Most sit on
+    a static dark object at a tube end (an end cap, the ROI edge) that the tracker
+    picks up about once a day, loses and finds again in place, which the gap-fill
+    rule took for a still fly. When enabled they train position only, and only on a
+    dark point: at least ``gap_contrast_ratio`` of the median contrast of the same
+    fly's confident labels (or ``gap_contrast_floor`` grey levels without any).
 
     Args:
         labels (pd.DataFrame): Packed labels.
+        use_gapfill (bool): Include gap-filled labels.
+        canvas_std (pd.DataFrame | None): Output of :func:`canvas_contrast`; rows on
+            canvases flatter than ``min_canvas_std`` are dropped (a black frame, or
+            a snapshot that shows nothing where the tracker saw a fly).
+        min_canvas_std (float): Minimum canvas standard deviation, grey levels.
         gap_contrast_ratio (float): Relative contrast a gap fill needs.
         gap_contrast_floor (float): Minimum contrast in grey levels.
 
     Returns:
         pd.DataFrame: Positive rows with a boolean ``shape_ok`` column.
     """
-    conf = labels[labels.status == "confident"]
-    typical = conf.groupby(["run_id", "roi_idx"]).contrast.median().rename("typical")
-    gaps = labels[labels.status == "gapfill"].join(typical, on=["run_id", "roi_idx"])
-    need = np.maximum(gap_contrast_floor, gap_contrast_ratio * gaps.typical.fillna(0))
-    gaps = gaps[gaps.contrast >= need].drop(columns="typical")
-    out = pd.concat([conf.assign(shape_ok=True), gaps.assign(shape_ok=False)])
-    return out[fits_canvas(out)].sort_values(["sid", "roi_idx"])
+    parts = [labels[labels.status == "confident"].assign(shape_ok=True)]
+    if use_gapfill:
+        typical = (
+            parts[0].groupby(["run_id", "roi_idx"]).contrast.median().rename("typical")
+        )
+        gaps = labels[labels.status == "gapfill"].join(
+            typical, on=["run_id", "roi_idx"]
+        )
+        need = np.maximum(
+            gap_contrast_floor, gap_contrast_ratio * gaps.typical.fillna(0)
+        )
+        parts.append(
+            gaps[gaps.contrast >= need].drop(columns="typical").assign(shape_ok=False)
+        )
+    out = pd.concat(parts)
+    out = out[fits_canvas(out)]
+    if canvas_std is not None:
+        out = out.merge(canvas_std, on=["sid", "roi_idx"], how="left")
+        out = out[out.canvas_std.fillna(0) >= min_canvas_std].drop(columns="canvas_std")
+    return out.sort_values(["sid", "roi_idx"])
+
+
+def _canvas_std_of_snapshot(args: tuple) -> list[tuple[int, int, float]]:
+    """Pool worker for :func:`canvas_contrast`: one snapshot's canvas spreads."""
+    store, sid, rois = args
+    cv2.setNumThreads(1)
+    img = store.frame(sid)
+    if img is None:
+        return [(sid, int(r[0]), -1.0) for r in rois]
+    half = P.downsample(img)
+    return [
+        (
+            sid,
+            int(r[0]),
+            float(
+                P.cut(
+                    half, *P.canvas_origin(*map(int, r[1:])), P.CANVAS_W, P.CANVAS_H
+                ).std()
+            ),
+        )
+        for r in rois
+    ]
+
+
+def canvas_contrast(pack_dir: Path, workers: int = 16) -> pd.DataFrame:
+    """
+    Measure the standard deviation of every labelled tube canvas in a pack.
+
+    Writes ``canvas_std.parquet`` next to the pack. A canvas with almost no spread
+    shows nothing (a black frame, or a corrupt snapshot), whatever its label says.
+
+    Args:
+        pack_dir (Path): Directory written by :func:`pack`.
+        workers (int): Parallel processes.
+
+    Returns:
+        pd.DataFrame: ``sid``, ``roi_idx``, ``canvas_std`` (-1 if undecodable).
+    """
+    store = SnapshotStore(pack_dir)
+    lab = pd.read_parquet(pack_dir / "labels.parquet")
+    lab = lab[fits_canvas(lab) & lab.sid.notna()]
+    cols = ["roi_idx", "roi_x", "roi_y", "roi_w", "roi_h"]
+    jobs = [(store, int(sid), g[cols].to_numpy()) for sid, g in lab.groupby("sid")]
+    if workers <= 1:
+        chunks = list(map(_canvas_std_of_snapshot, jobs))
+    else:
+        # Reason: forking a process that has started torch/OpenCV threads can
+        # deadlock the children; spawned workers start clean.
+        with get_context("spawn").Pool(workers) as pool:
+            chunks = pool.map(_canvas_std_of_snapshot, jobs, chunksize=100)
+    out = [x for chunk in chunks for x in chunk]
+    df = pd.DataFrame(out, columns=["sid", "roi_idx", "canvas_std"])
+    df.to_parquet(pack_dir / "canvas_std.parquet")
+    return df
 
 
 # ---------------------------------------------------------------- targets

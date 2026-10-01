@@ -51,7 +51,8 @@ def test_training_rows_filters_gapfills_by_relative_contrast() -> None:
             ),  # a well, not a tube
         ]
     )
-    rows = D.training_rows(labels)
+    assert set(D.training_rows(labels).status) == {"confident"}  # gap fills off
+    rows = D.training_rows(labels, use_gapfill=True)
     assert sorted(zip(rows.status, rows.contrast, strict=True)) == [
         ("confident", 60),
         ("confident", 60),
@@ -59,6 +60,15 @@ def test_training_rows_filters_gapfills_by_relative_contrast() -> None:
         ("gapfill", 30),
     ]
     assert rows[rows.status == "gapfill"].shape_ok.eq(False).all()
+
+
+def test_training_rows_drops_flat_canvases() -> None:
+    """A label on a canvas that shows nothing is not a training example."""
+    labels = pd.DataFrame(
+        [label_row("confident", 60, roi=1), label_row("confident", 60, roi=2)]
+    )
+    std = pd.DataFrame({"sid": [0, 0], "roi_idx": [1, 2], "canvas_std": [25.0, 0.8]})
+    assert D.training_rows(labels, canvas_std=std).roi_idx.tolist() == [1]
 
 
 def test_encode_round_trips_through_decode() -> None:
@@ -141,3 +151,11 @@ def test_items_survive_flat_canvases(packed: Path) -> None:
     ds = D.TubeDataset(store, rows, augment=True, p_swap=1.0)
     for k in range(len(ds)):
         assert ds[k]["x"].shape[1:] == (1, P.CANVAS_H, P.CANVAS_W)
+
+
+def test_canvas_contrast_measures_every_labelled_canvas(packed: Path) -> None:
+    """One spread per labelled canvas; the synthetic snapshots are flat."""
+    std = D.canvas_contrast(packed, workers=1)
+    labels = pd.read_parquet(packed / "labels.parquet")
+    assert len(std) == len(labels) and (std.canvas_std < D.MIN_CANVAS_STD).all()
+    assert (packed / "canvas_std.parquet").exists()
