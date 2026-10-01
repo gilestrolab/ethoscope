@@ -209,7 +209,16 @@ on the same frames:
       confident empty, 32,704 in between). Queued: 100 uncertain (presence
       0.15–0.85, mostly tube ends and empty-looking tubes), 40 confident-fly and
       20 confident-empty audits. Queue total 1,110 crops.
-- [ ] **After Giorgio's review**: `python -m dl_tracking.review.ingest`, then train v3
+- [x] **Giorgio's review (2026-10-01): all 1,110 crops answered.** Error rates:
+      AdaptiveBGModel confident labels 3.3% (5 of 150 wrong), tiny_v2 confident
+      "fly" on tracker misses 10% (4/40), tiny_v2 confident "empty" 0% (0/20); its
+      uncertain band was 98% empty tubes. Never-detected tubes: 184 of 200 empty
+      throughout, 10 with a dead fly in all four strips (within 10 px; up to 207 h),
+      the rest moved once or faded. Giorgio: the unrecognised flies were probably
+      dead, and dead flies dehydrate and change shape with time. Propagation over
+      each tube's other snapshots gives 5,226 human labels (469 fly, 4,757 empty);
+      the test split holds 774 verified empty crops and 53 dead-fly crops.
+- [ ] **v3** (tiny_s2, chosen on the Pi timings): `python -m dl_tracking.review.ingest`, then train v3
       (`train.py` picks up `review/human_labels.parquet`): human answers override
       automatic labels and verified empty tubes become negatives; `final.json`
       reports `test_human`, the false-detection measure for real empty tubes.
