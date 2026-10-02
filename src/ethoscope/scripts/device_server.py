@@ -607,6 +607,40 @@ def connectedModule(id):
         return interfaces.getModuleCapabilities(test=False)
 
 
+def _light_daemon_state():
+    """
+    Ask the light daemon what it is driving and whether the LED can dim.
+
+    Reason: the schedule file only says what the LED should do. On an SD image
+    without PWM (no pigpio, and an LED pin without hardware PWM) the daemon can only
+    switch the LED fully on or off, at 50 % or more, so a schedule asking for 40 %
+    kept the LED dark while the node showed it on.
+
+    Returns:
+        dict: ``pwm`` (the LED can dim), ``backend``, ``level`` (0-100, as driven)
+        and ``led_on`` (whether the LED is actually lit); empty if the daemon does
+        not answer, so the schedule-based values stand.
+    """
+    from ethoscope.hardware.interfaces.light_daemon import (
+        LightDaemonClient,
+        PinctrlBackend,
+    )
+
+    try:
+        status = LightDaemonClient(timeout=0.5).status()
+    except Exception as e:
+        logging.debug("Light daemon status unavailable: %s", e)
+        return {}
+    pwm = bool(status.get("fade_supported"))
+    level = int(status.get("led") or 0)
+    return {
+        "pwm": pwm,
+        "backend": status.get("backend"),
+        "level": level,
+        "led_on": level > 0 if pwm else level >= PinctrlBackend.ON_AT_PCT,
+    }
+
+
 @api.get("/data/<id>")
 @error_decorator
 def info(id):
@@ -717,6 +751,8 @@ def info(id):
                     period_minutes=light_info["period_minutes"],
                     anchor=light_info["anchor"],
                 )
+        if light_info["hardware"]:
+            light_info.update(_light_daemon_state())
     except Exception as e:
         logging.debug("Could not read light schedule: %s", e)
 

@@ -248,6 +248,18 @@ class TestPackagedModel:
         info = json.loads(engine.describe(json.loads(engine.MODEL_CARD.read_text())))
         assert info["model"] == "fly_locator_tiny_s2_v5"
         assert info["shake_correction"] == {"min_rois": 5, "gate_px": 0.3}
+        assert info["threads"] == engine.THREADS
+
+    def test_the_network_runs_on_two_threads(self):
+        """At 5 fps 2 threads keep up even throttled, without 4 threads' current spikes."""
+        import cv2
+
+        before = cv2.getNumThreads()
+        try:
+            engine.BatchLocator(tube_rects(2))
+            assert cv2.getNumThreads() == engine.THREADS == 2
+        finally:
+            cv2.setNumThreads(before)
 
 
 class TestParityWithTraining:

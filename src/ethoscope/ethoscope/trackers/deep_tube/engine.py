@@ -33,6 +33,12 @@ CM_MIN_ROIS = 5  # tubes needed to estimate the camera's own motion
 CM_GATE_PX = 0.3  # camera motion above which a frame's steps are not trusted
 ROI_MAX = (576, 80)  # largest ROI (w, h) in the training data, full resolution
 MIN_ASPECT = 5  # a tube is at least 5 times longer than it is wide
+# Reason: the camera delivers at most maxfps frames (5 by default), so a frame has
+# 200 ms. On a Pi 3, 2 threads take ~65 ms per frame at 1.2 GHz and ~130 ms when
+# under-voltage throttles it to 600 MHz (1 thread would then miss 5 fps); 4 threads
+# gain nothing but current spikes, which brown out the weak supplies common in the
+# lab (ETHOSCOPE_354 lost its camera after 5 min at 4 threads).
+THREADS = 2
 
 
 @dataclass(frozen=True)
@@ -152,6 +158,9 @@ class BatchLocator:
                 ``setInput`` and ``forward`` will do (tests pass a fake).
         """
         if net is None:
+            # Process-wide in OpenCV: later runs in this listener keep it, which
+            # suits them too.
+            cv2.setNumThreads(THREADS)
             net, self.card = load_model()
         else:
             self.card = None
@@ -239,7 +248,7 @@ def describe(card: dict) -> str:
             "model": card["name"],
             "sha256": card["sha256"],
             "opencv": cv2.__version__,
-            "threads": cv2.getNumThreads(),
+            "threads": THREADS,
             "presence_min": PRESENCE_MIN,
             "shake_correction": {"min_rois": CM_MIN_ROIS, "gate_px": CM_GATE_PX},
         }
