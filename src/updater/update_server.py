@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -63,6 +64,20 @@ def _schedule_restart(delay=5):
     label = "node" if is_node else "device"
     logging.info(f"Scheduling {label} service restart in {delay}s")
     timer = threading.Timer(delay, restart_fn)
+    timer.daemon = True
+    timer.start()
+
+
+def _reboot():
+    """Reboot this machine (a device: see ``device(ACTION_UPDATE)`` with then=reboot)."""
+    logging.info("Rebooting after the software update")
+    subprocess.call("reboot")
+
+
+def _schedule_reboot(delay=5):
+    """Schedule a reboot after a delay, so the HTTP response can be sent first."""
+    logging.info(f"Scheduling a reboot in {delay}s")
+    timer = threading.Timer(delay, _reboot)
     timer.daemon = True
     timer.start()
 
@@ -294,17 +309,29 @@ def device(action, id):
             return {"available_branches": str(ethoscope_updater.available_branches())}
 
         if action == ACTION_UPDATE:
-            old_commit, _ = ethoscope_updater.get_local_and_origin_commits()
-            ethoscope_updater.update_active_branch()
-            new_commit, _ = ethoscope_updater.get_local_and_origin_commits()
+            # Reason: ?then=reboot is how a device renamed with "software update"
+            # ticked updates (device_server._update_then_reboot). Its new identity
+            # must not go live through the service restart, before the reboot the
+            # rename needs, and the reboot must not cut the install short; so the
+            # reboot replaces the restart and comes after the attempt, whatever
+            # its outcome.
+            then_reboot = bottle.request.query.get("then") == "reboot" and not is_node
+            try:
+                old_commit, _ = ethoscope_updater.get_local_and_origin_commits()
+                ethoscope_updater.update_active_branch()
+                new_commit, _ = ethoscope_updater.get_local_and_origin_commits()
+            finally:
+                if then_reboot:
+                    _schedule_reboot()
 
             # Auto-restart services if the commit actually changed
-            if str(old_commit) != str(new_commit):
+            if not then_reboot and str(old_commit) != str(new_commit):
                 _schedule_restart()
 
             return {
                 "old_commit": get_commit_version(old_commit),
                 "new_commit": get_commit_version(new_commit),
+                "then": "reboot" if then_reboot else "restart",
             }
         if action == ACTION_RESTART_DAEMON:
             if is_node:
