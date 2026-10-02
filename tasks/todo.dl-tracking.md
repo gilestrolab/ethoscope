@@ -322,7 +322,32 @@ allowed.
 - [x] package data; unit, control, integration and drift tests; parity reference
       (device suite 1,214 passed + 3 integration; dl_tracking 96 passed)
 - [x] docs (CLAUDE.md, READMEs, rst)
-- [ ] live check on a stopped device (git bundle, no push), then restore it
+- [x] live check on a stopped device (git bundle, no push), then restore it.
+  **2026-10-02, ETHOSCOPE_312** (Pi 3, OpenCV 4.13, `dev` at d960edb9 plus the two
+  integration commits). It holds no arena any more, and ETHOSCOPE_380's arena markers
+  are out of view; on both, target detection failed before any tracker ran. So the run
+  was fed by a 30-min cut of the e044 video through MovieVirtualCamera. Results:
+  - The node offers both trackers on this production Pi, with AdaptiveBGModel first.
+    The real start dialog, rendered headless through the node, shows the tracker
+    section like the ROI builder's.
+  - DeepTubeTracker ran at 8.2–10.6 fps from the video, video decoding included.
+    The CPU peaked at 75.8 °C; throttle state and clock were checked only at the
+    start (no throttling, 1.2 GHz).
+  - The run wrote 222,877 rows (all frames, 2% inferred, every position inside its
+    ROI), the same table layout as AdaptiveBGModel, and `tracker_model` in METADATA
+    (threads = 4).
+  - Positions equal the offline v5 run on turing (PyTorch, GPU) within rounding:
+    p50 0.39 px, p90 0.56 px, 99.8% within 0.71 px. A one-frame timestamp offset was
+    found: MovieVirtualCamera reads the time before the frame, so frame k carries
+    frame k−1's time.
+  - A start request naming no tracker ran AdaptiveBGModel (3-min cut, all frames,
+    identical tables).
+  - Not from this change; seen with both trackers on video. A run stays "running" at
+    0 fps after the video ends, and TimedStop never arms with a video camera
+    (`autostop_at` null). A video run's DB is filed under `1970-01-01_00-00-00` and the
+    next video run replaces it. The two test DBs are on ETHOSCOPE_312 under that folder.
+  - Both devices are back on `dev` at d960edb9 with their services restarted; the
+    bundle and test videos have been removed.
 - [ ] later, own commit: tracker arguments from the UI are dropped in
       `_start_tracking` (kwargs built, never passed to Monitor)
 - **Found while integrating (2026-10-02).**
