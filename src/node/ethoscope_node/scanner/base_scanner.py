@@ -94,6 +94,9 @@ class DeviceStatus:
         "recording",
         "streaming",
         "busy",
+        # Gone because the node asked it to go (see Ethoscope._handle_departure).
+        "rebooting",
+        "shutdown",
     }
 
     ACTIVE_TRACKING_STATUSES = {"running", "recording", "streaming"}
@@ -244,6 +247,9 @@ class BaseDevice(Thread):
         # lower rate to avoid log spam and wasted network calls.
         self._unreachable_refresh_period = 60.0
         self._last_successful_contact = time.time()
+        # Set when the device is known to be switched off; the loop then stops
+        # contacting it until it announces itself again (on_announced).
+        self._polling_suspended = False
 
         # Logging
         self._logger = logging.getLogger(f"{self.__class__.__name__}_{ip}")
@@ -256,6 +262,12 @@ class BaseDevice(Thread):
 
         # Initialize device info
         self._reset_info()
+
+    def _get_json_once(
+        self, url: str, timeout: float | None = None, post_data: bytes | None = None
+    ) -> dict[str, Any]:
+        """``_get_json`` without its retry, for requests that must not be repeated."""
+        return BaseDevice._get_json.__wrapped__(self, url, timeout, post_data)
 
     def _setup_urls(self):
         """Setup device-specific URLs. Override in subclasses."""
@@ -305,6 +317,8 @@ class BaseDevice(Thread):
         """Main device monitoring loop"""
         while self._is_online:
             time.sleep(0.2)
+            if self._polling_suspended:
+                continue
 
             current_time = time.time()
 
@@ -430,6 +444,15 @@ class BaseDevice(Thread):
     def reset_error_state(self):
         """Reset error state for this device."""
         self._consecutive_errors = 0
+
+    def suspend_polling(self):
+        """Stop contacting the device until it announces itself (on_announced)."""
+        self._polling_suspended = True
+
+    def on_announced(self):
+        """The device announced itself on mDNS: contact it again."""
+        self._polling_suspended = False
+        self.reset_error_state()
         self._error_backoff_time = 0
 
     def _get_effective_refresh_period(self) -> float:
@@ -442,6 +465,9 @@ class BaseDevice(Thread):
         current_status = self.get_device_status()
         if current_status and current_status.status_name == "busy":
             return 60.0
+        if current_status and current_status.status_name == "rebooting":
+            # Reason: it is expected back within minutes; notice it promptly.
+            return self._refresh_period
         if self._consecutive_errors >= self._max_consecutive_errors:
             return self._unreachable_refresh_period
         return self._refresh_period
@@ -629,12 +655,18 @@ class DeviceScanner:
             }
 
     def get_device(self, device_id: str) -> BaseDevice | None:
-        """Get device by ID."""
+        """
+        Get device by ID.
+
+        Reason: fresh SD cards share one machine id, so two entries can hold the
+        same id for a while (one of them stale, at an old IP). Return the one
+        most recently reached, so an action goes where the device answers.
+        """
         with self._lock:
-            for device in self.devices:
-                if device.id() == device_id:
-                    return device
-        return None
+            matches = [d for d in self.devices if d.id() == device_id]
+        if not matches:
+            return None
+        return max(matches, key=lambda d: d._last_successful_contact)
 
     def _find_device_by_zeroconf_name(self, name: str):
         """Find a device by its mDNS service name. Caller must hold self._lock."""
@@ -810,6 +842,7 @@ class DeviceScanner:
                 self.add(new_ip, new_port, name, zcinfo=info.properties)
                 return
 
+            existing_device.on_announced()
             if existing_device._update_address(new_ip, new_port):
                 # _update_address already calls reset_error_state(); just refresh
                 # the published status so the next poll re-promotes it to online.

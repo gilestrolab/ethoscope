@@ -1629,6 +1629,13 @@
             $("#changeInfo").modal('hide');
             $http.post('/device/' + device_id + '/machineinfo', option)
                 .then(function(response) {
+                    // Reason: the node answers a failure with HTTP 200 and an
+                    // error, which used to leave the dialog closed and nothing said
+                    // (a rename sent to a fresh card's old IP, 2026-10-02).
+                    if (response.data && response.data.error) {
+                        $scope.ethoscope.alert("The settings were not applied: " + response.data.error);
+                        return;
+                    }
                     $scope.machine_info = response.data;
 
                     // Immediately refresh device data to show updated time/settings
@@ -1647,6 +1654,8 @@
                 })
                 .catch(function(error) {
                     console.error('Failed to update machine info:', error);
+                    $scope.ethoscope.alert("The settings were not applied: " +
+                        ((error && (error.statusText || error.status)) || "no answer from the node"));
                 });
         };
 

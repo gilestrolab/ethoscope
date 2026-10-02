@@ -1199,16 +1199,19 @@ class TestEthoscopeHandleDeviceComingOnline:
 
     @patch("ethoscope_node.scanner.ethoscope_scanner.ExperimentalDB")
     @patch("ethoscope_node.scanner.ethoscope_scanner.EthoscopeConfiguration")
-    def test_handle_device_coming_online_ooo_device(
+    def test_handle_device_coming_online_fresh_card(
         self, mock_config_class, mock_db_class
     ):
-        """Test device coming online with OOO in name (should be ignored)."""
+        """A fresh card (ETHOSCOPE_000, digits) gets no SSH setup until renamed.
+
+        The check used to read "ETHOSCOPE_OOO" (the letter O), so it never matched.
+        """
         mock_db = Mock()
         mock_db_class.return_value = mock_db
 
         device = Ethoscope("192.168.1.100")
         device._id = "test_device"
-        device._info = {"name": "ETHOSCOPE_OOO_001"}
+        device._info = {"name": "ETHOSCOPE_000"}
 
         device._handle_device_coming_online()
 

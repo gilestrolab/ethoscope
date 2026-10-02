@@ -538,6 +538,12 @@
     <div ng-if="device.status == 'stopping'">
         <p>Stopping tracking...</p>
     </div>
+    <div ng-if="device.status == 'rebooting'">
+        <p><span class="fa fa-power-off"></span> Rebooting at the node's request; it will be back shortly.</p>
+    </div>
+    <div ng-if="device.status == 'shutdown'">
+        <p><span class="fa fa-power-off"></span> Shut down from the node. It reappears when it is switched on again.</p>
+    </div>
 
     <div ng-if="device.status != 'not_in_use'">
 

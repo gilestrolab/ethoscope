@@ -77,6 +77,11 @@ class Ethoscope(BaseDevice):
         "reboot",
         "restart",
     }
+    # Instructions after which the device is expected to disappear.
+    _DEPARTURE_INSTRUCTIONS = {"poweroff", "reboot", "restart"}
+    # A departure the device never acted on is dropped after this long.
+    _DEPARTURE_NOT_TAKEN_S = 120
+    FRESH_CARD_NAME = "ETHOSCOPE_000"
 
     def __init__(
         self,
@@ -104,6 +109,15 @@ class Ethoscope(BaseDevice):
         # run finalisation. See ``_reconcile_run_state``.
         self._active_run_id: str | None = None
         self._unreached_since: float | None = None
+
+        # A reboot, restart or shutdown the node asked for (see _handle_departure),
+        # so the device's disappearance is expected, not an accident.
+        self._departure: dict | None = None
+        # The device accepted a rename: it mints a new machine id at its next
+        # boot and returns as a new entry, so this one will not come back.
+        self._identity_changes = False
+        # The EthoscopeScanner holding this entry (set by EthoscopeScanner.add).
+        self._registry = None
 
         # Use provided configuration or create new one
         self._config = config or EthoscopeConfiguration()
@@ -159,6 +173,8 @@ class Ethoscope(BaseDevice):
             self._edb.recordIntervention(self._id, instruction)
 
         self._check_instruction_status(instruction)
+        if instruction in self._DEPARTURE_INSTRUCTIONS:
+            self._expect_departure(instruction)
 
         # Handle post_data properly - it might already be bytes or need conversion
         json_data = None
@@ -177,14 +193,20 @@ class Ethoscope(BaseDevice):
         try:
             self._get_json(post_url, timeout=3, post_data=json_data)
         except ScanException as e:
-            if instruction in ["poweroff", "reboot", "restart"]:
+            if instruction in self._DEPARTURE_INSTRUCTIONS:
                 pass  # Expected for power operations
             else:
                 raise DeviceError(
                     "Cannot send '{instruction}' to device in status '{current_status}'"
                 ) from e
 
-        self._update_info()
+        try:
+            self._update_info()
+        except ScanException:
+            # Reason: a device going down cannot answer; that is the request
+            # working, not failing.
+            if instruction not in self._DEPARTURE_INSTRUCTIONS:
+                raise
 
     def send_settings(self, post_data: dict | bytes) -> Any:
         """Send settings update to ethoscope."""
@@ -198,9 +220,37 @@ class Ethoscope(BaseDevice):
         update_url = (
             f"http://{self._ip}:{self._port}/{self.REMOTE_PAGES['update']}/{self._id}"
         )
-        result = self._get_json(update_url, timeout=3, post_data=json_data)
+        # Reason: sent once, with time to answer. A rename runs raspi-config on the
+        # device (well over 3 s on a Pi 3), and every resend minted another id.
+        result = self._get_json_once(update_url, timeout=30, post_data=json_data)
+        if isinstance(result, dict) and result.get("haschanged"):
+            if self._renames(json_data):
+                self._identity_changes = True
+                self._logger.info(
+                    f"Device {self._id} accepted a rename; it returns under a new id"
+                )
         self._update_info()
         return result
+
+    def _renames(self, json_data: bytes) -> bool:
+        """
+        Tell whether a settings request changes the device's number (and so its id).
+
+        Args:
+            json_data (bytes): The JSON body sent to the device.
+
+        Returns:
+            bool: True if it sets an ``etho_number`` other than the current one.
+        """
+        try:
+            wanted = int(json.loads(json_data).get("etho_number"))
+        except (TypeError, ValueError, AttributeError):
+            return False
+        try:
+            current = int(str(self._info.get("name", "")).rsplit("_", 1)[-1])
+        except ValueError:
+            return True  # unknown number: assume it changes
+        return wanted != current
 
     def _check_instruction_status(self, instruction: str):
         """Validate that instruction is allowed for current status."""
@@ -410,8 +460,25 @@ class Ethoscope(BaseDevice):
 
         # Fetch device info
         if not self._fetch_device_info():
-            self._handle_unreachable_state(previous_status)
+            if self._departure is not None:
+                self._handle_departure()
+            elif self._registry is not None and self._registry.has_live_twin(self):
+                # Reason: another entry answers for this id (a fresh card came
+                # up at a new IP); this one is the stale copy at the old IP.
+                self._forget("another entry answers for this id")
+            else:
+                self._handle_unreachable_state(previous_status)
+                if (
+                    self.get_device_status().status_name == "offline"
+                    and self._info.get("name") == self.FRESH_CARD_NAME
+                ):
+                    # Reason: ETHOSCOPE_000 is the shared identity of fresh cards,
+                    # not a machine; keeping it would capture the next card.
+                    self._forget("a fresh card that went away")
             raise ScanException(f"Failed to fetch device info from {self._ip}")
+
+        if self._departure is not None:
+            self._departure_answered()
 
         new_status = self._info.get("status", "offline")
 
@@ -439,7 +506,9 @@ class Ethoscope(BaseDevice):
                     )
 
         # Handle device states
-        if previous_status == "offline" and new_status != "offline":
+        if previous_status in ("offline", "rebooting", "shutdown") and (
+            new_status != "offline"
+        ):
             self._handle_device_coming_online()
 
         # Check if backup_filename from API response has changed
@@ -794,6 +863,112 @@ class Ethoscope(BaseDevice):
                     f"Updated logger name from {current_logger_name} to {new_logger_name}"
                 )
 
+    def _expect_departure(self, instruction: str):
+        """
+        Note that the node asked the device to go away (reboot, restart, poweroff).
+
+        Args:
+            instruction (str): The power instruction about to be sent.
+        """
+        forget = self._identity_changes or (
+            self._info.get("name") == self.FRESH_CARD_NAME
+        )
+        self._departure = {
+            "action": instruction,
+            "since": time.time(),
+            "away": False,
+            "forget": forget,
+        }
+        self._logger.info(
+            f"Device {self._id}: {instruction} requested from the node"
+            + ("; this entry will be forgotten when it goes" if forget else "")
+        )
+
+    def _handle_departure(self):
+        """
+        A poll failed after the node asked the device to go away: expected.
+
+        * an entry that will not return (renamed, or a fresh ETHOSCOPE_000 card)
+          is forgotten; the device comes back as a new entry through discovery;
+        * a shut-down device is shown as such and no longer contacted, until it
+          announces itself again (on_announced);
+        * a rebooting device is shown as rebooting; if it is not back within
+          ``alerts.graceful_shutdown_grace_minutes``, normal unreachable
+          handling takes over, since a reboot that never ends is a real fault.
+        """
+        departure = self._departure
+        departure["away"] = True
+        if departure["forget"]:
+            self._forget(f"{departure['action']} of an entry that will not return")
+            return
+
+        if departure["action"] == "poweroff":
+            if self.get_device_status().status_name != "shutdown":
+                self._logger.info(f"Device {self._id} shut down from the node")
+                self._update_device_status("shutdown")
+                self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
+            self.suspend_polling()
+            return
+
+        alerts = self._config.get_custom("alerts") or {}
+        grace_min = alerts.get("graceful_shutdown_grace_minutes", 5)
+        if time.time() - departure["since"] > 60 * grace_min:
+            self._logger.warning(
+                f"Device {self._id} not back {grace_min} min after a "
+                f"{departure['action']} from the node"
+            )
+            self._departure = None
+            self._handle_unreachable_state(self.get_device_status().status_name)
+            return
+
+        if self.get_device_status().status_name != "rebooting":
+            self._logger.info(f"Device {self._id} rebooting at the node's request")
+            self._update_device_status("rebooting")
+            self._edb.updateEthoscopes(ethoscope_id=self._id, status="offline")
+
+    def _departure_answered(self):
+        """A poll succeeded while a departure was pending: drop it once settled."""
+        departure = self._departure
+        if departure["away"]:
+            self._logger.info(f"Device {self._id} back after {departure['action']}")
+            self._departure = None
+        elif time.time() - departure["since"] > self._DEPARTURE_NOT_TAKEN_S:
+            self._logger.warning(
+                f"Device {self._id} still answering "
+                f"{self._DEPARTURE_NOT_TAKEN_S} s after {departure['action']}"
+            )
+            self._departure = None
+
+    def _forget(self, reason: str):
+        """
+        Remove this entry from the scanner and stop polling it.
+
+        A renamed device's database row is retired: its old id will not return.
+        ETHOSCOPE_000 has no row (the database refuses that name).
+
+        Args:
+            reason (str): Logged.
+        """
+        name = self._info.get("name", "")
+        if self._identity_changes and name and name != self.FRESH_CARD_NAME:
+            try:
+                self._edb.updateEthoscopes(
+                    ethoscope_id=self._id, active=0, status="offline"
+                )
+            except Exception as e:
+                self._logger.warning(f"Could not retire {self._id}: {e}")
+        self._logger.info(f"Forgetting {name or self._id} at {self._ip}: {reason}")
+        if self._registry is not None:
+            self._registry.forget(self)
+        else:
+            self.stop()
+
+    def on_announced(self):
+        """The device announced itself again: a shut-down device is back."""
+        if self._departure is not None and self._departure["action"] == "poweroff":
+            self._departure = None
+        super().on_announced()
+
     def _handle_unreachable_state(self, previous_status: str):
         """Promote / demote the device status when polling fails.
 
@@ -861,7 +1036,7 @@ class Ethoscope(BaseDevice):
     def _handle_device_coming_online(self):
         """Handle device coming online with SSH key setup."""
         device_name = self._info.get("name", "")
-        if "ETHOSCOPE_OOO" in device_name.upper():
+        if self.FRESH_CARD_NAME in device_name.upper():
             return
 
         # Wait 10 seconds for device to stabilize before attempting SSH operations
@@ -1664,10 +1839,14 @@ class EthoscopeScanner(DeviceScanner):
                         f"{ip}:{port} (was {existing_device.ip()}:{existing_device._port})"
                     )
                     existing_device._update_address(ip, port)
+                    existing_device.on_announced()
                     with existing_device._lock:
                         existing_device._update_device_status("offline")
                         existing_device._info.update({"last_seen": time.time()})
                     return
+                if existing_device is not None:
+                    # Same address: a shut-down device that booted again.
+                    existing_device.on_announced()
 
             # Check if device already exists by IP (more immediate than waiting for ID)
             with self._lock:
@@ -1687,6 +1866,8 @@ class EthoscopeScanner(DeviceScanner):
 
                         # Reset error state so the next poll fires immediately
                         existing_device.reset_error_state()
+                        # and resume polling a device that had been shut down
+                        existing_device.on_announced()
 
                         # Force ID update to handle device renaming (ETHOSCOPE_000 -> new name)
                         # This is critical when devices are renamed via webUI
@@ -1750,6 +1931,7 @@ class EthoscopeScanner(DeviceScanner):
 
                     if hasattr(device, "zeroconf_name"):
                         device.zeroconf_name = name
+                    device._registry = self
 
                     # Start the device thread immediately (don't wait for ID)
                     device.start()
@@ -1841,6 +2023,45 @@ class EthoscopeScanner(DeviceScanner):
             self._logger.error(
                 f"Error handling device ID change from {old_id} to {new_id}: {e}"
             )
+
+    def forget(self, device) -> None:
+        """
+        Drop an entry from the registry and stop its polling thread.
+
+        Called by the entry itself (Ethoscope._forget) when it knows it will not
+        return: renamed, a fresh card gone away, or a stale copy of a live entry.
+
+        Args:
+            device: The Ethoscope entry.
+        """
+        with self._lock:
+            if device in self.devices:
+                self.devices.remove(device)
+        device.stop()
+
+    def has_live_twin(self, device, within_s: float = 60.0) -> bool:
+        """
+        Tell whether another entry with the same id was reached recently.
+
+        Args:
+            device: The entry asking.
+            within_s (float): How recent the other entry's last contact must be.
+
+        Returns:
+            bool: True if another entry answers for this id.
+        """
+        device_id = device.id()
+        if not device_id:
+            return False
+        now = time.time()
+        with self._lock:
+            others = [d for d in self.devices if d is not device]
+        return any(
+            d.id() == device_id
+            and d._consecutive_errors == 0
+            and now - d._last_successful_contact < within_s
+            for d in others
+        )
 
     def retire_device(self, device_id: str, active: int = 0) -> dict[str, Any]:
         """Retire device by updating database status."""
