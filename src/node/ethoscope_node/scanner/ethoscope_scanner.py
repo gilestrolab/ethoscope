@@ -243,7 +243,12 @@ class Ethoscope(BaseDevice):
             bool: True if it sets an ``etho_number`` other than the current one.
         """
         try:
-            wanted = int(json.loads(json_data).get("etho_number"))
+            body = json.loads(json_data)
+            # Reason: the settings dialog nests its fields as
+            # {"machine_options": {"arguments": {...}}}, which is also what the
+            # device reads; the flat form is accepted for direct API callers.
+            arguments = (body.get("machine_options") or {}).get("arguments") or body
+            wanted = int(arguments.get("etho_number"))
         except (TypeError, ValueError, AttributeError):
             return False
         try:
