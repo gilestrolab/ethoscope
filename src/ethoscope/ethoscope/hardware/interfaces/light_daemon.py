@@ -131,13 +131,14 @@ class PinctrlBackend(_LedBackend):
 
     supports_fade = False
     name = "pinctrl"
+    ON_AT_PCT = 50  # a request at or above this switches the LED on
 
     def __init__(self, gpio_pin: int):
         self._gpio_pin = str(gpio_pin)
         self._current_on: bool | None = None
 
     def set_pct(self, pct: int) -> None:
-        target_on = pct >= 50
+        target_on = pct >= self.ON_AT_PCT
         if target_on == self._current_on:
             return
         drive = "dh" if target_on else "dl"

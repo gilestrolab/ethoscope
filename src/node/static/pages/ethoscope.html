@@ -58,6 +58,12 @@
                   title="Light daemon running, no schedule active"
                   style="color: #ccc; transform: scale(0.9);">
             </span>
+            <!-- The LED can only switch fully on or off: SD image without PWM -->
+            <span ng-if="device.light_schedule.hardware && device.light_schedule.pwm === false"
+                  class="fa fa-exclamation-triangle fa-3x"
+                  title="This ethoscope's LED does not support PWM: update its SD card, or the LED cannot work as scheduled"
+                  style="color: #d9534f; transform: scale(0.9);">
+            </span>
 
             <!-- Response Time Icon -->
             <span ng-if="device.response_time !== undefined && device.response_time !== null" ng-class="{'fa fa-smile': device.response_time < 500.0, 'fa fa-face-dizzy': device.response_time >= 500.0}" class="fa-3x" title="Response time: {{device.response_time}} ms" style="color: var(--medium-gray); transform: scale(0.9);">
@@ -307,6 +313,12 @@
 
         </div>
     </div>
+</div>
+
+<!-- LED without PWM - Prominently displayed above buttons -->
+<div class="alert alert-danger" ng-if="device.light_schedule.hardware && device.light_schedule.pwm === false" style="margin: 20px auto; max-width: 640px;">
+    <h4><span class="fa fa-exclamation-triangle"></span> The LED does not support PWM</h4>
+    <p><strong>Update this ethoscope's SD card, or the LED cannot function.</strong> Its SD card image has no PWM support, so the LED cannot be dimmed: it only switches fully on at 50% brightness or more, and any light schedule set below 50% leaves it dark.</p>
 </div>
 
 <!-- Camera Hardware Warning - Prominently displayed above buttons -->
@@ -1028,6 +1040,10 @@
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
             </div>
             <div class="modal-body">
+                <div class="alert alert-danger" ng-if="device.light_schedule.hardware && device.light_schedule.pwm === false">
+                    <span class="fa fa-exclamation-triangle"></span>
+                    <strong>The LED does not support PWM.</strong> Update this ethoscope's SD card, or the LED cannot function: it only switches fully on at 50% brightness or more, and any light schedule set below 50% leaves it dark.
+                </div>
                 <form name="trackingoptionsform" class="input">
                     <div id="user_options" ng-repeat="(name, option) in user_options.tracking"
                          ng-if="name != 'result_writer' || !hideResultWriterSection">
