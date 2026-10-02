@@ -35,3 +35,17 @@ ethoscope.trackers.adaptive_bg_tracker module
     :members:
     :undoc-members:
     :show-inheritance:
+
+
+ethoscope.trackers.deep_tube package
+------------------------------------
+
+.. automodule:: ethoscope.trackers.deep_tube.tracker
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+.. automodule:: ethoscope.trackers.deep_tube.engine
+    :members:
+    :undoc-members:
+    :show-inheritance:

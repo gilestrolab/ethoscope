@@ -32,6 +32,7 @@ EXPECTED_FIELDS = {
     "pi_version",
     "picamera2_version",
     "tracker_class",
+    "tracker_model",
     "module_connected",
     "module_info",
 }
@@ -70,6 +71,18 @@ def test_reads_the_acquisition_regime_from_the_camera():
     assert metadata["target_fps"] == "5.0"
     assert metadata["exposure_decoupled"] == "True"
     assert metadata["tracker_class"] == "_FakeTracker"
+    assert metadata["tracker_model"] is None  # not a learned tracker
+
+
+def test_names_the_model_of_a_learned_tracker():
+    """DeepTubeTracker's runs record which network, OpenCV and threads produced them."""
+    import json
+
+    from ethoscope.trackers.deep_tube import DeepTubeTracker
+
+    metadata = ControlThread._acquisition_metadata(_FakeCam(), DeepTubeTracker)
+    info = json.loads(metadata["tracker_model"])
+    assert info["model"] == "fly_locator_tiny_s2_v5" and info["threads"] >= 1
 
 
 def test_reads_the_regime_from_the_frame_grabber():

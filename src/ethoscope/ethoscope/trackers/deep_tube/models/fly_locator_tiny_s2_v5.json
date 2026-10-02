@@ -1,0 +1,32 @@
+{
+ "name": "fly_locator_tiny_s2_v5",
+ "file": "fly_locator_tiny_s2_v5.onnx",
+ "sha256": "8544be694fb7bb098c4dbfcc9f5b0080b11f96cdefb85548565ad6d9f166cf91",
+ "architecture": "dl_tracking.model VARIANTS['tiny_s2'], 2.05 M MACs per canvas",
+ "training": "dl_tracking.train, run tiny_s2_v5 (best epoch 23), dense 3x3 offsets, human labels from review rounds 1-3",
+ "onnx_opset": 13,
+ "onnx_ops": ["Concat", "Conv", "Flatten", "GlobalAveragePool", "GlobalMaxPool", "Relu"],
+ "input": {"name": "input", "shape": ["n", 1, 32, 288], "dtype": "float32"},
+ "outputs": {
+  "maps": {"shape": ["n", 7, 8, 72], "channels": ["heatmap_logit", "offset_x", "offset_y", "log_w", "log_h", "sin_2phi", "cos_2phi"]},
+  "presence": {"shape": ["n", 1], "meaning": "logit that the canvas holds a fly"}
+ },
+ "preprocessing": {
+  "frame": "greyscale uint8, 1280 x 960",
+  "downsample": "cv2.resize INTER_AREA to half resolution, once per frame",
+  "canvas": [32, 288],
+  "canvas_origin": "centred on the ROI rectangle, half-resolution pixels",
+  "padding": "cv2.BORDER_REPLICATE",
+  "normalise": "(x - mean) / (std + 1) per canvas, population statistics",
+  "stride": 4,
+  "decode_blend_logits": 1.0
+ },
+ "thresholds": {"presence": 0.5},
+ "limits": {"frame_size": [1280, 960], "roi_max_size": [576, 80], "roi_min_aspect": 5},
+ "movement": "xy_dist_log10x1000 = round(1000 * log10((1 + step) / max(crop width, crop height))), as AdaptiveBGModel; step is the frame-to-frame displacement in px after the cross-tube shake correction",
+ "test_metrics": {
+  "snapshots_unflagged": {"err_median_px": 0.60, "err_p95_px": 2.66, "detect_rate": 0.966, "false_presence": 0.061},
+  "per_tube_sleep_error_vs_pixel_truth": {"alice_012": 0.038, "e044": 0.064, "ETHOSCOPE_109_shake_corrected_6fps": 0.060},
+  "still_fly_jitter_px_alice_012": {"p50": 0.12, "p95": 0.35, "p99": 0.49}
+ }
+}

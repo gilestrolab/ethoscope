@@ -19,7 +19,8 @@ Core tracking and monitoring functionality for individual Ethoscope devices.
 
 **Key components:**
 - `ethoscope.core.monitor.Monitor` - Main orchestrator that coordinates tracking pipeline
-- `ethoscope.trackers.adaptive_bg_tracker.AdaptiveBGTracker` - Primary tracking algorithm using adaptive background subtraction
+- `ethoscope.trackers.adaptive_bg_tracker.AdaptiveBGModel` - Default tracking algorithm using adaptive background subtraction
+- `ethoscope.trackers.deep_tube.DeepTubeTracker` - Learned per-tube fly locator (a small CNN in `cv2.dnn`, trained in `dl_tracking/`); tube arenas at 1280x960, selectable in the start dialog
 - `ethoscope.hardware.input.cameras` - Camera interfaces (PiCamera, OpenCV)
 - `ethoscope.stimulators` - Hardware interaction modules (optomotor, sleep deprivation)
 - `ethoscope.control.tracking.ControlThread` - Web API and tracking control

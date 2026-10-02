@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fly check</title>
+<style>
+  :root {
+    --bg: #f4f3ef; --card: #ffffff; --ink: #1d1d1b; --muted: #6b6a66;
+    --line: #dcdad3; --ring: #ff2d55; --accent: #1f6feb; --unsure: #b7791f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --card: #1f1f1d; --ink: #ecebe6; --muted: #9c9a93;
+            --line: #34332f; --accent: #5b9dff; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; background: var(--bg);
+           border-bottom: 1px solid var(--line); padding: 10px 16px; }
+  .bar { display: flex; align-items: center; gap: 16px; max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  .rule { color: var(--muted); flex: 1; }
+  .rule b { color: var(--ink); font-weight: 600; }
+  .progress { font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; }
+  .meter { height: 3px; background: var(--line); max-width: 1200px; margin: 8px auto 0; }
+  .meter i { display: block; height: 100%; background: var(--accent); width: 0; }
+  main { max-width: 1200px; margin: 0 auto; padding: 12px 16px 96px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+          padding: 10px 12px 12px; margin: 12px 0; }
+  .ask { font-weight: 600; margin: 0 0 8px; }
+  .strip { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .pic { position: relative; flex: 1; cursor: crosshair; line-height: 0; overflow: hidden;
+         border-radius: 4px; }
+  .pic img { width: 100%; height: auto; border-radius: 4px; user-select: none;
+             -webkit-user-drag: none; }
+  .ring { display: none; position: absolute; width: 54px; height: 54px; border: 2px solid var(--ring);
+          border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;
+          box-shadow: 0 0 0 1.5px rgba(0,0,0,.45); }
+  .strip.unsure .pic img { opacity: .35; }
+  .strip.unsure .pic::after { content: "unsure"; position: absolute; left: 10px; top: 50%;
+          transform: translateY(-50%); line-height: 1; color: var(--unsure); font-weight: 700; }
+  .side { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 52px; }
+  .when { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  button { font: inherit; border-radius: 6px; border: 1px solid var(--line);
+           background: var(--card); color: var(--ink); cursor: pointer; }
+  .q { width: 36px; height: 30px; font-weight: 700; }
+  .strip.unsure .q { background: var(--unsure); color: #fff; border-color: var(--unsure); }
+  footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg);
+           border-top: 1px solid var(--line); padding: 10px 16px; }
+  footer .bar { justify-content: flex-end; }
+  .next { background: var(--accent); color: #fff; border: 0; padding: 10px 22px;
+          font-weight: 650; font-size: 16px; }
+  .next:disabled { opacity: .5; cursor: default; }
+  .done { text-align: center; padding: 80px 16px; font-size: 18px; }
+  @media (max-width: 700px) { .rule { display: none; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>Fly check</h1>
+    <div class="rule">Make each strip show the truth: <b>click the fly</b> ·
+      <b>click the ring</b> to remove it · <b>?</b> if unsure · <b>Enter</b> for the next page</div>
+    <div class="progress" id="progress"></div>
+  </div>
+  <div class="meter"><i id="meter"></i></div>
+</header>
+<main id="main"></main>
+<footer><div class="bar"><button class="next" id="next">Next page ⏎</button></div></footer>
+<script>
+const key = new URLSearchParams(location.search).get("k");
+const api = (p) => `${p}${p.includes("?") ? "&" : "?"}k=${encodeURIComponent(key)}`;
+const ASK = {
+  never_detected: "Same tube at four times. Click the fly wherever you see one.",
+  audit_confident: "Is each ring on the fly? Fix only the wrong ones.",
+  audit_gapfill: "Is each ring on the fly? Fix only the wrong ones.",
+  model_unsure: "Is there a fly? Ring on it if so, no ring if the tube is empty.",
+  model_conf: "Is each ring on the fly? Fix only the wrong ones.",
+  model_none: "These should be empty. Click a fly if you see one.",
+  tube_model_seen: "Same tube at four times. Keep rings on flies, remove the rest.",
+  tube_model_none: "Same tube at four times, thought empty. Click a fly if you see one.",
+};
+let items = [];  // {id, state, ix, iy, prev, el}
+
+function place(it) {
+  const img = it.el.querySelector("img"), ring = it.el.querySelector(".ring");
+  it.el.classList.toggle("unsure", it.state === "unsure");
+  if (it.state === "fly" && img.naturalWidth) {
+    ring.style.display = "block";
+    ring.style.left = `${100 * it.ix / img.naturalWidth}%`;
+    ring.style.top = `${100 * it.iy / img.naturalHeight}%`;
+  } else {
+    ring.style.display = "none";
+  }
+}
+
+function strip(item) {
+  const el = document.createElement("div");
+  el.className = "strip";
+  el.innerHTML = `<div class="pic"><img alt="tube crop" src="${api("/img/" + encodeURIComponent(item.id))}">
+    <div class="ring"></div></div>
+    <div class="side"><button class="q" title="Unsure">?</button><span class="when">${item.t}</span></div>`;
+  const it = { id: item.id, el, state: item.mx === null ? "empty" : "fly", ix: item.mx, iy: item.my };
+  const img = el.querySelector("img");
+  img.addEventListener("load", () => place(it));
+  el.querySelector(".pic").addEventListener("click", (e) => {
+    const r = img.getBoundingClientRect(), s = img.naturalWidth / r.width;
+    const ix = (e.clientX - r.left) * s, iy = (e.clientY - r.top) * s;
+    const near = it.state === "fly" && Math.hypot(ix - it.ix, iy - it.iy) / s < 27;
+    Object.assign(it, near ? { state: "empty" } : { state: "fly", ix, iy });
+    place(it);
+  });
+  el.querySelector(".q").addEventListener("click", () => {
+    if (it.state === "unsure") { it.state = it.prev; } else { it.prev = it.state; it.state = "unsure"; }
+    place(it);
+  });
+  items.push(it);
+  return el;
+}
+
+async function load() {
+  const page = await (await fetch(api("/api/next"))).json();
+  document.getElementById("progress").textContent = `${page.done} / ${page.total}`;
+  document.getElementById("meter").style.width = `${100 * page.done / Math.max(page.total, 1)}%`;
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  items = [];
+  if (!page.groups.length) {
+    main.innerHTML = `<div class="done">All done. Thank you!</div>`;
+    document.getElementById("next").disabled = true;
+    return;
+  }
+  for (const g of page.groups) {
+    const card = document.createElement("section");
+    card.className = "card";
+    card.innerHTML = `<p class="ask">${ASK[g.kind] || "Where is the fly?"}</p>`;
+    g.items.forEach((item) => card.appendChild(strip(item)));
+    main.appendChild(card);
+  }
+  window.scrollTo(0, 0);
+}
+
+async function next() {
+  const btn = document.getElementById("next");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const body = items.map((it) => ({ id: it.id, state: it.state, ix: it.ix, iy: it.iy }));
+  try {
+    const res = await fetch(api("/api/answers"), { method: "POST", body: JSON.stringify(body),
+                                                    headers: { "Content-Type": "application/json" } });
+    if (!res.ok) throw new Error(res.status);
+    await load();
+  } catch (err) {
+    alert("Could not save this page (" + err + "). Nothing was lost; try again.");
+  } finally {
+    btn.disabled = !items.length;
+  }
+}
+
+document.getElementById("next").addEventListener("click", next);
+document.addEventListener("keydown", (e) => { if (e.key === "Enter") next(); });
+load();
+</script>
+</body>
+</html>

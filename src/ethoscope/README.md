@@ -61,7 +61,7 @@ sudo python setup.py develop
 
 ### Core Components
 - **`ethoscope.core`** - Fundamental tracking and monitoring classes
-- **`ethoscope.trackers`** - Computer vision tracking algorithms
+- **`ethoscope.trackers`** - Computer vision tracking algorithms: `AdaptiveBGModel` (the default, background subtraction) and `DeepTubeTracker` (a learned per-tube locator for 20-tube arenas at 1280x960; its network and model card live in `trackers/deep_tube/models/`)
 - **`ethoscope.roi_builders`** - Region of Interest detection and management
 - **`ethoscope.stimulators`** - Behavioral intervention modules
 - **`ethoscope.hardware`** - Camera and interface abstractions

@@ -1506,3 +1506,9 @@ streaming suite reworked to 52. Device unit suite 444 passed; node unit suite
       that into a failed test. `serving_socket()` in the node streaming tests is now
       the sanctioned way to mock a socket a loop reads from, and its docstring says
       why a bare mock defeats every guard in a read loop at once.
+
+# Learned per-tube fly locator (2026-09-30)
+
+A CNN tracker to replace or complement AdaptiveBGModel, trained on turing from the
+snapshot archive. Plan, tasks and open questions: `tasks/todo.dl-tracking.md`.
+Status: draft, awaiting approval.
