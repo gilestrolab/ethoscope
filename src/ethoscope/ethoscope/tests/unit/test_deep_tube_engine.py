@@ -264,7 +264,12 @@ class TestParityWithTraining:
         )
 
     def test_decoding_is_identical(self, ref):
-        assert np.array_equal(P.decode(ref["maps"], ref["presence"]), ref["decoded"])
+        # Reason: within float rounding, not bit for bit. The reference was made on
+        # another machine, and numpy's exp/arctan2 differ in the last bits between
+        # builds (CI failed an exact comparison). The peak cell must agree exactly.
+        decoded = P.decode(ref["maps"], ref["presence"])
+        assert np.array_equal(decoded[:, 7], ref["decoded"][:, 7])
+        np.testing.assert_allclose(decoded, ref["decoded"], rtol=1e-6, atol=1e-6)
 
     def test_the_packaged_model_finds_the_same_flies(self, ref):
         rects = [tuple(map(int, r[1:])) for r in ref["rects"]]
