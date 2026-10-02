@@ -838,7 +838,11 @@
          * Manage loading spinner display
          */
         function manageSpinner(action) {
-            if (action === 'start' && starting_tracking) {
+            // Reason: one spinner at a time. start_tracking and start_recording
+            // call this again when the low-space check re-enters them; the second
+            // spinner replaced spStart, so the first was never stopped and kept
+            // turning until the page was reloaded.
+            if (action === 'start' && starting_tracking && !spStart) {
                 spStart = new Spinner(opts).spin();
                 starting_tracking.appendChild(spStart.el);
             } else if (action === 'stop' && spStart) {
