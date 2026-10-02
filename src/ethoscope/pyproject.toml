@@ -114,6 +114,11 @@ ethoscope-light = "ethoscope.hardware.interfaces.light_cli:main"
 where = ["."]
 include = ["ethoscope*"]
 
+[tool.setuptools.package-data]
+# The DeepTubeTracker network and its model card (devices install editable and
+# read them in place; this ships them in wheels too).
+"ethoscope.trackers.deep_tube" = ["models/*.onnx", "models/*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["ethoscope/tests"]
 python_files = ["test_*.py"]

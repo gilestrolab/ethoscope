@@ -77,6 +77,13 @@ class Monitor:
         if rois is None:
             raise NotImplementedError("rois must exist (cannot be None)")
 
+        # Reason: a tracker that processes every ROI of a frame at once (one batched
+        # network pass, a correction across tubes) needs state shared by its per-ROI
+        # instances. It is built here, once per Monitor, so nothing outlives the run.
+        make_shared_state = getattr(tracker_class, "make_shared_state", None)
+        if callable(make_shared_state):
+            kwargs = dict(kwargs, shared_state=make_shared_state(list(rois)))
+
         if stimulators is None:
             self._unit_trackers = [
                 TrackingUnit(tracker_class, r, None, *args, **kwargs) for r in rois
