@@ -310,7 +310,33 @@ Constraints measured so far (2026-10-01):
   lab) moves a frame between ~45 and ~75 ms.
 - `xy_dist` from float positions before the SMALLINT rounding.
 
-Sketch, not to be implemented under this plan:
+**Approved 2026-10-02** (plan: `~/.claude/plans/cuddly-hopping-russell.md`). The
+tracker is called `DeepTubeTracker`. It is a radio button in the start dialog's tracker
+group, AdaptiveBGModel stays the default, and a live test on one stopped device is
+allowed.
+- [x] `trackers/deep_tube/`: preprocess copy, engine (batched forward, shake
+      correction, setup check), tracker, v5 ONNX + model card
+- [x] Monitor hook `make_shared_state` (one engine per Monitor)
+- [x] control: selectable on production Pis, early setup check, `tracker_model`
+      metadata
+- [x] package data; unit, control, integration and drift tests; parity reference
+      (device suite 1,214 passed + 3 integration; dl_tracking 96 passed)
+- [x] docs (CLAUDE.md, READMEs, rst)
+- [ ] live check on a stopped device (git bundle, no push), then restore it
+- [ ] later, own commit: tracker arguments from the UI are dropped in
+      `_start_tracking` (kwargs built, never passed to Monitor)
+- **Found while integrating (2026-10-02).**
+  - The bandit pre-commit hook (rev 1.7.6) cannot run on Python 3.14: it reports
+    "Unknown test found in profile" and cannot parse any file, so every commit
+    touching `src/` fails it. bandit 1.9.4 (via `uvx`) finds no medium/high issue in
+    the new code; the integration commits skip only that hook (`SKIP=bandit`).
+    Bumping the hook's rev is a one-line fix for Giorgio to decide on.
+  - The ROI template JSONs are not package data either, so a wheel would ship
+    without them (devices install editable, so nothing breaks today).
+  - `is_inferred` is stored as the text '0' / '1' (BOOLEAN column through the
+    writer), for every tracker.
+
+Sketch, superseded by the plan above:
 - `trackers/cnn_tracker.py`, a BaseTracker subclass. The Monitor calls `track()` once
   per ROI, so a shared per-frame inference object runs one batched forward pass on the
   first call for a new `t` and serves the other ROIs from its cache. No Monitor

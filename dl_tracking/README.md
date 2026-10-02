@@ -37,6 +37,22 @@ root, as `python -m dl_tracking.<module>`.
 
 `qa` renders contact sheets of labelled crops for checking by eye.
 
+## On the device
+
+The device runs the network as `DeepTubeTracker`
+(`src/ethoscope/ethoscope/trackers/deep_tube/`), with its own copy of
+`preprocess.py`, since the device package cannot import this directory. To ship a
+new model:
+
+1. Export it (`python -m dl_tracking.export --ckpt runs/<name>/best.pt --out <name>.onnx`)
+   and check it on a Pi with OpenCV 4.7 (`pi_parity.py`).
+2. Copy the `.onnx` into `trackers/deep_tube/models/`, write its card (`.json`, with
+   the file's sha256) and point `engine.MODEL_CARD` at it.
+3. Regenerate the parity reference in the device venv
+   (`python -m dl_tracking.device_reference`) and run both test suites.
+
+`tests/test_device_copy.py` fails if the two copies of `preprocess.py` differ.
+
 ## Labels in one paragraph
 
 A snapshot's tube gets a **confident** label when AdaptiveBGModel detected the fly
