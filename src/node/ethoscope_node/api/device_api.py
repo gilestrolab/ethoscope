@@ -244,10 +244,15 @@ class DeviceAPI(BaseAPI):
             except Exception as e:
                 self.logger.warning(f"Failed to setup SSH keys for device {id}: {e}")
 
-        return {
+        answer = {
             **device.machine_info(),
             "haschanged": response.get("haschanged", False),
         }
+        if response.get("self_reboot"):
+            # The device updates, then reboots by itself: the page must not
+            # send its own reboot.
+            answer["self_reboot"] = response["self_reboot"]
+        return answer
 
     @error_decorator
     def _get_device_module(self, id):

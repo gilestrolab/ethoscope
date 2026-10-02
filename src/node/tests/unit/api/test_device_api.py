@@ -356,6 +356,22 @@ class TestDeviceAPI(unittest.TestCase):
         mock_device.setup_ssh_authentication.assert_called_once()
 
     @patch("ethoscope_node.api.device_api.BaseAPI.get_request_data")
+    def test_set_device_machine_info_passes_the_self_reboot_on(self, mock_get_data):
+        """A device that updates, then reboots by itself says so; the page must hear it."""
+        mock_get_data.return_value = b'{"machine_options": {"arguments": {}}}'
+        mock_device = Mock()
+        mock_device.send_settings.return_value = {
+            "haschanged": True,
+            "self_reboot": "after_update",
+        }
+        mock_device.machine_info.return_value = {}
+        self.api.device_scanner.get_device.return_value = mock_device
+
+        result = self.api._set_device_machine_info("device1")
+
+        self.assertEqual(result["self_reboot"], "after_update")
+
+    @patch("ethoscope_node.api.device_api.BaseAPI.get_request_data")
     def test_set_device_machine_info_no_change(self, mock_get_data):
         """Test updating device machine info with no changes."""
         mock_get_data.return_value = b'{"hardware": "same"}'

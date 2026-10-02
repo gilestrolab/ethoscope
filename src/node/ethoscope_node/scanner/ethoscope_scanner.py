@@ -81,6 +81,9 @@ class Ethoscope(BaseDevice):
     _DEPARTURE_INSTRUCTIONS = {"poweroff", "reboot", "restart"}
     # A departure the device never acted on is dropped after this long.
     _DEPARTURE_NOT_TAKEN_S = 120
+    # A device updating its software before it reboots keeps answering for
+    # minutes and takes longer to come back.
+    _SELF_REBOOT_WINDOW_S = 15 * 60
     FRESH_CARD_NAME = "ETHOSCOPE_000"
 
     def __init__(
@@ -229,6 +232,10 @@ class Ethoscope(BaseDevice):
                 self._logger.info(
                     f"Device {self._id} accepted a rename; it returns under a new id"
                 )
+        if isinstance(result, dict) and result.get("self_reboot"):
+            # The device updates its software, then reboots by itself: the node
+            # sends no reboot, so it records the departure here.
+            self._expect_departure("reboot", window_s=self._SELF_REBOOT_WINDOW_S)
         self._update_info()
         return result
 
@@ -868,12 +875,15 @@ class Ethoscope(BaseDevice):
                     f"Updated logger name from {current_logger_name} to {new_logger_name}"
                 )
 
-    def _expect_departure(self, instruction: str):
+    def _expect_departure(self, instruction: str, window_s: float | None = None):
         """
         Note that the node asked the device to go away (reboot, restart, poweroff).
 
         Args:
             instruction (str): The power instruction about to be sent.
+            window_s (float | None): How long it may keep answering, and then stay
+                away, before that is no longer expected; None for the defaults
+                (_DEPARTURE_NOT_TAKEN_S, and the configured reboot grace).
         """
         forget = self._identity_changes or (
             self._info.get("name") == self.FRESH_CARD_NAME
@@ -883,6 +893,7 @@ class Ethoscope(BaseDevice):
             "since": time.time(),
             "away": False,
             "forget": forget,
+            "window_s": window_s,
         }
         self._logger.info(
             f"Device {self._id}: {instruction} requested from the node"
@@ -916,10 +927,12 @@ class Ethoscope(BaseDevice):
             return
 
         alerts = self._config.get_custom("alerts") or {}
-        grace_min = alerts.get("graceful_shutdown_grace_minutes", 5)
-        if time.time() - departure["since"] > 60 * grace_min:
+        grace_s = departure.get("window_s") or 60 * alerts.get(
+            "graceful_shutdown_grace_minutes", 5
+        )
+        if time.time() - departure["since"] > grace_s:
             self._logger.warning(
-                f"Device {self._id} not back {grace_min} min after a "
+                f"Device {self._id} not back {grace_s / 60:.0f} min after a "
                 f"{departure['action']} from the node"
             )
             self._departure = None
@@ -937,10 +950,12 @@ class Ethoscope(BaseDevice):
         if departure["away"]:
             self._logger.info(f"Device {self._id} back after {departure['action']}")
             self._departure = None
-        elif time.time() - departure["since"] > self._DEPARTURE_NOT_TAKEN_S:
+        elif time.time() - departure["since"] > (
+            departure.get("window_s") or self._DEPARTURE_NOT_TAKEN_S
+        ):
             self._logger.warning(
                 f"Device {self._id} still answering "
-                f"{self._DEPARTURE_NOT_TAKEN_S} s after {departure['action']}"
+                f"{time.time() - departure['since']:.0f} s after {departure['action']}"
             )
             self._departure = None
 
