@@ -563,7 +563,9 @@
         };
 
         $scope.isDeviceOffline = function(device) {
-            return !!device && (device.status || '').toLowerCase() === 'offline';
+            // A device shut down from the node is as absent as an offline one.
+            var status = (device && device.status || '').toLowerCase();
+            return !!device && (status === 'offline' || status === 'shutdown');
         };
 
         // Offline ethoscopes are hidden unless asked for: they are placed by the
