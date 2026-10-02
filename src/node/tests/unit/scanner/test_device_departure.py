@@ -228,6 +228,45 @@ class TestRenameRequest:
         assert once.call_args.kwargs["timeout"] == 30
         assert json.loads(once.call_args.kwargs["post_data"]) == {"etho_number": number}
 
+    @pytest.mark.parametrize("number,renames", [(124, True), (123, False)])
+    def test_the_dialogs_nested_payload_is_read(self, scanner, number, renames):
+        """The settings dialog sends {"machine_options": {"arguments": {...}}}.
+
+        Only the flat form was read before, so a rename from the UI never marked
+        the old entry for retirement.
+        """
+        device = make_device(scanner, name="ETHOSCOPE_123")
+        payload = {
+            "machine_options": {
+                "name": "Ethoscope Options",
+                "arguments": {"etho_number": number, "node_ip": "192.168.1.2"},
+            }
+        }
+        with (
+            patch.object(device, "_get_json_once", return_value={"haschanged": True}),
+            patch.object(device, "_update_info"),
+        ):
+            device.send_settings(payload)
+        assert device._identity_changes is renames
+
+    def test_a_self_reboot_is_expected_for_as_long_as_an_update_takes(self, scanner):
+        """The device keeps answering while it updates, then reboots by itself."""
+        device = make_device(scanner, name="ETHOSCOPE_000", device_id="b14bdd6b")
+        answer = {"haschanged": True, "self_reboot": "after_update"}
+        with (
+            patch.object(device, "_get_json_once", return_value=answer),
+            patch.object(device, "_update_info"),
+        ):
+            device.send_settings({"machine_options": {"arguments": {"etho_number": 5}}})
+        departure = device._departure
+        assert departure["action"] == "reboot" and departure["forget"]
+        assert departure["window_s"] == Ethoscope._SELF_REBOOT_WINDOW_S
+        departure["since"] -= Ethoscope._DEPARTURE_NOT_TAKEN_S + 1  # still updating
+        poll(device, answers=True)
+        assert device._departure is departure
+        poll(device, answers=False)  # it rebooted
+        assert device not in scanner.devices
+
     def test_a_power_request_does_not_fail_because_the_device_left(self, scanner):
         device = make_device(scanner)
         ask(device, "poweroff")  # would raise if the vanished device were an error

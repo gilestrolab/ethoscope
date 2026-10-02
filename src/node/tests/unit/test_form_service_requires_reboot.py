@@ -54,6 +54,8 @@ const options = { machine_options: [{
     {type: 'boolean', name: 'remoteLogging', default: true, requires_reboot: true},
     {type: 'boolean', name: 'expand_rootfs', default: false, requires_reboot: true,
      is_action: true},
+    {type: 'boolean', name: 'software_update', default: false, requires_reboot: true,
+     is_action: true},
   ],
 }]};
 
@@ -79,6 +81,11 @@ args.remoteLogging = true;
 
 args.expand_rootfs = true;
 answers.action_turned_on = svc.requiresReboot(options, pending);
+args.expand_rootfs = false;
+
+args.software_update = true;
+answers.update_ticked = svc.requiresReboot(options, pending);
+args.software_update = false;
 
 // The clock auto-correct posts its own payload, naming an option group that is
 // not one of the served ones.
@@ -134,6 +141,11 @@ def test_turning_a_state_off_offers_to_reboot(answers):
 def test_an_action_offers_to_reboot_whenever_it_is_on(answers):
     """expand_rootfs runs on submit, so being on is enough - default or not."""
     assert answers["action_turned_on"] is True
+
+
+def test_a_software_update_offers_to_reboot(answers):
+    """Ticking it is an action: the device updates, then reboots."""
+    assert answers["update_ticked"] is True
 
 
 def test_the_clock_autocorrect_never_offers_to_reboot(answers):

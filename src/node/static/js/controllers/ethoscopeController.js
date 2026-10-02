@@ -1643,6 +1643,14 @@
 
                     if (!response.data.haschanged) return;
 
+                    if (response.data.self_reboot) {
+                        // Reason: the device is updating its software and reboots by
+                        // itself when done; a reboot sent now would cut the update
+                        // short.
+                        $scope.ethoscope.alert("Settings applied. The ethoscope is updating its software and will reboot by itself; it will be back in a few minutes.");
+                        return;
+                    }
+
                     if (needs_reboot) {
                         // Told before it is asked for: alert() blocks the tab, and
                         // the reboot request would sit in the queue behind it.

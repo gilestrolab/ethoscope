@@ -6,8 +6,11 @@ import os
 import signal
 import socket
 import subprocess
+import threading
 import time
 import traceback
+import urllib.error
+import urllib.request
 from optparse import OptionParser
 
 import bottle
@@ -337,7 +340,87 @@ def update_machine_info(id):
         tn = datetime.datetime.fromtimestamp(update_machine_json_data["datetime"])
         pi.set_datetime(tn)
 
+    if update_machine_json_data.get("software_update"):
+        # The device reboots by itself once updated, so the node must not send its
+        # own reboot (it would cut the update short): "self_reboot" tells it so.
+        threading.Thread(
+            target=_update_then_reboot,
+            args=(bottle.request.remote_addr,),
+            daemon=True,
+            name="update_then_reboot",
+        ).start()
+        return {"haschanged": True, "self_reboot": "after_update"}
+
     return {"haschanged": haschanged}
+
+
+UPDATER = "http://127.0.0.1:8888"
+
+
+def _http_json(url, timeout):
+    """GET ``url`` and decode its JSON answer."""
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        return json.loads(response.read() or b"{}")
+
+
+def _update_then_reboot(node):
+    """
+    Update this device's software from the node, then reboot.
+
+    Reason: a rename only takes effect when the services restart, and a normal
+    update restarts them; done by the node, the update would bring the new
+    identity up before the reboot the rename needs, and the node's reboot to the
+    old id would then miss. Here the local update server updates with
+    ``then=reboot``, which reboots instead of restarting, after the install.
+
+    1. Ask the node to refresh its mirror from GitHub (best effort; the mirror is
+       also refreshed every 10 min).
+    2. Update through the local update server, which reboots when done.
+    3. If that cannot be done, reboot anyway, so the other settings apply.
+
+    Args:
+        node (str): Address of the node that sent the settings.
+    """
+    try:
+        _http_json(f"http://{node}:8888/bare/update", timeout=120)
+        logging.info("Node mirror refreshed before the software update")
+    except Exception as e:
+        logging.warning(f"Could not refresh the node's mirror, updating anyway: {e}")
+    try:
+        updater_id = _http_json(f"{UPDATER}/id", timeout=10)["id"]
+    except Exception as e:
+        logging.error(f"Update server unavailable, rebooting without updating: {e}")
+        subprocess.call("reboot")
+        return
+    try:
+        result = _http_json(
+            f"{UPDATER}/device/update/{updater_id}?then=reboot", timeout=900
+        )
+    except urllib.error.HTTPError as e:
+        # It refused the request (e.g. a wrong id), so it schedules no reboot.
+        logging.error(f"Update refused ({e}), rebooting without updating")
+        subprocess.call("reboot")
+        return
+    except urllib.error.URLError as e:
+        if not isinstance(e.reason, TimeoutError):
+            # Never reached it (e.g. connection refused): nothing will reboot.
+            logging.error(f"Update server gone ({e}), rebooting without updating")
+            subprocess.call("reboot")
+            return
+        logging.warning(f"No answer from the update ({e}); it reboots when it ends")
+        return
+    except Exception as e:
+        # Reason: no answer in time means it is still installing; it reboots when
+        # done, and rebooting here could cut the install short.
+        logging.warning(f"No answer from the update ({e}); it reboots when it ends")
+        return
+    if "error" in result:
+        logging.error(f"Software update failed, rebooting: {result['error']}")
+    else:
+        logging.info(
+            f"Software updated {result.get('old_commit')} -> "
+            f"{result.get('new_commit')}; rebooting"
+        )
 
 
 def _refused_command(id, action, result):
@@ -1107,6 +1190,17 @@ def user_options(id):
                             # the distinction to work out whether the pending edit
                             # needs a reboot: a state counts once it differs from the
                             # default, an action counts whenever it is on.
+                            "is_action": True,
+                        },
+                        {
+                            "type": "boolean",
+                            "name": "software_update",
+                            "description": "Update the software before rebooting (the device reboots by itself once updated)",
+                            # On by default for a fresh card, like expand_rootfs: a
+                            # card renamed for the first time should come back
+                            # renamed and up to date. See _update_then_reboot.
+                            "default": machine_info["machine-number"] == 0,
+                            "requires_reboot": True,
                             "is_action": True,
                         },
                         {
