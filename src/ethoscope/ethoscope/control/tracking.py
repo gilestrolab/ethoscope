@@ -57,6 +57,7 @@ from ethoscope.stimulators.sleep_restriction_stimulators import (
 )
 from ethoscope.stimulators.stimulators import DefaultStimulator
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
+from ethoscope.trackers.deep_tube import DeepTubeTracker
 from ethoscope.utils import pi
 from ethoscope.utils.debug import EthoscopeException
 from ethoscope.utils.description import DescribedObject
@@ -274,7 +275,8 @@ class ControlThread(Thread):
             (
                 "tracker",
                 {
-                    "possible_classes": [AdaptiveBGModel],
+                    # The first is the default.
+                    "possible_classes": [AdaptiveBGModel, DeepTubeTracker],
                 },
             ),
             (
@@ -314,7 +316,9 @@ class ControlThread(Thread):
     # some classes do not need to be offered as choices to the user in normal conditions
     # these are shown only if the machine is not a PI
     _is_a_rPi = pi.isMachinePI() and pi.hasPiCamera() and not pi.isExperimental()
-    _hidden_options = {"camera", "tracker"}  # result_writer is now always available
+    # The tracker is offered since there is a choice (AdaptiveBGModel or DeepTubeTracker);
+    # result_writer is always available.
+    _hidden_options = {"camera"}
 
     for k in _option_dict:
         _option_dict[k]["class"] = _option_dict[k]["possible_classes"][0]
@@ -801,6 +805,8 @@ class ControlThread(Thread):
             "tracker_class": (
                 getattr(TrackerClass, "__name__", None) if TrackerClass else None
             ),
+            # For a learned tracker: which model, on which OpenCV and threads.
+            "tracker_model": _safe(getattr(TrackerClass, "model_info", lambda: None)),
             # Whether a stimulator module was physically attached, and which.
             "module_connected": module_connected,
             "module_info": module_info,
@@ -1143,6 +1149,18 @@ class ControlThread(Thread):
 
         self._monit.run(result_writer, self._drawer)
 
+    def _release_camera_after_failed_start(self, cam):
+        """Close the camera of a start that will not happen, so the next one finds it free."""
+        try:
+            cam._close()
+            # Add a delay to allow camera hardware to reset
+            time.sleep(2.0)
+            logging.info(
+                "Camera cleanup completed, hardware should be available for next attempt"
+            )
+        except Exception as cleanup_error:
+            logging.error(f"Error during camera cleanup: {cleanup_error}")
+
     def _set_tracking_from_scratch(self):
         """ """
         CameraClass = self._option_dict["camera"]["class"]
@@ -1184,16 +1202,20 @@ class ControlThread(Thread):
 
         # Handle detection failure
         if reference_points is None or rois is None:
-            try:
-                cam._close()
-                # Add a delay to allow camera hardware to reset
-                time.sleep(2.0)
-                logging.info(
-                    "Camera cleanup completed, hardware should be available for next attempt"
-                )
-            except Exception as cleanup_error:
-                logging.error(f"Error during camera cleanup: {cleanup_error}")
+            self._release_camera_after_failed_start(cam)
             # Return None to indicate failure instead of raising exception
+            return None
+
+        # Reason: a tracker that supports only some setups (DeepTubeTracker needs a
+        # tube arena at 1280x960) refuses here, before any database exists, through
+        # the same path as a failed ROI build, so the user reads why it cannot run
+        # rather than a traceback from the first frame.
+        check_setup = getattr(TrackerClass, "check_setup", None)
+        problem = check_setup(cam.resolution, rois) if callable(check_setup) else None
+        if problem:
+            logging.error(problem)
+            self._roi_build_error = problem
+            self._release_camera_after_failed_start(cam)
             return None
 
         logging.info("Initialising monitor")
