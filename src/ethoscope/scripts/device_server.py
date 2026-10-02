@@ -3,6 +3,7 @@ import glob
 import json
 import logging
 import os
+import signal
 import socket
 import subprocess
 import time
@@ -605,6 +606,18 @@ def connectedModule(id):
 
     else:
         return interfaces.getModuleCapabilities(test=False)
+
+
+def _exit_on_sigterm(signum, frame):
+    """
+    Turn systemd's SIGTERM into SystemExit, so the server's cleanup runs.
+
+    Reason: at reboot and poweroff systemd stops this service with SIGTERM, which
+    killed the process before ``main``'s finally could unregister the mDNS
+    service. Without that goodbye the node's zeroconf cache kept the old records
+    and did not notice the device coming back.
+    """
+    raise SystemExit(0)
 
 
 def _light_daemon_state():
@@ -1257,6 +1270,7 @@ if __name__ == "__main__":
         ethoscope = commandingThread(ethoscope_info)
         ethoscope.start()
 
+    signal.signal(signal.SIGTERM, _exit_on_sigterm)
     try:
         # Register the ethoscope using zeroconf so that the node knows about it.
         hostname = socket.gethostname()
