@@ -357,6 +357,22 @@ diagnostics are what tell us which regime a device is actually in.
 - [x] Record in METADATA which regime applied: exposure policy and configured
       gain are now stamped at experiment start. The *observed* exposure/gain per
       frame still needs the per-minute DIAGNOSTICS table (1b).
+- [x] **Exposure-first tracking (2026-10-03).** Measured, not inferred: with the
+      gain pinned, auto-exposure can only *shorten* the exposure to hold
+      brightness, so a higher gain setting means a shorter exposure and a noisier
+      frame. Neither binning (the grabber already gets the 2x2 binned mode) nor
+      denoise (on; HighQuality barely beats Fast) is the cause. Still-scene SNR
+      under the IR backlight alone:
+      ETHOSCOPE_380 (imx219): gain 5 pinned 68, gain 3 pinned 82, exposure-first
+      to 200 ms 114. ETHOSCOPE_354 (ov5647): gain 3 pinned 84-88, exposure-first
+      104 (200 ms at gain 1.75). Tracking now loads a derived copy of the NoIR
+      tuning whose "long" table runs exposure to the frame period of the cap
+      (200 ms at 5 fps) at gain 1.0 before any gain, and leaves gain to
+      auto-exposure; video keeps the pinned gain. METADATA `exposure_policy`
+      says which applied. Trap found on the way: `Picamera2()` without a
+      `tuning=` argument *deletes* `LIBCAMERA_RPI_TUNING_FILE` and loads the
+      default colour tuning; the grabber passes `tuning=` and is unaffected,
+      but a probe that does not measures the wrong camera.
 
 ## NoIR tuning: make it constant, and fix the sensor mismatch
 

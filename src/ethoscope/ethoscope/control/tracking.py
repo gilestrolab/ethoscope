@@ -792,6 +792,14 @@ class ControlThread(Thread):
             # build lets auto-exposure integrate beyond 1 / target_fps.
             "gain_setting": _safe(pi.get_gain_setting),
             "exposure_decoupled": _safe(lambda: _camera_attr("_exposure_decoupled")),
+            # 'exposure_first': gain automatic, raised only once the exposure
+            # is at its ceiling (tracking since 2026-10); 'pinned_gain': gain
+            # fixed at gain_setting. None for cameras without the choice.
+            "exposure_policy": _safe(
+                lambda: {True: "exposure_first", False: "pinned_gain"}.get(
+                    _camera_attr("_exposure_first")
+                )
+            ),
             # Camera tuning: what this sensor needs, and what was really loaded.
             # "DEFAULT" means it fell back to libcamera's colour tuning and this
             # run is not comparable with a correctly tuned one.

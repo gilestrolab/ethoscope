@@ -507,6 +507,10 @@ class SQLiteResultWriter(BaseResultWriter):
         self._create_table(
             self.CAMERA_EVENTS_TABLE_NAME, self.CAMERA_EVENTS_FIELDS, engine=None
         )
+        logging.info("Creating exposure and gain table 'CAMERA_EXPOSURE'")
+        self._create_table(
+            self.CAMERA_EXPOSURE_TABLE_NAME, self.CAMERA_EXPOSURE_FIELDS, engine=None
+        )
 
         if self._erase_old_db:
             logging.info("Creating master table 'ROI_MAP'")
