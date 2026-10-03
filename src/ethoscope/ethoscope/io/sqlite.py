@@ -503,6 +503,10 @@ class SQLiteResultWriter(BaseResultWriter):
         self._create_table(
             self.LIGHT_EVENTS_TABLE_NAME, self.LIGHT_EVENTS_FIELDS, engine=None
         )
+        logging.info("Creating camera dropouts table 'CAMERA_EVENTS'")
+        self._create_table(
+            self.CAMERA_EVENTS_TABLE_NAME, self.CAMERA_EVENTS_FIELDS, engine=None
+        )
 
         if self._erase_old_db:
             logging.info("Creating master table 'ROI_MAP'")
