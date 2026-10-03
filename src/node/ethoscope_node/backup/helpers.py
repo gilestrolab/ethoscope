@@ -1649,6 +1649,12 @@ class GenericBackupWrapper(threading.Thread):
         self._cycle_count = 0
         self._last_cycle_start = None
 
+        # Each device's most recent job. Reason: a job outlives the wait in a cycle
+        # (a recording crossing a weak WiFi link takes hours), and starting another
+        # meanwhile set several rsyncs copying the same chunks over the same link
+        # (four at once from ETHOSCOPE_361, 2026-10-03), each slowing the others.
+        self._inflight: dict[str, concurrent.futures.Future] = {}
+
         # Remove retry throttling - incremental backups are safe to run frequently
 
         # Configuration
@@ -2391,6 +2397,14 @@ class GenericBackupWrapper(threading.Thread):
             device_name = device.get("name", "unknown")
 
             try:
+                previous = self._inflight.get(device_id)
+                if previous is not None and not previous.done():
+                    self._logger.info(
+                        f"Backup of {device_name} (ID: {device_id}) from an earlier "
+                        "cycle is still running; not starting another"
+                    )
+                    continue
+
                 self._logger.info(
                     f"Submitting backup job for device {device_name} (ID: {device_id})"
                 )
@@ -2405,6 +2419,7 @@ class GenericBackupWrapper(threading.Thread):
 
                 # Create fault-isolated backup job wrapper
                 future = executor.submit(self._execute_backup_job_safely, device)
+                self._inflight[device_id] = future
                 futures.append((future, device_id, device_name))
                 successful_submissions += 1
 
@@ -2511,21 +2526,13 @@ class GenericBackupWrapper(threading.Thread):
                     )
 
             except concurrent.futures.TimeoutError:
+                # Reason: a running job cannot be cancelled, and it is not failing; it
+                # carries on, and no new job starts for this device until it ends.
                 timed_out_jobs += 1
-                self._logger.error(
-                    f"⏰ Backup TIMED OUT (600s): {device_name} (ID: {device_id})"
+                self._logger.info(
+                    f"Backup still running after 600 s: {device_name} (ID: {device_id}); "
+                    "leaving it to finish"
                 )
-
-                # Cancel the timed out job to free resources
-                try:
-                    future.cancel()
-                    self._handle_backup_failure(
-                        device_id, "Backup timed out after 600 seconds"
-                    )
-                except Exception as cancel_error:
-                    self._logger.error(
-                        f"Error canceling timed out job for {device_id}: {cancel_error}"
-                    )
 
             except Exception as e:
                 failed_jobs += 1
@@ -2549,7 +2556,7 @@ class GenericBackupWrapper(threading.Thread):
         self._logger.info(f"Total jobs: {total_jobs}")
         self._logger.info(f"Successful: {successful_jobs}")
         self._logger.info(f"Failed: {failed_jobs}")
-        self._logger.info(f"Timed out: {timed_out_jobs}")
+        self._logger.info(f"Still running: {timed_out_jobs}")
         self._logger.info(
             f"Success rate: {(successful_jobs/total_jobs*100):.1f}%"
             if total_jobs > 0
