@@ -635,17 +635,18 @@ def reload_node_daemon():
     logging.info("Restarting ethoscope_node service")
     _reload_daemon("ethoscope_node")
 
-    # Restart update service
-    logging.info("Restarting ethoscope_update_node service")
-    _reload_daemon("ethoscope_update_node")
-
     # Restart any active backup services
     active_backup_services = _get_active_backup_services()
     for service in active_backup_services:
         logging.info(f"Restarting active backup service: {service}")
         _reload_daemon(service)
 
-    logging.info("Node service reload complete")
+    # Reason: this runs inside ethoscope_update_node, so restarting it ends this
+    # process. It has to come last: when it came before the backup services,
+    # they were never restarted, and the node's backup ran the old code after
+    # every update (2026-10-03: a fix to the backup stayed inactive).
+    logging.info("Restarting ethoscope_update_node service (last: it is this process)")
+    _reload_daemon("ethoscope_update_node")
 
 
 def reload_device_daemon():
