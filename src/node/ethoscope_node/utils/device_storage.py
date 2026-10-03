@@ -16,8 +16,10 @@ Two details do not follow from that rule alone:
   the run is held back until a checkpoint folds them in.
 * ``accessories/h264_to_mp4.py --purge`` deletes the node's ``.h264`` chunks once it
   has merged them into an ``.mp4``. A chunk missing for that reason is still safe, so
-  it is accepted when the node's copy of the run holds a settled ``.mp4`` — settled
-  meaning no ``.tmp`` sibling and old enough that ffmpeg is no longer writing it.
+  it is accepted when the chunk list the merge writes beside the video
+  (``<video>.mp4.json``) names it, at the size the device reports. The mere presence
+  of a video proves nothing: a merge can run while chunks are still arriving, and
+  ETHOSCOPE_361's 202-chunk recording once had a node video holding only the first 21.
 
 Checksums are deliberately not used: the backup does not use them either, and hashing
 multi-gigabyte files off an SD card would take minutes per run for no practical gain,
@@ -30,16 +32,16 @@ gates, and phrases the result — including how much of it could be reclaimed, w
 only knowable from the classification above.
 """
 
+import json
 import os
-import time
 
 # rsync's --modify-window: filesystems disagree about mtime resolution, so compare
 # with a tolerance rather than for equality.
 MTIME_TOLERANCE_S = 2
 
-# How long an .mp4 must have been untouched before we believe the conversion that
-# replaced the node's .h264 chunks has finished.
-MP4_SETTLE_S = 600
+# The chunk list accessories/h264_to_mp4.py writes beside a merged video, last, once
+# the video is complete: {"video": name, "chunks": [{"name": ..., "size": ...}, ...]}.
+MANIFEST_SUFFIX = ".mp4.json"
 
 # Sidecars rsync is told to skip; they never need a counterpart on the node.
 WAL_SUFFIXES = (".db-wal", ".db-shm", ".db-journal")
@@ -90,26 +92,43 @@ def _node_run_dir(run: dict, node_dirs: dict[str, str]) -> str | None:
     return os.path.join(root, run.get("rel_dir", ""))
 
 
-def _has_settled_mp4(node_run_dir: str, listdir, stat, now: float) -> bool:
-    """True when the node's copy of the run holds a finished merged video."""
+def _read_text(path: str) -> str:
+    """Return a file's text."""
+    with open(path) as f:
+        return f.read()
+
+
+def _merged_chunks(node_run_dir: str, listdir, stat, read_text) -> dict[str, int]:
+    """
+    Return the chunks the node's merged videos of this run are known to hold.
+
+    Args:
+        node_run_dir (str): The node's copy of the run.
+        listdir: ``os.listdir``-alike.
+        stat: ``os.stat``-alike.
+        read_text: Callable returning a file's text.
+
+    Returns:
+        dict[str, int]: Chunk name to its size when merged. Only lists whose video is
+        present count; an unreadable list counts as none.
+    """
     try:
         entries = listdir(node_run_dir)
     except OSError:
-        return False
+        return {}
 
-    if any(e.endswith(".tmp") for e in entries):
-        return False
-
+    held: dict[str, int] = {}
     for entry in entries:
-        if not entry.endswith(".mp4"):
+        if not entry.endswith(MANIFEST_SUFFIX):
             continue
         try:
-            st = stat(os.path.join(node_run_dir, entry))
-        except OSError:
+            manifest = json.loads(read_text(os.path.join(node_run_dir, entry)))
+            stat(os.path.join(node_run_dir, manifest["video"]))
+            for chunk in manifest["chunks"]:
+                held[chunk["name"]] = int(chunk["size"])
+        except (OSError, ValueError, KeyError, TypeError):
             continue
-        if now - st.st_mtime >= MP4_SETTLE_S:
-            return True
-    return False
+    return held
 
 
 def classify_run(
@@ -117,7 +136,7 @@ def classify_run(
     node_dirs: dict[str, str],
     stat=os.stat,
     listdir=os.listdir,
-    now=None,
+    read_text=_read_text,
 ) -> dict:
     """
     Decide whether a device run is fully backed up on the node.
@@ -128,14 +147,13 @@ def classify_run(
             to the node directory rsync mirrors it into.
         stat: ``os.stat``-alike, injectable for testing.
         listdir: ``os.listdir``-alike, injectable for testing.
-        now (float | None): Current time, defaults to ``time.time()``.
+        read_text: Callable returning a file's text, injectable for testing.
 
     Returns:
         dict: A copy of ``run`` with ``backed_up`` (bool), ``reason`` (str, shown to
         the user), ``missing`` (up to five unverified file names), ``date`` (the run's
         date-time component) and ``kind`` (``"results"`` or ``"videos"``).
     """
-    now = time.time() if now is None else now
     result = dict(run)
     rel_dir = run.get("rel_dir", "")
     result["date"] = rel_dir.split("/")[-1] if rel_dir else ""
@@ -149,8 +167,7 @@ def classify_run(
         return result
 
     missing: list[str] = []
-    mp4_checked = False
-    mp4_present = False
+    merged: dict[str, int] | None = None
 
     for entry in run.get("files", []):
         name = entry.get("name", "")
@@ -172,10 +189,9 @@ def classify_run(
             st = stat(node_file)
         except OSError:
             if name.endswith(".h264"):
-                if not mp4_checked:
-                    mp4_present = _has_settled_mp4(node_run_dir, listdir, stat, now)
-                    mp4_checked = True
-                if mp4_present:
+                if merged is None:
+                    merged = _merged_chunks(node_run_dir, listdir, stat, read_text)
+                if merged.get(name) == entry.get("size"):
                     continue
             missing.append(name)
             continue

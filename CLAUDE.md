@@ -332,9 +332,24 @@ Two files break the pattern and are handled explicitly:
   absence on the node proves nothing. But a **non-empty** write-ahead log holds
   committed rows the copied `.db` does not have, so such a run is held back. If one
   never clears, the run needs a `PRAGMA wal_checkpoint(TRUNCATE)` on the device.
-- a missing `.h264` is accepted when the node's copy of that run holds a settled
-  `.mp4` (no `.tmp` sibling, untouched for ten minutes), because
+- a missing `.h264` is accepted only when the chunk list beside one of the node's
+  merged videos (`<video>.mp4.json`) names it at the size the device reports, because
   `accessories/h264_to_mp4.py --purge` deletes the node's chunks after merging them.
+  A video alone proves nothing: the nightly merge can run while a slow device's
+  chunks are still arriving. ETHOSCOPE_361's node video once held 21 of its 202
+  chunks, and the old "any settled `.mp4`" rule counted all 202 as backed up.
+
+The merge (`h264_to_mp4.py`, daily cron on the node) writes the video under a
+temporary name, then the chunk list, last. It merges only chunks that run from
+`00001` without a gap, so it never overwrites a video after its chunks were purged.
+It merges a folder again when chunks arrive that the list does not name. Without a
+`recording.info` marker it waits until no chunk has *arrived* (ctime) for six hours;
+mtime is the device's write time, which rsync preserves, so a lagging backup looks
+finished. `--purge` deletes only listed chunks of the listed size, and leaves alone
+any video merged before lists existed.
+
+The backup runs one job per device at a time: a recording crossing a weak WiFi link
+takes hours, and a new job per cycle meant several rsyncs copying the same chunks.
 
 Checksums are deliberately not used: the backup does not use them either, and hashing
 multi-gigabyte files off an SD card costs minutes per run.
