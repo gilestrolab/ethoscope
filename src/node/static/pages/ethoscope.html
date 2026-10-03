@@ -122,6 +122,17 @@
                 </span>
                 <span ng-if="device.status == 'running'" class="fas fa-camera"></span> {{device.monitor_info.fps}} FPS
                 <br>
+                <!-- Camera dropouts ridden out during the run (weak power supply):
+                     the run continues with a gap, recorded in CAMERA_EVENTS. -->
+                <span ng-if="device.monitor_info.camera.recovering" style="color: #d9534f;">
+                    <span class="fa fa-exclamation-triangle"></span>
+                    Camera dropped out, reconnecting&hellip;<br>
+                </span>
+                <span ng-if="device.monitor_info.camera.dropouts > 0 && !device.monitor_info.camera.recovering" style="color: #f0ad4e;">
+                    <span class="fa fa-exclamation-triangle"></span>
+                    The camera dropped out {{device.monitor_info.camera.dropouts}} time{{device.monitor_info.camera.dropouts > 1 ? 's' : ''}}
+                    (last on {{ethoscope.start_date_time(device.monitor_info.camera.last_dropout)}}) and recovered; check this ethoscope's power supply.<br>
+                </span>
                 <!-- Acquisition quality, sampled once a minute during tracking.
                      Every figure stays on screen - losing the numbers would lose
                      information, and they are what a user reports when asking
