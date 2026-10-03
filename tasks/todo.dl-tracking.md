@@ -360,6 +360,20 @@ allowed.
     without them (devices install editable, so nothing breaks today).
   - `is_inferred` is stored as the text '0' / '1' (BOOLEAN column through the
     writer), for every tracker.
+- [x] **Tracking survives a camera dropout (2026-10-03, b7891923..05d1bff8, on dev).**
+      ETHOSCOPE_354 and 358 lost their runs to "Camera frontend has timed out!" on
+      weak supplies. The grabber now captures with a 10 s timeout, reopens the camera
+      in the same run (back-off 2–60 s, up to 10 attempts), and drops 2 s of frames
+      while exposure settles. Each gap is written to `CAMERA_EVENTS`. A camera that
+      cannot be reopened ends the run with an error; a video that ends stops the run,
+      which fixes the "running at 0 fps" above. The node page shows the dropouts.
+      Live on ETHOSCOPE_380: a stall was injected into the real picamera2, and the
+      camera was reopened in-process with frames resuming after 5.6 s.
+- [ ] Recording sessions share the grabber but not its capture path, so a dropout
+      still ends a recording.
+- Splitting a change into several commits: pre-commit stashes unstaged source but
+  leaves intent-to-add and untracked tests in place. A later commit's tests then
+  run against the earlier source and fail. Move them aside for the earlier commit.
 
 Sketch, superseded by the plan above:
 - `trackers/cnn_tracker.py`, a BaseTracker subclass. The Monitor calls `track()` once

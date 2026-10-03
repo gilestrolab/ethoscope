@@ -29,6 +29,10 @@ while getopts "h:m:" opt; do
   esac
 done
 
-# Use rsync to sync videos and tracking results
-rsync -rav --update "${VIDEOS_DIR}"/* "${REMOTE_HOST}:${MOUNT_PATH}/videos/"
-rsync -rav --update "${RESULTS_DIR}"/* "${REMOTE_HOST}:${MOUNT_PATH}/results/"
+# Use rsync to sync videos and tracking results.
+# Hidden files are left out: the backup's rsync writes each file in transit as
+# .<name>.XXXXXX and renames it when done, so a copy taken mid-transfer is a partial
+# file that the remote side then keeps forever (this mirror never deletes). That left
+# 92 of them, 4.6 GB, in turing's mirror by 2026-10-03.
+rsync -rav --update --exclude='.*' "${VIDEOS_DIR}"/* "${REMOTE_HOST}:${MOUNT_PATH}/videos/"
+rsync -rav --update --exclude='.*' "${RESULTS_DIR}"/* "${REMOTE_HOST}:${MOUNT_PATH}/results/"

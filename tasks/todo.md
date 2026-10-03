@@ -1512,3 +1512,26 @@ streaming suite reworked to 52. Device unit suite 444 passed; node unit suite
 A CNN tracker to replace or complement AdaptiveBGModel, trained on turing from the
 snapshot archive. Plan, tasks and open questions: `tasks/todo.dl-tracking.md`.
 Status: draft, awaiting approval.
+
+# Video backup and merge (2026-10-03)
+
+Found while fetching ETHOSCOPE_361's overnight recording (202 chunks, 24 GB, WiFi only).
+
+- [x] **Free up space could delete unbacked-up video.** A missing `.h264` was accepted
+      whenever the node held any settled `.mp4`; 361's held 21 of 202 chunks. Now a
+      chunk counts only if the merged video's chunk list (`<video>.mp4.json`) names it.
+- [x] **The nightly merge ran on recordings still arriving.** Its no-marker fallback
+      used chunk mtime (device time, kept by rsync); it now uses arrival (ctime). It
+      merges only chunks contiguous from 00001, writes the video atomically and the
+      list last, re-merges when new chunks arrive, and `--purge` deletes only listed
+      chunks.
+- [x] **Several rsyncs per device at once.** A job outliving the 600 s wait was
+      "cancelled" (a no-op) and marked failed, and each cycle started another: four
+      concurrent rsyncs from 361. Now one job per device; a long job is left to run.
+- [x] **The hourly node→turing mirror copied rsync's in-transit files** (92, 4.6 GB on
+      turing). `accessories/cronie_scripts/sync` excludes hidden files.
+- [ ] The node's `/etc/cron.hourly/sync` is a hand-edited copy, not the repo script:
+      its videos line needs `--exclude='.*'` (root on the node).
+- [ ] Remove the 92 stray `.*.h264.*` files under turing's `/mnt/data/videos` (Giorgio's call).
+- [ ] 361 is on WiFi only (~0.3 MB/s): a 15 fps recording makes chunks faster than
+      they can be copied. A cable, or a lower bitrate, for long recordings.

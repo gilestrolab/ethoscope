@@ -3,17 +3,17 @@ Unit tests for ``ethoscope_node.utils.device_storage``.
 
 These cover the rule that decides whether a device run may be deleted: every file
 present on the node with the same size and mtime, with the documented exceptions for
-SQLite write-ahead logs and for h264 chunks the node has already merged into an mp4.
+SQLite write-ahead logs and for h264 chunks listed as merged into one of the node's mp4s.
 They also cover the free-space assessment the web interface consults before a run
 starts.
 """
 
+import json
 import os
 import unittest
 
 from ethoscope_node.utils.device_storage import (
     DEFAULT_PERCENT_THRESHOLD,
-    MP4_SETTLE_S,
     _parse_df_size,
     assess_free_space,
     classify_run,
@@ -47,13 +47,14 @@ def make_run(files, root="results"):
     }
 
 
-def fake_fs(files, entries=None):
+def fake_fs(files, entries=None, texts=None):
     """
-    Return ``(stat, listdir)`` backed by a dict of node paths to (size, mtime).
+    Return ``(stat, listdir, read_text)`` backed by dicts of node paths.
 
     Args:
         files (dict): Node path to ``(size, mtime)``.
         entries (dict | None): Directory path to the names it contains.
+        texts (dict | None): Node path to file contents, for ``read_text``.
     """
 
     def stat(path):
@@ -66,7 +67,12 @@ def fake_fs(files, entries=None):
             raise FileNotFoundError(path)
         return entries[path]
 
-    return stat, listdir
+    def read_text(path):
+        if texts is None or path not in texts:
+            raise FileNotFoundError(path)
+        return texts[path]
+
+    return stat, listdir, read_text
 
 
 def node_path(name, root="results"):
@@ -77,9 +83,11 @@ def node_path(name, root="results"):
 class TestClassifyRun(unittest.TestCase):
     """The backed-up decision for a single run."""
 
-    def _classify(self, run, files, entries=None):
-        stat, listdir = fake_fs(files, entries)
-        return classify_run(run, NODE_DIRS, stat=stat, listdir=listdir, now=NOW)
+    def _classify(self, run, files, entries=None, texts=None):
+        stat, listdir, read_text = fake_fs(files, entries, texts)
+        return classify_run(
+            run, NODE_DIRS, stat=stat, listdir=listdir, read_text=read_text
+        )
 
     def test_identical_file_is_backed_up(self):
         run = make_run([{"name": "a.db", "size": 300, "mtime": 1_782_143_000}])
@@ -144,38 +152,63 @@ class TestClassifyRun(unittest.TestCase):
 
         self.assertTrue(result["backed_up"])
 
-    def test_missing_h264_accepted_when_node_holds_settled_mp4(self):
-        run = make_run(
+    def _video_run(self):
+        return make_run(
             [{"name": "c_00001.h264", "size": 10, "mtime": 1_700_000_000}],
             root="videos",
         )
+
+    def _merged(self, chunks, video="c_merged.mp4", video_present=True):
+        """Node files and texts for a merged video whose list names *chunks*."""
         node_dir = os.path.join(NODE_VIDEOS, REL_DIR)
-        files = {os.path.join(node_dir, "c_merged.mp4"): (5, NOW - MP4_SETTLE_S - 1)}
-        result = self._classify(run, files, {node_dir: ["c_merged.mp4"]})
+        files = {os.path.join(node_dir, video): (5, NOW)} if video_present else {}
+        texts = {
+            os.path.join(node_dir, video + ".json"): json.dumps(
+                {"video": video, "chunks": chunks}
+            )
+        }
+        entries = {node_dir: [video, video + ".json"]}
+        return files, entries, texts
+
+    def test_missing_h264_accepted_when_the_merged_video_lists_it(self):
+        files, entries, texts = self._merged([{"name": "c_00001.h264", "size": 10}])
+        result = self._classify(self._video_run(), files, entries, texts)
 
         self.assertTrue(result["backed_up"])
 
-    def test_missing_h264_rejected_when_mp4_is_still_being_written(self):
-        run = make_run(
-            [{"name": "c_00001.h264", "size": 10, "mtime": 1_700_000_000}],
-            root="videos",
-        )
-        node_dir = os.path.join(NODE_VIDEOS, REL_DIR)
-        files = {os.path.join(node_dir, "c_merged.mp4"): (5, NOW - 10)}
-        result = self._classify(run, files, {node_dir: ["c_merged.mp4"]})
+    def test_missing_h264_rejected_when_the_video_does_not_list_it(self):
+        """ETHOSCOPE_361: a video of the first chunks while later ones were still in transit."""
+        files, entries, texts = self._merged([{"name": "c_00000.h264", "size": 10}])
+        result = self._classify(self._video_run(), files, entries, texts)
 
         self.assertFalse(result["backed_up"])
         self.assertEqual(result["missing"], ["c_00001.h264"])
 
-    def test_missing_h264_rejected_when_a_tmp_file_is_present(self):
-        run = make_run(
-            [{"name": "c_00001.h264", "size": 10, "mtime": 1_700_000_000}],
-            root="videos",
-        )
+    def test_missing_h264_rejected_when_the_video_has_no_list(self):
         node_dir = os.path.join(NODE_VIDEOS, REL_DIR)
-        files = {os.path.join(node_dir, "c_merged.mp4"): (5, NOW - MP4_SETTLE_S - 1)}
-        entries = {node_dir: ["c_merged.mp4", "c_merged.tmp"]}
-        result = self._classify(run, files, entries)
+        files = {os.path.join(node_dir, "c_merged.mp4"): (5, NOW - 86400)}
+        result = self._classify(self._video_run(), files, {node_dir: ["c_merged.mp4"]})
+
+        self.assertFalse(result["backed_up"])
+
+    def test_missing_h264_rejected_when_the_listed_size_differs(self):
+        files, entries, texts = self._merged([{"name": "c_00001.h264", "size": 9}])
+        result = self._classify(self._video_run(), files, entries, texts)
+
+        self.assertFalse(result["backed_up"])
+
+    def test_missing_h264_rejected_when_the_listed_video_is_gone(self):
+        files, entries, texts = self._merged(
+            [{"name": "c_00001.h264", "size": 10}], video_present=False
+        )
+        result = self._classify(self._video_run(), files, entries, texts)
+
+        self.assertFalse(result["backed_up"])
+
+    def test_missing_h264_rejected_when_the_list_is_unreadable(self):
+        files, entries, texts = self._merged([{"name": "c_00001.h264", "size": 10}])
+        texts = dict.fromkeys(texts, "{not json")
+        result = self._classify(self._video_run(), files, entries, texts)
 
         self.assertFalse(result["backed_up"])
 
