@@ -371,6 +371,25 @@ allowed.
       camera was reopened in-process with frames resuming after 5.6 s.
 - [ ] Recording sessions share the grabber but not its capture path, so a dropout
       still ends a recording.
+- **First production runs (2026-10-02/03).** ETHOSCOPE_354 and 356 ran DeepTubeTracker
+  overnight, 17.1 h each at 4.99 / 4.95 fps on 2 threads. Neither had a camera dropout;
+  max CPU temperature was 62 / 50 °C. The fly was found in 99–100% of frames per tube
+  (356 tube 12: 95%). 354 tube 19 is a dead fly at the dark outer end (x 501–506 px for
+  17 h). Its jitter is p95 0.73 px at night against 0.35 px for alice_012's dead flies,
+  so a 1 px cut scores it awake; the ethoscopy session's per-fly "auto" threshold
+  absorbs it (night sleep 2.5% -> 95.4%). The on-device sleep-deprivation threshold is
+  fixed, though, so jitter in dark corners is the next thing to fix
+  (`turing:/mnt/cache/claude_motion_calibration/dl_nights_2026-10-02/`).
+- **ETHOSCOPE_361 evening video** (2026-10-02 17:48–20:58, lights on, 15 fps; chunks
+  1–3 out of focus and skipped). Both trackers at 5 fps, scored against pixel truth at
+  15 fps (`/mnt/cache/dl_tracking/eval/e361/`). Fly found 99.7% vs 87.0% (tube 20:
+  100% vs 57%). At the 20-grey-level truth used for alice_012 and e044 (truth sleep
+  42.1%): still windows called moving 1.3% vs 46.2% (AdaptiveBGModel at 2 px: 6.9%);
+  per-tube sleep error 8.8 vs 33.9 points (2 px: 16.8). The noise-scaled "auto" level
+  picks 12 here, where the fly crop changes in 76% of windows but the empty control in
+  2.5%. At that level truth sleep is 22.2%, and every tracker errs by 12.5–15 points.
+  No dead fly in this video can settle the level. The night part is still crossing
+  361's WiFi.
 - Splitting a change into several commits: pre-commit stashes unstaged source but
   leaves intent-to-add and untracked tests in place. A later commit's tests then
   run against the earlier source and fail. Move them aside for the earlier commit.
