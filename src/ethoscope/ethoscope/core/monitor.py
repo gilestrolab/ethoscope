@@ -74,6 +74,10 @@ class Monitor:
         self._last_light_pct = self._LIGHT_UNSET
         self._light_client = None
 
+        # Camera dropouts already written to CAMERA_EVENTS; see _record_camera_events.
+        self._camera_dropouts_seen = 0
+        self._prev_t_with_offset = None
+
         if rois is None:
             raise NotImplementedError("rois must exist (cannot be None)")
 
@@ -435,6 +439,54 @@ class Monitor:
         Interrupts the `run` method. This is meant to be called by another thread to stop monitoring externally.
         """
         self._force_stop = True
+        # Reason: the flag is only read when a frame arrives; a camera waiting
+        # out a dropout would otherwise hold the stop for minutes.
+        interrupt = getattr(self._camera, "interrupt", None)
+        if callable(interrupt):
+            interrupt()
+
+    def camera_state(self):
+        """The camera's dropout state (see OurPiCameraAsync.camera_state), or None."""
+        state_fn = getattr(self._camera, "camera_state", None)
+        return state_fn() if callable(state_fn) else None
+
+    def _record_camera_events(self, t, result_writer, ended=False):
+        """
+        Write CAMERA_EVENTS rows for camera dropouts the camera has reported.
+
+        A frame arriving after a dropout means the camera came back, so the gap
+        lies between the previous frame and this one: 'dropout' is written at the
+        former, 'recovered' at the latter.
+
+        Args:
+            t (int): This frame's run time, ms (with the time offset).
+            result_writer: The run's writer, or None.
+            ended (bool): The camera stopped yielding frames; record if it gave up.
+        """
+        state_fn = getattr(self._camera, "camera_state", None)
+        if (
+            result_writer is None
+            or not callable(state_fn)
+            or not hasattr(result_writer, "write_camera_event")
+        ):
+            return
+        state = state_fn()
+        dropouts = state.get("dropouts", 0)
+        if dropouts > self._camera_dropouts_seen and not ended:
+            detail = f"dropout {dropouts}; power: {state.get('last_power')}"
+            result_writer.write_camera_event(
+                self._prev_t_with_offset if self._prev_t_with_offset is not None else t,
+                "dropout",
+                detail,
+            )
+            result_writer.write_camera_event(t, "recovered", detail)
+            self._camera_dropouts_seen = dropouts
+        if ended and state.get("gave_up"):
+            result_writer.write_camera_event(
+                t,
+                "gave_up",
+                f"after dropout {dropouts}; power: {state.get('last_power')}",
+            )
 
     def run(self, result_writer=None, drawer=None, verbose=False):
         """
@@ -483,6 +535,8 @@ class Monitor:
 
                 if result_writer is not None:
                     result_writer.flush(t_with_offset, frame)
+                self._record_camera_events(t_with_offset, result_writer)
+                self._prev_t_with_offset = t_with_offset
 
                 if drawer is not None:
                     drawer.draw(
@@ -527,6 +581,13 @@ class Monitor:
                 self._last_t = t
                 time.sleep(0.001)
 
+            # The camera stopped yielding frames (stop, end of video, or a camera
+            # that could not be brought back): say which in the data.
+            if self._prev_t_with_offset is not None:
+                self._record_camera_events(
+                    self._prev_t_with_offset, result_writer, ended=True
+                )
+
         except Exception as e:
             logging.error(
                 f"Monitor closing with an exception: '{traceback.format_exc()}'"
@@ -535,6 +596,8 @@ class Monitor:
 
         finally:
             self._is_running = False
-            logging.info(f"Monitor closing - processed {i} frames")
+            # Reason: not the loop variable, which is unbound when the camera
+            # fails before its first frame and would mask the real error.
+            logging.info(f"Monitor closing - processed {self._last_frame_idx} frames")
             if verbose:
-                print(f"Monitor closing - processed {i} frames")
+                print(f"Monitor closing - processed {self._last_frame_idx} frames")

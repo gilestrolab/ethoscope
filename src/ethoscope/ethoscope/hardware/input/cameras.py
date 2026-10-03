@@ -1,3 +1,4 @@
+import concurrent.futures
 import gc
 import importlib.util
 import logging
@@ -5,7 +6,6 @@ import os
 import queue
 import threading
 import time
-import traceback
 
 import cv2
 import numpy as np
@@ -679,10 +679,21 @@ class PiFrameGrabber(threading.Thread):
             logging.warning("Camera Frame grabber stopped acquisition cleanly.")
 
 
+class CameraStalled(Exception):
+    """The camera stopped delivering frames, or could not be reopened after that."""
+
+
 class PiFrameGrabber2(PiFrameGrabber):
     """
     Same as PiFrameGrabber but uses picamera2
     """
+
+    # Camera dropouts (tracking only, see _run_sessions). On a weak power supply
+    # libcamera's frontend times out and capture_array() then waits forever.
+    FRAME_TIMEOUT_S = 10  # no frame for this long (exposure <= 200 ms) = stalled
+    WARMUP_S = 2.0  # frames dropped after a reopen while auto-exposure settles
+    REOPEN_BACKOFF_S = (2, 5, 10, 20, 30, 60)  # waits before successive reopens
+    MAX_REOPEN_ATTEMPTS = 10  # consecutive reopens without a frame (~7 min)
 
     # Upper bound on the auto-exposure integration time when the exposure ceiling
     # is decoupled from the tracking frame rate (issue #222). 200 ms == 1/5 s,
@@ -711,6 +722,15 @@ class PiFrameGrabber2(PiFrameGrabber):
         self.no_camera_detected = False
         # Throttles the live gain poll in the capture loop.
         self._last_gain_poll = 0.0
+        # Camera dropouts, read by the parent (OurPiCameraAsync.camera_state).
+        self.dropouts = 0
+        self.recovering = False
+        self.last_dropout = None  # unix time
+        self.last_recovered = None
+        self.last_power = None  # power state when the last dropout happened
+        self.gave_up = False
+        self._session_frames = 0
+        self._stalled = False
         super().__init__(*args, **kwargs)
 
     # How often the gain setting file is re-read, in seconds. A stat() at this
@@ -961,6 +981,106 @@ class PiFrameGrabber2(PiFrameGrabber):
         else:
             logging.info(f"Using NoIR tuning file: {self._tuning_file}")
 
+        self._run_sessions()
+
+    def _run_sessions(self):
+        """
+        Capture until stopped, reopening the camera after it stalls (tracking).
+
+        Reason: on a weak power supply the camera's frontend times out, after
+        which capture_array() never returns and the run used to end 30 s later.
+        A stall now closes this Picamera2 and opens a new one, so the run goes on
+        with a gap. Recording keeps a single session (its loop does not stall-check).
+        """
+        attempt = 0  # consecutive reopens that have not yet produced a frame
+        while True:
+            try:
+                self._session(reopening=attempt > 0)
+                return
+            except CameraStalled as e:
+                if self._session_frames:
+                    # A working camera stalled: a new dropout.
+                    self.dropouts += 1
+                    self.last_dropout = time.time()
+                    self.last_power = self._power_state()
+                    self.recovering = True
+                    attempt = 1
+                    logging.error(
+                        f"Camera dropout {self.dropouts} ({e}); power: "
+                        f"{self.last_power}. Reopening the camera."
+                    )
+                else:
+                    attempt += 1
+                    logging.error(f"Camera reopen {attempt - 1} failed: {e}")
+            if attempt > self.MAX_REOPEN_ATTEMPTS:
+                logging.error(
+                    f"Giving up on the camera after {self.MAX_REOPEN_ATTEMPTS} "
+                    "failed reopens"
+                )
+                self.gave_up = True
+                self.recovering = False
+                self._queue.put(None)  # ends the parent's iteration
+                return
+            backoff = self.REOPEN_BACKOFF_S[
+                min(attempt - 1, len(self.REOPEN_BACKOFF_S) - 1)
+            ]
+            if self._wait_or_stop(backoff):
+                return
+
+    def _wait_or_stop(self, seconds):
+        """
+        Sleep in 1-s steps, returning early (True) if a stop was requested.
+
+        Args:
+            seconds (float): How long to wait.
+
+        Returns:
+            bool: True if the grabber was asked to stop.
+        """
+        deadline = time.time() + seconds
+        while time.time() < deadline:
+            if not self._stop_queue.empty():
+                self._stop_queue.get()
+                self._stop_queue.task_done()
+                return True
+            time.sleep(min(1.0, max(0.0, deadline - time.time())))
+        return False
+
+    @staticmethod
+    def _power_state():
+        """'under-voltage', 'ok' or 'unknown', for the dropout log."""
+        try:
+            under = pi.underPowered()
+        except Exception:
+            return "unknown"
+        return {True: "under-voltage", False: "ok"}.get(under, "unknown")
+
+    def _capture_frame(self, capture):
+        """
+        Capture one frame, raising CameraStalled if none comes in time.
+
+        Args:
+            capture: The running Picamera2.
+
+        Returns:
+            np.ndarray: The YUV420 frame.
+        """
+        job = capture.capture_array("main", wait=False)
+        try:
+            return capture.wait(job, timeout=self.FRAME_TIMEOUT_S)
+        except (TimeoutError, concurrent.futures.TimeoutError) as e:
+            self._stalled = True
+            raise CameraStalled(f"no frame for {self.FRAME_TIMEOUT_S} s") from e
+
+    def _session(self, reopening=False):
+        """
+        One camera session: open, configure, capture until stopped or stalled.
+
+        Args:
+            reopening (bool): True when this reopens the camera after a dropout.
+        """
+        self._session_frames = 0
+        self._stalled = False
         try:
             # tuning=None is exactly Picamera2(), so the degraded case needs no
             # branch of its own. The environment variable set by
@@ -1095,11 +1215,22 @@ class PiFrameGrabber2(PiFrameGrabber):
                         else 0.0
                     )
                     last_emit = time.time()
+                    # After a reopen, auto-exposure starts over: drop its first frames.
+                    warm_until = time.time() + self.WARMUP_S if reopening else 0.0
 
                     while self._stop_queue.empty():
                         self._apply_live_gain(capture)
 
-                        frame = capture.capture_array("main")
+                        frame = self._capture_frame(capture)
+                        if time.time() < warm_until:
+                            continue
+                        if self.recovering:
+                            self.recovering = False
+                            self.last_recovered = time.time()
+                            logging.warning(
+                                f"Camera back after dropout {self.dropouts}"
+                            )
+                        self._session_frames += 1
 
                         # As for picamera, we take arrays in YUV420 format and then get only the Y channel. The slicing, however, is different.
                         # from the picamera2 manual, pg 37 https://datasheets.raspberrypi.com/camera/picamera2-manual.pdf
@@ -1122,7 +1253,14 @@ class PiFrameGrabber2(PiFrameGrabber):
                     self._stop_queue.task_done()
                     capture.stop()
 
+        except CameraStalled:
+            raise
         except Exception as e:
+            if reopening or self._stalled:
+                # Reason: a reopen that fails (camera still busy, sensor not back
+                # yet), or a close that fails after a stall, is one more attempt
+                # for _run_sessions, not the end of the run.
+                raise CameraStalled(f"camera unavailable: {e}") from e
             # Check if this is a camera hardware issue or PiCamera2 compatibility issue
             error_msg = str(e).lower()
             logging.error(f"PiFrameGrabber2 exception: {e}")
@@ -1175,6 +1313,9 @@ class PiFrameGrabber2(PiFrameGrabber):
 
 
 class OurPiCameraAsync(BaseCamera):
+    FRAME_WAIT_S = 30  # no frame for this long, outside a recovery, ends the run
+    MAX_RECOVERY_WAIT_S = 15 * 60  # cap on waiting for a grabber that is reopening
+
     _description = {
         "overview": "Default class to acquire frames from the raspberry pi camera asynchronously.",
         "arguments": [],
@@ -1269,6 +1410,8 @@ class OurPiCameraAsync(BaseCamera):
 
         self._queue = queue.Queue(maxsize=1)
         self._stop_queue = queue.Queue(maxsize=1)
+        # Set by interrupt() (Monitor.stop) so a stop works even while waiting.
+        self._interrupted = threading.Event()
 
         # Retry initialization with fallback mechanisms
         while self._initialization_attempts < self._max_initialization_attempts:
@@ -1437,25 +1580,27 @@ class OurPiCameraAsync(BaseCamera):
                                  Only use for actual hardware failures, not normal operation.
         """
         try:
-            # Signal the frame grabber to stop
-            self._stop_queue.put(None)
+            # Signal the frame grabber to stop. Reason: put_nowait, as a second
+            # call would otherwise block forever on the full (maxsize 1) queue.
+            try:
+                self._stop_queue.put_nowait(None)
+            except queue.Full:
+                pass  # a stop is already pending
 
             # Empty the frames queue to prevent blocking
             while not self._queue.empty():
                 self._queue.get()
 
-            # Wait for the process to finish with timeout
+            # Wait for the thread to finish with timeout. A thread cannot be
+            # terminated; one stuck in the camera is a daemon and dies with us.
             self._p.join(5)
-            logging.warning("Framegrabber thread joined")
+            if self._p.is_alive():
+                logging.error("Frame grabber thread did not stop within 5 s")
+            else:
+                logging.warning("Framegrabber thread joined")
 
         except Exception as cleanup_e:
             logging.error(f"Error during frame grabber cleanup: {cleanup_e}")
-            # Force terminate if join fails
-            if self._p.is_alive():
-                self._p.terminate()
-                self._p.join(1)
-                if self._p.is_alive():
-                    logging.error("Could not terminate frame grabber process")
 
         finally:
             # Additional cleanup for Picamera2 global state - only on actual failures
@@ -1505,16 +1650,65 @@ class OurPiCameraAsync(BaseCamera):
         logging.info("Requesting grabbing process to stop!")
         self._cleanup_frame_grabber()  # Normal shutdown - use gentle cleanup
 
+    def interrupt(self):
+        """Stop waiting for frames: the next ``_next_image`` returns None."""
+        self._interrupted.set()
+
+    def camera_state(self):
+        """
+        Report camera dropouts, for the device info and the CAMERA_EVENTS table.
+
+        Returns:
+            dict: dropouts, recovering, last_dropout, last_recovered (unix times),
+            last_power and gave_up.
+        """
+        grabber = self._p
+        return {
+            "dropouts": getattr(grabber, "dropouts", 0),
+            "recovering": getattr(grabber, "recovering", False),
+            "last_dropout": getattr(grabber, "last_dropout", None),
+            "last_recovered": getattr(grabber, "last_recovered", None),
+            "last_power": getattr(grabber, "last_power", None),
+            "gave_up": getattr(grabber, "gave_up", False),
+        }
+
+    def _next_time_image(self):
+        # Reason: stamp the frame once it has arrived. The base class stamps
+        # before the blocking get, so the first frame after a camera dropout
+        # carried the time from before the stall.
+        im = self._next_image()
+        t = self._time_stamp()
+        self._frame_idx += 1
+        return t, im
+
     def _next_image(self):
+        """
+        Wait for the next frame, through a camera dropout if the grabber is reopening.
+
+        Returns:
+            np.ndarray | None: The frame, or None when interrupted or when the
+            grabber gave up (which ends the iteration).
+
+        Raises:
+            EthoscopeException: No frame for FRAME_WAIT_S outside a recovery, or
+            for MAX_RECOVERY_WAIT_S during one.
+        """
         self.fps = self._frame_idx / (time.time() - self._start_time)
-
-        try:
-            return self._queue.get(timeout=30)
-
-        except Exception as e:
-            raise EthoscopeException(
-                "Could not get frame from camera\n%s", traceback.format_exc()
-            ) from e
+        waited = 0
+        while True:
+            if self._interrupted.is_set():
+                return None
+            try:
+                return self._queue.get(timeout=1)
+            except queue.Empty:
+                waited += 1
+            recovering = getattr(self._p, "recovering", False)
+            limit = self.MAX_RECOVERY_WAIT_S if recovering else self.FRAME_WAIT_S
+            if waited >= limit:
+                raise EthoscopeException(
+                    f"Could not get frame from camera: none for {waited} s"
+                    + (" while it was being reopened" if recovering else "")
+                )
 
 
 if __name__ == "__main__":

@@ -948,18 +948,46 @@ class BaseResultWriter:
                 float(light_pct) if light_pct is not None else None,
                 str(mode) if mode is not None else None,
             )
-
-            placeholder = "?" if self._database_type == "SQLite3" else "%s"
-            placeholders = ", ".join([placeholder] * len(values))
-            command = (
-                f"INSERT INTO {self.LIGHT_EVENTS_TABLE_NAME} "
-                f"({', '.join(self.LIGHT_EVENTS_INSERT_FIELDS)}) "
-                f"VALUES ({placeholders})"
+            self._insert_event(
+                self.LIGHT_EVENTS_TABLE_NAME, self.LIGHT_EVENTS_INSERT_FIELDS, values
             )
-            self._write_async_command(command, values)
 
         except Exception as e:
             logging.warning(f"Could not record a light event: {e}")
+
+    def _insert_event(self, table, fields, values):
+        """Queue one INSERT of ``values`` into ``fields`` of an event table."""
+        placeholder = "?" if self._database_type == "SQLite3" else "%s"
+        placeholders = ", ".join([placeholder] * len(values))
+        command = f"INSERT INTO {table} ({', '.join(fields)}) VALUES ({placeholders})"
+        self._write_async_command(command, values)
+
+    # Camera dropouts during a run, so the gap they leave in the ROI tables is
+    # explained rather than mistaken for missing flies. A table of its own, like
+    # LIGHT_EVENTS, so it appears cleanly on a resumed run.
+    CAMERA_EVENTS_TABLE_NAME = "CAMERA_EVENTS"
+    CAMERA_EVENTS_FIELDS = "t INTEGER, event TEXT, detail TEXT"
+    CAMERA_EVENTS_INSERT_FIELDS = ("t", "event", "detail")
+
+    def write_camera_event(self, t, event, detail=None):
+        """
+        Record a camera dropout, a recovery from one, or the camera giving up.
+
+        Never raises: the event log must not be able to interrupt an experiment.
+
+        Args:
+            t (int): Run time of the event, in milliseconds (the ROI tables' clock).
+            event (str): 'dropout' (last frame before the gap), 'recovered' (first
+                frame after it) or 'gave_up'.
+            detail (str, optional): Free text, e.g. the power state.
+        """
+        try:
+            values = (int(t), str(event), str(detail) if detail is not None else None)
+            self._insert_event(
+                self.CAMERA_EVENTS_TABLE_NAME, self.CAMERA_EVENTS_INSERT_FIELDS, values
+            )
+        except Exception as e:
+            logging.warning(f"Could not record a camera event: {e}")
 
     def write_diagnostics(self, t, sample, fps=None):
         """

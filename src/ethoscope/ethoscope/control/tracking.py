@@ -978,6 +978,8 @@ class ControlThread(Thread):
                 # interval. Rides along with the existing payload so the node
                 # needs no new endpoint to display it (issue #222).
                 "diagnostics": self._monit.diagnostics,
+                # Camera dropouts ridden out during this run, for the node page.
+                "camera": self._monit.camera_state(),
             }
 
         if self._drawer:
@@ -1747,6 +1749,7 @@ class ControlThread(Thread):
                     stimulator_kwargs,
                     time_offset=time_offset,
                 )
+            self._end_if_camera_ended(cam)
 
         except EthoscopeException as e:
             if e.img is not None:
@@ -1807,6 +1810,34 @@ class ControlThread(Thread):
             except Exception:
                 logging.warning("Could not close hardware connection properly")
                 pass
+
+    def _end_if_camera_ended(self, cam):
+        """
+        Stop the run when the Monitor returned without being asked to.
+
+        Reason: the Monitor also returns when the camera stops yielding frames.
+        The status then stayed "running" with nothing behind it: after a camera
+        that could not be brought back from a dropout, or at the end of a video.
+
+        Args:
+            cam: The run's camera.
+        """
+        if self._info.get("status") != "running":
+            return  # a stop was requested, and is under way
+        if isinstance(cam, MovieVirtualCamera):
+            logging.info("The video has ended")
+            self.stop()
+            return
+        state_fn = getattr(cam, "camera_state", None)
+        state = state_fn() if callable(state_fn) else {}
+        if state.get("gave_up"):
+            self.stop(
+                "The camera stopped delivering frames and could not be reopened "
+                f"(dropout {state.get('dropouts')}, power: {state.get('last_power')}). "
+                "Check this ethoscope's power supply and camera cable."
+            )
+        else:
+            self.stop("The camera stopped delivering frames.")
 
     def _write_light_schedule(self):
         """Write light schedule config file for the light daemon.
