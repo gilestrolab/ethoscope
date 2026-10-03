@@ -1,9 +1,11 @@
 import concurrent.futures
 import gc
 import importlib.util
+import json
 import logging
 import os
 import queue
+import tempfile
 import threading
 import time
 
@@ -707,6 +709,29 @@ class PiFrameGrabber2(PiFrameGrabber):
     # bright light. Frames in excess of the tracking cap are dropped in software.
     _MIN_FRAME_DURATION_US = 33333
 
+    # Tracking orders auto-exposure exposure-first: lengthen the exposure up to
+    # the frame period first, raise gain only after that, and lower gain first
+    # when the light rises. Gain is adaptive and only comes in when needed.
+    # Reason: with the gain pinned (the policy from the move to picamera2 until
+    # 2026-10), auto-exposure could only shorten the exposure to hold brightness,
+    # and the shorter the exposure the noisier the frame. Measured on
+    # ETHOSCOPE_380 (imx219, IR backlight only, the dark phase), median temporal
+    # noise and SNR of a still scene:
+    #
+    #   gain pinned at 5.0              52 ms   noise 1.57   SNR  68
+    #   gain pinned at 3.0 (default)    85 ms   noise 1.28   SNR  82
+    #   exposure first, 120 ms ceiling 120 ms   gain 2.1     SNR  93
+    #   exposure first, 200 ms ceiling 200 ms   gain 1.24    SNR 114
+    #
+    # Gain was pinned so AdaptiveBGModel's background would not see it jump;
+    # exposure-first keeps it at 1.0 until the exposure is at its ceiling, and
+    # libcamera moves it as smoothly as the exposure. On ETHOSCOPE_354 (ov5647,
+    # whose default gain already reached the 120 ms ceiling at night) the same
+    # change took SNR from 84-88 to 104 (200 ms at gain 1.75). The table replaces
+    # the "long" exposure mode in a derived copy of the tuning file
+    # (_exposure_first_tuning), which only tracking loads.
+    _EXPOSURE_FIRST_MODE = "long"
+
     def __init__(self, *args, **kwargs):
         """
         Initialize PiFrameGrabber2 with configurable gain from system settings.
@@ -716,6 +741,9 @@ class PiFrameGrabber2(PiFrameGrabber):
         # Set in run(), i.e. in the child process: the tuning file actually
         # loaded, or None if the camera fell back to the default tuning.
         self._tuning_file = None
+        # Set in run(): True when auto-exposure runs exposure-first (tracking
+        # with a derived tuning file), False when the gain is pinned.
+        self._exposure_first = False
         # Set in run() when libcamera reports no attached camera at all. The
         # grabber is a thread, so the parent reads it directly to tell "nothing
         # is plugged in" from "the camera stalled".
@@ -731,12 +759,46 @@ class PiFrameGrabber2(PiFrameGrabber):
         self.gave_up = False
         self._session_frames = 0
         self._stalled = False
+        # The camera's own exposure and gain, sampled once a minute
+        # (_sample_exposure) for the CAMERA_EXPOSURE table; None until then.
+        self.exposure = None
+        self._last_exposure_sample = 0.0
         super().__init__(*args, **kwargs)
 
     # How often the gain setting file is re-read, in seconds. A stat() at this
     # rate is free next to frame capture, and a gain change lands within a
     # second rather than at the next restart.
     _GAIN_POLL_INTERVAL = 1.0
+
+    # How often the camera's exposure and gain are read back (seconds).
+    _EXPOSURE_SAMPLE_INTERVAL = 60.0
+
+    def _sample_exposure(self, capture):
+        """
+        Read back the exposure and gain auto-exposure chose, once a minute.
+
+        With gain adaptive, what the camera actually ran at is no longer the
+        gain setting; without these values a run's noise cannot be explained
+        afterwards. Reading the metadata takes one frame from the stream, so it
+        happens once per _EXPOSURE_SAMPLE_INTERVAL. Never raises.
+
+        Args:
+            capture: The live Picamera2 instance.
+        """
+        now = time.time()
+        if now - self._last_exposure_sample < self._EXPOSURE_SAMPLE_INTERVAL:
+            return
+        self._last_exposure_sample = now
+        try:
+            job = capture.capture_metadata(wait=False)
+            metadata = capture.wait(job, timeout=self.FRAME_TIMEOUT_S)
+            self.exposure = {
+                "exposure_us": metadata.get("ExposureTime"),
+                "analogue_gain": metadata.get("AnalogueGain"),
+                "digital_gain": metadata.get("DigitalGain"),
+            }
+        except Exception as e:
+            logging.debug(f"Could not read back exposure and gain: {e}")
 
     def _apply_live_gain(self, capture):
         """
@@ -755,6 +817,8 @@ class PiFrameGrabber2(PiFrameGrabber):
         Args:
             capture: The live Picamera2 instance.
         """
+        if self._exposure_first:
+            return  # gain belongs to auto-exposure; setting it would pin it
         now = time.time()
         if now - self._last_gain_poll < self._GAIN_POLL_INTERVAL:
             return
@@ -787,6 +851,22 @@ class PiFrameGrabber2(PiFrameGrabber):
         Returns:
             dict: libcamera controls passed to ``create_video_configuration``.
         """
+        if self._exposure_first:
+            # Exposure and gain both automatic, ordered by the derived tuning's
+            # custom exposure mode; the frame duration may stretch to the
+            # ceiling, which is the frame period of the tracking cap.
+            controls = {
+                "ExposureTime": 0,
+                "AwbEnable": False,
+                "FrameDurationLimits": (
+                    self._MIN_FRAME_DURATION_US,
+                    self._exposure_ceiling_us(),
+                ),
+            }
+            if libcamera_controls is not None:
+                controls["AeExposureMode"] = libcamera_controls.AeExposureModeEnum.Long
+            return controls
+
         controls = {
             "ExposureTime": 0,  # 0 = auto-exposure (libcamera 0.5.0 compatible)
             "AnalogueGain": self._gain,  # Fixed gain to avoid tracking artifacts
@@ -819,9 +899,10 @@ class PiFrameGrabber2(PiFrameGrabber):
             # also tried and reached only SNR 46.7, so the forked file is not
             # worth its maintenance.
             #
-            # This also partly restores the legacy stack: on the firmware camera
-            # the exposure ceiling was the frame period, so a Pi 3 at 5 fps could
-            # integrate for 200 ms. Moving to libcamera cut that to 66.7 ms.
+            # (An earlier version of this comment said the legacy firmware camera
+            # integrated for up to 200 ms at 5 fps. It did not: the legacy
+            # OurPiCameraAsync ran the sensor at target_fps=20, so exposure topped
+            # out at 50 ms with auto gain, and tracking took the latest frame.)
             controls["AeExposureMode"] = libcamera_controls.AeExposureModeEnum.Long
 
         if self._exposure_decoupled and not self._record_video:
@@ -838,6 +919,76 @@ class PiFrameGrabber2(PiFrameGrabber):
             controls["FrameRate"] = self._target_fps
 
         return controls
+
+    def _exposure_ceiling_us(self):
+        """
+        Return the longest exposure tracking allows: one frame period of the cap.
+
+        Returns:
+            int: Microseconds, between ``_MIN_FRAME_DURATION_US`` and
+            ``_MAX_EXPOSURE_US`` (200 ms, the 5 fps frame period).
+        """
+        if not self._target_fps:
+            return self._MAX_EXPOSURE_US
+        period = int(1e6 / self._target_fps)
+        return max(self._MIN_FRAME_DURATION_US, min(self._MAX_EXPOSURE_US, period))
+
+    def _exposure_first_tuning(self, base_path):
+        """
+        Write a copy of a tuning file whose "long" exposure mode puts exposure first.
+
+        The mode lengthens the exposure to the ceiling at gain 1.0, then raises
+        the gain up to the highest the sensor's own tables use. The copy goes to
+        a fixed path that is never removed: libcamera reads the tuning when a
+        camera manager registers the sensor, which happens again for every
+        acquisition in the process (see _select_tuning_file).
+
+        Args:
+            base_path (str): The sensor's NoIR tuning file.
+
+        Returns:
+            str: Path of the derived tuning file.
+
+        Raises:
+            ValueError: The file holds no Raspberry Pi AGC exposure modes.
+        """
+        with open(base_path) as f:
+            tuning = json.load(f)
+        ceiling = self._exposure_ceiling_us()
+        changed = 0
+        for algorithm in tuning.get("algorithms", []):
+            agc = algorithm.get("rpi.agc")
+            if not isinstance(agc, dict):
+                continue
+            for channel in agc.get("channels", [agc]):
+                modes = channel.get("exposure_modes")
+                if not modes:
+                    continue
+                # Reason: libcamera renamed the table's "shutter" to "exposure".
+                key = (
+                    "shutter" if "shutter" in next(iter(modes.values())) else "exposure"
+                )
+                top_gain = max(g for mode in modes.values() for g in mode["gain"])
+                modes[self._EXPOSURE_FIRST_MODE] = {
+                    key: [100, ceiling // 2, ceiling, ceiling],
+                    "gain": [1.0, 1.0, 1.0, float(top_gain)],
+                }
+                changed += 1
+        if not changed:
+            raise ValueError(f"no rpi.agc exposure modes in {base_path}")
+
+        directory = pi.RUNTIME_DIR
+        if not os.access(directory, os.W_OK):
+            directory = tempfile.gettempdir()
+        stem = os.path.splitext(os.path.basename(base_path))[0]
+        path = os.path.join(
+            directory, f"{stem}_exposure_first_{ceiling // 1000}ms.json"
+        )
+        tmp = f"{path}.{os.getpid()}.tmp"
+        with open(tmp, "w") as f:
+            json.dump(tuning, f, indent=1)
+        os.replace(tmp, path)
+        return path
 
     def _select_tuning_file(self):
         """
@@ -901,6 +1052,19 @@ class PiFrameGrabber2(PiFrameGrabber):
             diagnostic = (
                 f"No NoIR tuning file could be resolved for this camera. {degraded}"
             )
+
+        # Tracking runs auto-exposure exposure-first, from a derived copy of the
+        # tuning; video keeps the pinned gain and the exact frame rate.
+        self._exposure_first = False
+        if tuning_path and self._exposure_decoupled and not self._record_video:
+            try:
+                tuning_path = self._exposure_first_tuning(tuning_path)
+                self._exposure_first = True
+            except Exception as e:
+                logging.warning(
+                    f"Could not derive the exposure-first tuning from {tuning_path}: "
+                    f"{e}. Tracking with the gain pinned at {self._gain} instead."
+                )
 
         if tuning_path:
             os.environ["LIBCAMERA_RPI_TUNING_FILE"] = tuning_path
@@ -980,6 +1144,11 @@ class PiFrameGrabber2(PiFrameGrabber):
             logging.error(tuning_problem)
         else:
             logging.info(f"Using NoIR tuning file: {self._tuning_file}")
+        if self._exposure_first:
+            logging.info(
+                "Exposure-first auto-exposure: up to "
+                f"{self._exposure_ceiling_us() // 1000} ms before any gain"
+            )
 
         self._run_sessions()
 
@@ -1140,7 +1309,12 @@ class PiFrameGrabber2(PiFrameGrabber):
                 logging.info("Camera configured successfully")
 
                 # Explicitly configure exposure/gain after configuration (libcamera 0.5.0 compatible)
-                capture.set_controls({"ExposureTime": 0, "AnalogueGain": self._gain})
+                if self._exposure_first:
+                    capture.set_controls({"ExposureTime": 0})
+                else:
+                    capture.set_controls(
+                        {"ExposureTime": 0, "AnalogueGain": self._gain}
+                    )
 
                 # Log auto-exposure status for debugging
                 try:
@@ -1220,6 +1394,7 @@ class PiFrameGrabber2(PiFrameGrabber):
 
                     while self._stop_queue.empty():
                         self._apply_live_gain(capture)
+                        self._sample_exposure(capture)
 
                         frame = self._capture_frame(capture)
                         if time.time() < warm_until:
@@ -1671,6 +1846,17 @@ class OurPiCameraAsync(BaseCamera):
             "last_power": getattr(grabber, "last_power", None),
             "gave_up": getattr(grabber, "gave_up", False),
         }
+
+    def exposure_state(self):
+        """
+        Report the exposure and gain the camera last ran at.
+
+        Returns:
+            dict | None: exposure_us, analogue_gain and digital_gain, or None
+            before the first sample.
+        """
+        exposure = getattr(self._p, "exposure", None)
+        return dict(exposure) if exposure else None
 
     def _next_time_image(self):
         # Reason: stamp the frame once it has arrived. The base class stamps

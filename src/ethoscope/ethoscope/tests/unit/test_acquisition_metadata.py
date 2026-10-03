@@ -26,6 +26,7 @@ EXPECTED_FIELDS = {
     "target_fps",
     "gain_setting",
     "exposure_decoupled",
+    "exposure_policy",
     "camera_tuning_expected",
     "camera_tuning_loaded",
     "camera_sensor",
@@ -96,6 +97,7 @@ def test_reads_the_regime_from_the_frame_grabber():
     class _Grabber:
         _target_fps = 5.0
         _exposure_decoupled = True
+        _exposure_first = True
 
     class _PiCam:
         width = 1280
@@ -106,6 +108,21 @@ def test_reads_the_regime_from_the_frame_grabber():
 
     assert metadata["target_fps"] == "5.0"
     assert metadata["exposure_decoupled"] == "True"
+    assert metadata["exposure_policy"] == "exposure_first"
+
+
+def test_a_pinned_gain_is_named_as_such():
+    """A grabber that fell back to the pinned gain says so in the database."""
+
+    class _Grabber:
+        _exposure_first = False
+
+    class _PiCam:
+        _p = _Grabber()
+
+    metadata = ControlThread._acquisition_metadata(_PiCam(), _FakeTracker)
+
+    assert metadata["exposure_policy"] == "pinned_gain"
 
 
 def test_a_failing_probe_does_not_break_the_experiment():
@@ -135,6 +152,7 @@ def test_camera_without_the_expected_attributes_is_tolerated():
 
     assert metadata["target_fps"] is None
     assert metadata["exposure_decoupled"] is None
+    assert metadata["exposure_policy"] is None
     assert metadata["tracker_class"] is None
 
 

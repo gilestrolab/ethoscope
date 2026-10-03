@@ -969,6 +969,20 @@ class BaseResultWriter:
     CAMERA_EVENTS_FIELDS = "t INTEGER, event TEXT, detail TEXT"
     CAMERA_EVENTS_INSERT_FIELDS = ("t", "event", "detail")
 
+    # The exposure and gain auto-exposure ran at, once a minute alongside
+    # DIAGNOSTICS. A table of its own for the same reason as LIGHT_EVENTS: it
+    # appears cleanly on a resumed run, where new DIAGNOSTICS columns would not.
+    CAMERA_EXPOSURE_TABLE_NAME = "CAMERA_EXPOSURE"
+    CAMERA_EXPOSURE_FIELDS = (
+        "t INTEGER, exposure_us INTEGER, analogue_gain REAL, digital_gain REAL"
+    )
+    CAMERA_EXPOSURE_INSERT_FIELDS = (
+        "t",
+        "exposure_us",
+        "analogue_gain",
+        "digital_gain",
+    )
+
     def write_camera_event(self, t, event, detail=None):
         """
         Record a camera dropout, a recovery from one, or the camera giving up.
@@ -1028,6 +1042,20 @@ class BaseResultWriter:
                 f"VALUES ({placeholders})"
             )
             self._write_async_command(command, values)
+
+            if sample.get("exposure_us") is not None:
+                gain = sample.get("analogue_gain")
+                digital = sample.get("digital_gain")
+                self._insert_event(
+                    self.CAMERA_EXPOSURE_TABLE_NAME,
+                    self.CAMERA_EXPOSURE_INSERT_FIELDS,
+                    (
+                        t,
+                        int(sample["exposure_us"]),
+                        float(gain) if gain is not None else None,
+                        float(digital) if digital is not None else None,
+                    ),
+                )
 
         except Exception as e:
             logging.warning(f"Could not record a diagnostics sample: {e}")

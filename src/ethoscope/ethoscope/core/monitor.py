@@ -284,6 +284,13 @@ class Monitor:
             self._diagnostics["light_pct"] = light_pct
             self._diagnostics["light_mode"] = light_mode
 
+            # What auto-exposure actually ran at: with gain adaptive, the gain
+            # setting no longer says. Written to CAMERA_EXPOSURE by the writer.
+            exposure_fn = getattr(self._camera, "exposure_state", None)
+            exposure = exposure_fn() if callable(exposure_fn) else None
+            if exposure:
+                self._diagnostics.update(exposure)
+
         except Exception:
             logging.warning(
                 f"Could not collect tracking diagnostics: {traceback.format_exc()}"

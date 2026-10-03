@@ -409,6 +409,10 @@ class MySQLResultWriter(BaseResultWriter):
             self._create_table(self.LIGHT_EVENTS_TABLE_NAME, self.LIGHT_EVENTS_FIELDS)
             logging.info("Creating camera dropouts table 'CAMERA_EVENTS'")
             self._create_table(self.CAMERA_EVENTS_TABLE_NAME, self.CAMERA_EVENTS_FIELDS)
+            logging.info("Creating exposure and gain table 'CAMERA_EXPOSURE'")
+            self._create_table(
+                self.CAMERA_EXPOSURE_TABLE_NAME, self.CAMERA_EXPOSURE_FIELDS
+            )
             logging.info("Creating 'START_EVENTS' table")
             self._create_table(
                 "START_EVENTS",
