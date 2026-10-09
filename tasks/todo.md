@@ -1552,6 +1552,18 @@ Found while fetching ETHOSCOPE_361's overnight recording (202 chunks, 24 GB, WiF
 - [ ] 361 is on WiFi only (~0.3 MB/s): a 15 fps recording makes chunks faster than
       they can be copied. A cable, or a lower bitrate, for long recordings.
 
+# A start sent right after an autostop is refused silently (2026-10-06)
+
+- [ ] The device reports `stopped` while the finished run is still tearing down (camera
+      cleanup about 30 s later).
+      - The listener refuses the start with "ERROR: this ethoscope is already busy
+        (stopped)".
+      - The node's start response shows `stopped` with no error, so the web UI gives no
+        sign the run did not begin.
+      - Seen on ETHOSCOPE_356 and 352, 2026-10-06 13:34 UTC.
+      - Fix: either report a teardown state until the thread has joined, or have the node
+        surface the device's refusal.
+
 # Home page: when each device was last backed up, and when the next sweep runs (2026-10-09)
 
 The "Time since backup" column shows two icons and a size, never a time. Cause, from the
