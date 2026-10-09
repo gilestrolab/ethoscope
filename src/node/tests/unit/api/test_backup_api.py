@@ -422,7 +422,6 @@ class TestBackupAPI(unittest.TestCase):
                 "mysql": {
                     "available": True,
                     "total_size_bytes": 1024,
-                    "last_backup": 1000,
                     "database_count": 1,
                     "directory": "/backups/mysql",
                     "message": "OK",
@@ -430,14 +429,12 @@ class TestBackupAPI(unittest.TestCase):
                 "sqlite": {
                     "available": True,
                     "total_size_bytes": 2048,
-                    "last_backup": 1000,
                     "database_count": 2,
                     "directory": "/backups/sqlite",
                 },
                 "video": {
                     "available": True,
                     "total_size_bytes": 4096,
-                    "last_backup": 1000,
                     "file_count": 5,
                     "directory": "/backups/video",
                     "size_human": "4.0 KB",
@@ -445,7 +442,17 @@ class TestBackupAPI(unittest.TestCase):
             }
         }
 
-        result = self.api._get_devices_backup_summary()
+        # When a device was last backed up comes from the daemon that backed it up
+        mysql_devices = {
+            "ETHOSCOPE_001": {
+                "started": 990,
+                "ended": 1000,
+                "last_success": 1000,
+                "progress": {"status": "completed"},
+            }
+        }
+
+        result = self.api._get_devices_backup_summary(mysql_devices=mysql_devices)
 
         # Verify both devices are in result
         self.assertIn("ETHOSCOPE_001", result)
@@ -487,7 +494,6 @@ class TestBackupAPI(unittest.TestCase):
                 "mysql": {
                     "available": True,
                     "total_size_bytes": 1024,
-                    "last_backup": 1000,
                     "database_count": 1,
                     "directory": "/backups/mysql",
                     "message": "OK",
@@ -502,7 +508,6 @@ class TestBackupAPI(unittest.TestCase):
                 "video": {
                     "available": True,
                     "total_size_bytes": 4096,
-                    "last_backup": 1000,
                     "file_count": 5,
                     "directory": "/backups/video",
                     "size_human": "4.0 KB",

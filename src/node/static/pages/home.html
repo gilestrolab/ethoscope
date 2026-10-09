@@ -171,10 +171,12 @@
                 <span ng-show="sortType == 'time' && sortReverse" class="fa fa-caret-up"></span>
         </th>
         <th>
-            <a href="#" ng-click="sortType = 'time_since_backup'; sortReverse = !sortReverse">
+            <a href="#" ng-click="sortType = 'last_backup'; sortReverse = !sortReverse">
                 Time since backup
-                <span ng-show="sortType == 'time_since_backup' && !sortReverse" class="fa fa-caret-down"></span>
-                <span ng-show="sortType == 'time_since_backup' && sortReverse" class="fa fa-caret-up"></span>
+                <span ng-show="sortType == 'last_backup' && !sortReverse" class="fa fa-caret-down"></span>
+                <span ng-show="sortType == 'last_backup' && sortReverse" class="fa fa-caret-up"></span>
+            </a>
+            <div class="backup-cycle" ng-if="getBackupCycleText()" title="{{getBackupCycleTitle()}}">{{getBackupCycleText()}}</div>
         </th>
         <th>
             <a href="#" ng-click="sortType = 'experimental_info.current.name'; sortReverse = !sortReverse">
@@ -202,7 +204,7 @@
         </th>
     </thead>
     <tbody>
-        <tr ng-repeat="device in devices | orderObjectBy:sortType:sortReverse:orderEthoscopes | filter:filterEthoscopes" ng-if="showOnline ? (device.status != 'offline' && device.status != 'shutdown') : (device.status == 'offline' || device.status == 'shutdown')">
+        <tr ng-repeat="device in devices | orderObjectBy:(sortType == 'last_backup' ? lastBackupTime : sortType):sortReverse:orderEthoscopes | filter:filterEthoscopes" ng-if="showOnline ? (device.status != 'offline' && device.status != 'shutdown') : (device.status == 'offline' || device.status == 'shutdown')">
             <td>
                 <div ng-if="device.status != 'offline' && device.status != 'shutdown'">
                     <a ng-href="#!/ethoscope/{{device.id}}" target="_blank">
@@ -230,7 +232,7 @@
             <td>
                 <span class="fa fa-video-camera backup-status-icon" ng-class="getVideoBackupStatusClass(device)" title="{{getVideoBackupStatusTitle(device)}}"></span>
                 <span class="fa fa-database backup-status-icon" ng-class="getDatabaseBackupStatusClass(device)" title="{{getDatabaseBackupStatusTitle(device)}}"></span>
-                <span>{{getBackupStatusText(device)}}</span>
+                <span ng-class="{'color-red': backupFailed(device)}" title="{{getBackupTimeTitle(device)}}">{{getBackupStatusText(device)}}</span>
             </td>
             <td>
                 <span ng-if="device.experimental_info.current.name">{{device.experimental_info.current.name}}</span>

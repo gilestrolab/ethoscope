@@ -17,13 +17,17 @@
     });
 
     app.filter('orderObjectBy', function() {
+        // field: a property name, or a function returning the value to sort by
         return function(items, field, reverse) {
+            var value = typeof field === 'function' ? field : function(item) {
+                return item[field];
+            };
             var filtered = [];
             angular.forEach(items, function(item) {
                 filtered.push(item);
             });
             filtered.sort(function(a, b) {
-                return (a[field] > b[field] ? 1 : -1);
+                return (value(a) > value(b) ? 1 : -1);
             });
             if (reverse) filtered.reverse();
             return filtered;
@@ -406,6 +410,9 @@
                 // Extract devices for easy access by device ID
                 $scope.backup_status = data.devices || {};
 
+                // The rsync daemon's sweep (epochs); null when it cannot say
+                $scope.backup_cycle = data.cycle || null;
+
                 // Check backup service availability from summary
                 var summary = data.summary || {};
                 $scope.mysql_backup_available = summary.services && summary.services.mysql_service_available;
@@ -414,6 +421,7 @@
 
             }).catch(function(error) {
                 $scope.backup_status = {};
+                $scope.backup_cycle = null;
                 $scope.backup_service_available = false;
                 $scope.mysql_backup_available = false;
                 $scope.rsync_backup_available = false;
@@ -892,6 +900,34 @@
             return title;
         };
 
+        // Time elapsed since an epoch, e.g. "3h, 12min"
+        var timeSince = function(epoch) {
+            return $scope.elapsedtime(Date.now() / 1000 - epoch).trim();
+        };
+
+        // Whether a backup daemon is copying from this device right now
+        var isBackingUp = function(backup_info) {
+            var types = backup_info.backup_types || {};
+            return ['mysql', 'sqlite', 'video'].some(function(type) {
+                return types[type] && types[type].processing;
+            });
+        };
+
+        /**
+         * When the device was last backed up successfully, as an epoch (0 if
+         * never since the backup service started). Sorts the backup column.
+         */
+        $scope.lastBackupTime = function(device) {
+            var backup_info = $scope.backup_status && $scope.backup_status[device.id];
+            return (backup_info && backup_info.last_job && backup_info.last_job.last_success) || 0;
+        };
+
+        $scope.backupFailed = function(device) {
+            var backup_info = $scope.backup_status && $scope.backup_status[device.id];
+            return !!(backup_info && backup_info.last_job && backup_info.last_job.result === 'error' &&
+                !isBackingUp(backup_info));
+        };
+
         $scope.getBackupStatusText = function(device) {
             if (!$scope.backup_service_available) {
                 return 'Service offline';
@@ -902,57 +938,86 @@
                 return 'No backup info';
             }
 
-            var mysql = backup_info.backup_types.mysql;
-            var sqlite = backup_info.backup_types.sqlite;
-            var video = backup_info.backup_types.video;
-
-            var text = '';
-
-            // Check if any backup is processing
-            if ((mysql && mysql.processing) || (sqlite && sqlite.processing) || (video && video.processing)) {
-                return 'Processing...';
+            var job = backup_info.last_job;
+            if (isBackingUp(backup_info)) {
+                return job && job.started ? 'backing up (' + timeSince(job.started) + ')' : 'backing up';
+            }
+            if (!job) {
+                return '—';
             }
 
-            // Calculate total size for display
+            var lastOk = job.last_success ? timeSince(job.last_success) + ' ago' : '';
+            if (job.result === 'error') {
+                return lastOk ? 'failed · last OK ' + lastOk : 'failed';
+            }
+            return lastOk || '—';
+        };
+
+        $scope.getBackupTimeTitle = function(device) {
+            var backup_info = $scope.backup_status && $scope.backup_status[device.id];
+            if (!$scope.backup_service_available || !backup_info) {
+                return '';
+            }
+
+            var job = backup_info.last_job;
+            if (!job) {
+                return 'The backup service has not reached this device since it started';
+            }
+
+            var lines = [];
+            if (isBackingUp(backup_info) && job.started) {
+                lines.push('Backing up since ' + $scope.secToDate(job.started));
+            }
+            lines.push(job.last_success ?
+                'Last successful backup: ' + $scope.secToDate(job.last_success) :
+                'No successful backup since the backup service started');
+            if (job.result === 'error' && !isBackingUp(backup_info)) {
+                lines.push('Last attempt failed: ' + $scope.secToDate(job.ended) +
+                    (job.message ? ' (' + job.message + ')' : ''));
+            }
+
+            // Data held on the node; the unified rsync job copies results and videos
+            var types = backup_info.backup_types;
             var totalSize = 0;
-            if (mysql && mysql.available && mysql.size) totalSize += mysql.size;
-            if (sqlite && sqlite.available && sqlite.size) totalSize += sqlite.size;
-            if (video && video.available && video.size) totalSize += video.size;
-
-            // Show size if we have any backups
-            if (totalSize > 0) {
-                text = $scope.humanFileSize(totalSize);
-            }
-
-            // Show last backup time if available (take the most recent)
-            var lastBackupTime = 0;
-            if (mysql && mysql.last_backup) lastBackupTime = Math.max(lastBackupTime, mysql.last_backup);
-            if (sqlite && sqlite.last_backup) lastBackupTime = Math.max(lastBackupTime, sqlite.last_backup);
-            if (video && video.last_backup) lastBackupTime = Math.max(lastBackupTime, video.last_backup);
-
-            if (lastBackupTime > 0) {
-                var timeSinceBackup = (Date.now() / 1000) - lastBackupTime;
-                if (text) text += ' - ';
-                text += $scope.elapsedtime(timeSinceBackup) + ' ago';
-            }
-
-            // If no meaningful info, show overall status
-            if (!text) {
-                switch (backup_info.overall_status) {
-                    case 'success':
-                        return 'All backups OK';
-                    case 'partial':
-                        return 'Partial backup';
-                    case 'error':
-                        return 'Backup failed';
-                    case 'no_backups':
-                        return 'No backups configured';
-                    default:
-                        return 'Unknown status';
+            ['mysql', 'sqlite', 'video'].forEach(function(type) {
+                if (types[type] && types[type].available && types[type].size) {
+                    totalSize += types[type].size;
                 }
+            });
+            if (totalSize > 0) {
+                lines.push('Held on the node: ' + $scope.humanFileSize(totalSize));
             }
+            return lines.join('\n');
+        };
 
-            return text;
+        // The backup sweep, shown under the column header
+        $scope.getBackupCycleText = function() {
+            var cycle = $scope.backup_cycle;
+            if (!$scope.backup_service_available || !cycle) {
+                return '';
+            }
+            if (!cycle.next_at) {
+                return 'sweep running';
+            }
+            var wait = cycle.next_at - Date.now() / 1000;
+            // Reason: /backup/status is cached for a minute, so a sweep may have begun
+            return wait > 0 ? 'next sweep in ' + $scope.elapsedtime(wait).trim() : 'next sweep due';
+        };
+
+        $scope.getBackupCycleTitle = function() {
+            var cycle = $scope.backup_cycle;
+            if (!$scope.backup_service_available || !cycle) {
+                return '';
+            }
+            var lines = ['The node backs up every device in a sweep every ' +
+                $scope.elapsedtime(cycle.interval).trim()];
+            if (cycle.last_started) {
+                lines.push('Last sweep started: ' + $scope.secToDate(cycle.last_started));
+            }
+            if (cycle.next_at) {
+                lines.push('Next sweep: ' + $scope.secToDate(cycle.next_at));
+            }
+            return lines.join('\n');
         };
 
         // Last known user/location of a device that is not currently running an

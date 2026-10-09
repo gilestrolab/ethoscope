@@ -182,6 +182,7 @@ def status():
                         "count": getattr(backup_status, "count", 0),
                         "synced": getattr(backup_status, "synced", {}),
                         "progress": getattr(backup_status, "progress", {}),
+                        "last_success": getattr(backup_status, "last_success", 0),
                         "data_duplication": getattr(
                             backup_status, "data_duplication", False
                         ),
