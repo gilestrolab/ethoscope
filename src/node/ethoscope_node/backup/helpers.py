@@ -197,6 +197,9 @@ class BackupStatus:
     synced: dict = None
     progress: dict = None
     metadata: dict = None
+    # Reason: started/ended describe the latest job, failed or not; a failure must
+    # not erase when the device's data was last secured.
+    last_success: int = 0
 
     def __post_init__(self):
         if self.synced is None:
@@ -1648,6 +1651,7 @@ class GenericBackupWrapper(threading.Thread):
         # Backup cycle tracking
         self._cycle_count = 0
         self._last_cycle_start = None
+        self._next_cycle_at = 0  # epoch of the next cycle; 0 while one is running
 
         # Each device's most recent job. Reason: a job outlives the wait in a cycle
         # (a recording crossing a weak WiFi link takes hours), and starting another
@@ -1996,6 +2000,7 @@ class GenericBackupWrapper(threading.Thread):
 
             # Update final progress status
             if success:
+                status.last_success = status.ended
                 # Update progress with success status while preserving device data
                 current_progress = status.progress.copy()
                 current_progress.update(
@@ -2068,6 +2073,7 @@ class GenericBackupWrapper(threading.Thread):
                     cycle_start_time = time.time()
                     self._cycle_count += 1
                     self._last_cycle_start = cycle_start_time
+                    self._next_cycle_at = 0
 
                     logging.info(f"=== Starting backup cycle #{self._cycle_count} ===")
                     self._logger.info(
@@ -2123,9 +2129,7 @@ class GenericBackupWrapper(threading.Thread):
                     # Health monitoring and adaptive behavior
                     if not self._stop_event.is_set():
                         # Adaptive wait time based on recent failures
-                        wait_time = self._calculate_adaptive_wait_time(
-                            consecutive_failures
-                        )
+                        wait_time = self._schedule_next_cycle(consecutive_failures)
 
                         self._logger.info(
                             f"Backup cycle #{self._cycle_count} complete. Waiting {wait_time}s until next cycle..."
@@ -2199,6 +2203,35 @@ class GenericBackupWrapper(threading.Thread):
 
             # Always re-raise to be handled by the main loop's error handling
             raise
+
+    def _schedule_next_cycle(self, consecutive_failures: int) -> int:
+        """
+        Pick the wait before the next cycle and record when that cycle will start.
+
+        Args:
+            consecutive_failures (int): Cycles that have failed in a row.
+
+        Returns:
+            int: Seconds to wait before the next cycle.
+        """
+        wait_time = self._calculate_adaptive_wait_time(consecutive_failures)
+        self._next_cycle_at = int(time.time() + wait_time)
+        return wait_time
+
+    def get_cycle_info(self) -> dict:
+        """
+        Describe the backup cycle: how often it runs, when it last began, when next.
+
+        Returns:
+            dict: ``interval`` in seconds, ``count`` of cycles run, and the epochs
+            ``last_started`` and ``next_at`` (``next_at`` is 0 while a cycle runs).
+        """
+        return {
+            "interval": self._backup_interval,
+            "count": self._cycle_count,
+            "last_started": int(self._last_cycle_start or 0),
+            "next_at": self._next_cycle_at,
+        }
 
     def _calculate_adaptive_wait_time(self, consecutive_failures: int) -> int:
         """Calculate adaptive wait time based on failure rate."""

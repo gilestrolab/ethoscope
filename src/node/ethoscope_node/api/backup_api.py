@@ -49,12 +49,23 @@ class BackupAPI(BaseAPI):
         # Determine which devices are currently being processed
         processing_devices = self._get_processing_devices(mysql_status, rsync_status)
 
-        # Get device-level backup information for home page icons
-        devices_backup_info = self._get_devices_backup_summary(processing_devices)
-
         # Determine service availability
         mysql_available = "error" not in mysql_status
         rsync_available = "error" not in rsync_status
+
+        # Each daemon's record of every device it has backed up, keyed by id. Reason:
+        # rsync nests them under "devices"; the MySQL daemon returns them flat.
+        rsync_devices = rsync_status.get("devices", {}) if rsync_available else {}
+        mysql_devices = (
+            {k: v for k, v in mysql_status.items() if isinstance(v, dict)}
+            if mysql_available
+            else {}
+        )
+
+        # Get device-level backup information for home page icons
+        devices_backup_info = self._get_devices_backup_summary(
+            processing_devices, rsync_devices, mysql_devices
+        )
 
         # Create aggregated response with device-level data and summary
         aggregated_status = {
@@ -80,6 +91,9 @@ class BackupAPI(BaseAPI):
             },
             "devices": devices_backup_info,
             "processing_devices": processing_devices,
+            # The rsync daemon's sweep: interval, last start, next start (epochs).
+            # None when the daemon is down or too old to report it.
+            "cycle": rsync_status.get("cycle") if rsync_available else None,
             "timestamp": current_time,
         }
 
@@ -169,9 +183,112 @@ class BackupAPI(BaseAPI):
 
         return processing
 
-    def _get_devices_backup_summary(self, processing_devices=None):
-        """Get backup summary for all devices for home page display."""
+    @staticmethod
+    def _job_summary(job: dict | None) -> dict:
+        """
+        Reduce a backup daemon's record of one device to what the pages show.
+
+        Args:
+            job (dict | None): The daemon's serialised BackupStatus for the device.
+
+        Returns:
+            dict: ``last_success``, ``started`` and ``ended`` as epochs (0 when
+            unknown), the latest job's ``result`` ("completed", "error", or its
+            progress status while running) and its ``message``.
+        """
+        job = job or {}
+        progress = job.get("progress") or {}
+        ended = job.get("ended") or 0
+        # Reason: a job that crashed is recorded with ended = -1; its time is kept
+        # in the progress record instead.
+        if ended < 0:
+            ended = progress.get("completion_time", 0)
+        result = progress.get("status", "")
+        # Reason: a daemon older than last_success still says when its latest job
+        # ended, and a job that completed is by definition the last success.
+        last_success = job.get("last_success") or (
+            ended if result == "completed" else 0
+        )
+        return {
+            "last_success": last_success,
+            "started": job.get("started") or 0,
+            "ended": ended,
+            "result": result,
+            "message": progress.get("message", ""),
+        }
+
+    @staticmethod
+    def _type_status(available: bool, job: dict) -> str:
+        """
+        Status of one backup type: whether the node holds data, and the last job.
+
+        Args:
+            available (bool): The node holds backed-up data of this type.
+            job (dict): The device's job summary from the daemon handling the type.
+
+        Returns:
+            str: "not_available", "error" when the latest job failed, else "success".
+        """
+        if not available:
+            return "not_available"
+        return "error" if job["result"] == "error" else "success"
+
+    @staticmethod
+    def _unavailable_backup_types(status: str) -> dict:
+        """
+        Backup types of a device the node cannot describe (offline, or an error).
+
+        Args:
+            status (str): Status to give every type, e.g. "offline" or "unknown".
+
+        Returns:
+            dict: The ``backup_types`` structure with nothing available.
+        """
+        common = {"available": False, "status": status, "processing": False}
+        return {
+            "mysql": {
+                **common,
+                "size": 0,
+                "last_backup": 0,
+                "records": 0,
+                "directory": "",
+                "message": "",
+            },
+            "sqlite": {
+                **common,
+                "size": 0,
+                "last_backup": 0,
+                "files": 0,
+                "directory": "",
+            },
+            "video": {
+                **common,
+                "size": 0,
+                "last_backup": 0,
+                "files": 0,
+                "directory": "",
+                "size_human": "",
+            },
+        }
+
+    def _get_devices_backup_summary(
+        self, processing_devices=None, rsync_devices=None, mysql_devices=None
+    ):
+        """
+        Get backup summary for all devices for home page display.
+
+        Args:
+            processing_devices (list | None): Devices a daemon is backing up now.
+            rsync_devices (dict | None): The rsync daemon's records, keyed by id.
+            mysql_devices (dict | None): The MySQL daemon's records, keyed by id.
+
+        Returns:
+            dict: Per device id, ``backup_types``, ``overall_status`` and
+            ``last_job`` (the latest job's summary, or None if no daemon knows it).
+        """
         devices_backup = {}
+        rsync_devices = rsync_devices or {}
+        mysql_devices = mysql_devices or {}
 
         # Build a lookup of which device names are currently being processed
         # and by which service (mysql or rsync)
@@ -191,6 +308,10 @@ class BackupAPI(BaseAPI):
 
             # For each device, get basic backup information
             for device_id, device_info in devices.items():
+                # Reason: one unified rsync job copies both results and videos, so
+                # SQLite and video share its record; MySQL has a daemon of its own.
+                rsync_job = self._job_summary(rsync_devices.get(device_id))
+                mysql_job = self._job_summary(mysql_devices.get(device_id))
                 try:
                     # For summary endpoint, use a more efficient approach
                     # Check if device is online and has database information
@@ -239,41 +360,32 @@ class BackupAPI(BaseAPI):
                             "backup_types": {
                                 "mysql": {
                                     "available": mysql_info.get("available", False),
-                                    "status": (
-                                        "success"
-                                        if mysql_info.get("available", False)
-                                        else "not_available"
+                                    "status": self._type_status(
+                                        mysql_info.get("available", False), mysql_job
                                     ),
                                     "processing": "mysql" in active_services,
                                     "size": mysql_info.get("total_size_bytes", 0),
-                                    "last_backup": mysql_info.get("last_backup", 0),
                                     "records": mysql_info.get("database_count", 0),
                                     "directory": mysql_info.get("directory", ""),
                                     "message": mysql_info.get("message", ""),
                                 },
                                 "sqlite": {
                                     "available": sqlite_info.get("available", False),
-                                    "status": (
-                                        "success"
-                                        if sqlite_info.get("available", False)
-                                        else "not_available"
+                                    "status": self._type_status(
+                                        sqlite_info.get("available", False), rsync_job
                                     ),
                                     "processing": "rsync" in active_services,
                                     "size": sqlite_info.get("total_size_bytes", 0),
-                                    "last_backup": sqlite_info.get("last_backup", 0),
                                     "files": sqlite_info.get("database_count", 0),
                                     "directory": sqlite_info.get("directory", ""),
                                 },
                                 "video": {
                                     "available": video_info.get("available", False),
-                                    "status": (
-                                        "success"
-                                        if video_info.get("available", False)
-                                        else "not_available"
+                                    "status": self._type_status(
+                                        video_info.get("available", False), rsync_job
                                     ),
                                     "processing": "rsync" in active_services,
                                     "size": video_info.get("total_size_bytes", 0),
-                                    "last_backup": video_info.get("last_backup", 0),
                                     "files": video_info.get("file_count", 0),
                                     "directory": video_info.get("directory", ""),
                                     "size_human": video_info.get("size_human", ""),
@@ -284,78 +396,27 @@ class BackupAPI(BaseAPI):
                     else:
                         # For offline devices or devices without database info, show as not available
                         device_backup_data = {
-                            "backup_types": {
-                                "mysql": {
-                                    "available": False,
-                                    "status": "offline",
-                                    "processing": False,
-                                    "size": 0,
-                                    "last_backup": 0,
-                                    "records": 0,
-                                    "directory": "",
-                                    "message": "",
-                                },
-                                "sqlite": {
-                                    "available": False,
-                                    "status": "offline",
-                                    "processing": False,
-                                    "size": 0,
-                                    "last_backup": 0,
-                                    "files": 0,
-                                    "directory": "",
-                                },
-                                "video": {
-                                    "available": False,
-                                    "status": "offline",
-                                    "processing": False,
-                                    "size": 0,
-                                    "last_backup": 0,
-                                    "files": 0,
-                                    "directory": "",
-                                    "size_human": "",
-                                },
-                            },
+                            "backup_types": self._unavailable_backup_types("offline"),
                             "overall_status": "no_backups",
                         }
 
-                    devices_backup[device_id] = device_backup_data
-
                 except Exception:
                     # If we can't get backup info for this device, mark as unknown
-                    devices_backup[device_id] = {
-                        "backup_types": {
-                            "mysql": {
-                                "available": False,
-                                "status": "unknown",
-                                "processing": False,
-                                "size": 0,
-                                "last_backup": 0,
-                                "records": 0,
-                                "directory": "",
-                                "message": "",
-                            },
-                            "sqlite": {
-                                "available": False,
-                                "status": "unknown",
-                                "processing": False,
-                                "size": 0,
-                                "last_backup": 0,
-                                "files": 0,
-                                "directory": "",
-                            },
-                            "video": {
-                                "available": False,
-                                "status": "unknown",
-                                "processing": False,
-                                "size": 0,
-                                "last_backup": 0,
-                                "files": 0,
-                                "directory": "",
-                                "size_human": "",
-                            },
-                        },
+                    device_backup_data = {
+                        "backup_types": self._unavailable_backup_types("unknown"),
                         "overall_status": "unknown",
                     }
+
+                # Reason: when a device was last backed up is known to the daemon
+                # whether or not the device is reachable now.
+                types = device_backup_data["backup_types"]
+                types["mysql"]["last_backup"] = mysql_job["last_success"]
+                types["sqlite"]["last_backup"] = rsync_job["last_success"]
+                types["video"]["last_backup"] = rsync_job["last_success"]
+                device_backup_data["last_job"] = next(
+                    (job for job in (rsync_job, mysql_job) if job["started"]), None
+                )
+                devices_backup[device_id] = device_backup_data
 
         except Exception:
             # If we can't get device list, return empty dict

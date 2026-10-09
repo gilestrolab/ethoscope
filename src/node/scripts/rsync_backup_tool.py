@@ -42,6 +42,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             response = {
                 "devices": enhanced_status,
                 "disk_usage_summary": disk_usage_summary,
+                "cycle": gbw.get_cycle_info(),
             }
             self._send_response(response)
         else:

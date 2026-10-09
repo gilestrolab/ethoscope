@@ -1551,3 +1551,69 @@ Found while fetching ETHOSCOPE_361's overnight recording (202 chunks, 24 GB, WiF
 - [ ] Remove the 92 stray `.*.h264.*` files under turing's `/mnt/data/videos` (Giorgio's call).
 - [ ] 361 is on WiFi only (~0.3 MB/s): a 15 fps recording makes chunks faster than
       they can be copied. A cable, or a lower bitrate, for long recordings.
+
+# Home page: when each device was last backed up, and when the next sweep runs (2026-10-09)
+
+The "Time since backup" column shows two icons and a size, never a time. Cause, from the
+live node: `/backup/status` hardcodes `last_backup: 0`. The rsync daemon (8093) knows each
+device's `started`/`ended`/result, but the node only reads its `processing` flag. The
+daemon's next wake-up is computed in `run()` and never recorded. Icons are green whenever
+the node holds data for a device, so ETHOSCOPE_265 and 359, whose jobs fail every sweep,
+show green. The column's sort key, `time_since_backup`, is absent from `/devices`, so
+sorting by it does nothing.
+
+- [x] **Daemon** (`GenericBackupWrapper`): `BackupStatus.last_success`, set only when a job
+      succeeds, so a failure does not erase when data was last secured. Record the next
+      cycle's epoch before the wait, cleared while a cycle runs. Expose both in the rsync
+      daemon's `/status` (`cycle` block); `last_success` in the MySQL daemon's per-device dict.
+- [x] **Node** (`backup_api.py`): look rsync devices up by id; `last_backup` = `last_success`,
+      `status` from the last job's result (`completed`/`error`), plus a `last_job`
+      (started, ended, result, message); offline devices too. Top-level `cycle`, absent
+      when the daemon is too old to send it. Epochs only; ages computed in the browser.
+- [x] **Home page**: the column reads "4 min ago" / "backing up (12 min)" /
+      "failed · last OK 2 h ago"; size moves to the tooltip. Under the header:
+      "next sweep in 3 min" / "sweep running" / "backup service offline". Sort by the
+      last successful backup.
+- [x] Unit tests: daemon (`last_success` survives a failure; next-cycle set and cleared),
+      node API (rsync lookup, error status, missing `cycle`).
+- [x] Headless-Chrome render of the column with a captured `/devices` + a crafted
+      `/backup/status`.
+
+## Review (2026-10-09)
+
+- Daemon: `BackupStatus.last_success`; `_schedule_next_cycle()` records `next_at` before the
+  wait, `run()` zeroes it while a cycle runs; `get_cycle_info()`. The rsync `/status` gains
+  `cycle`; the MySQL `/status` gains `last_success` per device.
+- Node: `_job_summary()` (handles the crash record `ended = -1`, and falls back to `ended`
+  for a completed job from a daemon older than `last_success`), `_type_status()`, and one
+  `_unavailable_backup_types()` in place of two copies of the empty skeleton. Offline devices
+  keep their last backup time. `cycle` at the top of `/backup/status`.
+- Home page: column text and tooltip rebuilt around `last_job`; total size moved to the
+  tooltip (Giorgio's choice); `next sweep in N` under the header; `orderObjectBy` takes a
+  function, so the column sorts by `lastBackupTime`.
+- Tests: `tests/unit/api/test_backup_api_times.py` (10), `tests/unit/backup/test_backup_cycle_info.py`
+  (8). One existing test asserted a `last_backup` that only its mock produced; now fed by a
+  daemon record. Node unit suite 1838 passed; backup integration 34 passed (one timing test,
+  `test_filesystem_scan_vs_cache_performance`, failed once under load and passed on rerun and at HEAD).
+- Rendered in headless Chrome: the new `BackupAPI` over the live `/devices` and rsync
+  `/status` captures, plus crafted failure and long-job rows.
+- Not deployed: the live node still runs the old daemon. The page needs both the node
+  service and `ethoscope_backup_unified` restarted to show times and the next sweep.
+
+## Discovered During Work (2026-10-09)
+
+- [ ] **Sorting the home page's device table does not stick.** Every header is
+      `<a href="#" ng-click=...>`. In headless Chrome a click replaces the view (route
+      reload), the controller restarts and `sortType` returns to `name`. Status sorts no
+      better than the new column. Likely fix: `href=""`, whose default Angular's `a`
+      directive prevents. Not yet checked in a desktop browser.
+- [ ] `orderObjectBy` reads `item[field]`, so the User and Location headers
+      (`experimental_info.current.name`/`.location`) cannot sort either.
+- [ ] ETHOSCOPE_265 and 359: every sweep's job ended in `error` ("Backup failed") on
+      2026-10-09; they showed green until now. Cause not investigated.
+- [ ] `/backup/status` cache: `__init__` says 300 s, the first fetch resets it to 60 s.
+- [ ] The ethoscope detail page shows no backup times either. Its backup panel is built
+      from `/device/<id>/backup` (`get_device_backup_info`, no `last_backup`), not from
+      `/backup/status`. The template comment at `ethoscope.html:361` says otherwise. Its
+      header line `Last backup {{elapsedtime(device.time_since_backup)}}` (line 98) reads
+      a field `/devices` never carries.
