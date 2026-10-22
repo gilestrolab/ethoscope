@@ -7,12 +7,12 @@ Ethoscope
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![GitHub release](https://img.shields.io/github/v/release/gilestrolab/ethoscope)](https://github.com/gilestrolab/ethoscope/releases)
-[![Documentation](https://img.shields.io/badge/docs-lab.gilest.ro-brightgreen)](https://lab.gilest.ro/ethoscope-manual)
+[![Documentation](https://img.shields.io/badge/docs-ethoscope.net-brightgreen)](https://ethoscope.net/docs/ethoscope/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
-The **Ethoscope** is a platform for high-throughput ethomics: automated behavioral monitoring of small organisms like *Drosophila melanogaster*. This is the GitHub repository for the software part of the [ethoscope platform](https://lab.gilest.ro/ethoscope).
+The **Ethoscope** is a platform for high-throughput ethomics: automated behavioral monitoring of small organisms like *Drosophila melanogaster*. This is the GitHub repository for the software part of the [ethoscope platform](https://ethoscope.net).
 
-All technical information regarding ethoscope is compiled in [our documentation](https://lab.gilest.ro/ethoscope-manual).
+All technical information regarding ethoscope is compiled in [our documentation](https://ethoscope.net/docs/ethoscope/).
 
 ## What's New in v2.0
 
@@ -97,7 +97,7 @@ See [TESTING.md](docs/TESTING.md) for comprehensive testing documentation.
 7. After several weeks of stable operation, merge `dev` to `main`
 8. Create release tag for public deployment
 
-**Latest stable release**: v2.0 (November 2025)
+**Latest stable release**: see [Releases](https://github.com/gilestrolab/ethoscope/releases/latest)
 
 ### Code Quality
 
@@ -175,14 +175,18 @@ See our [CI/CD documentation](.github/CICD.md) for details on automated checks.
 
 If you use ethoscope in your research, please cite:
 
-> Geissmann Q, Garcia Rodriguez L, Beckwith EJ, Gilestro GF (2019)
+> Geissmann Q, Garcia Rodriguez L, Beckwith EJ, French AS, Jamasb AR, Gilestro GF (2017)
 > **Ethoscopes: An open platform for high-throughput ethomics**
-> *PLOS Biology* 17(10): e3000461
-> https://doi.org/10.1371/journal.pbio.3000461
+> *PLOS Biology* 15(10): e2003026
+> https://doi.org/10.1371/journal.pbio.2003026
+
+If you analysed the data with rethomics or ethoscopy, please cite those papers too; see
+[ethoscope.net/publications](https://ethoscope.net/publications/) for all references and BibTeX.
 
 ## Support
 
-- **Documentation**: https://lab.gilest.ro/ethoscope-manual
+- **Website and documentation**: https://ethoscope.net
+- **Questions**: https://github.com/gilestrolab/ethoscope/discussions
 - **Issues**: https://github.com/gilestrolab/ethoscope/issues
 - **Lab Website**: https://lab.gilest.ro
 
