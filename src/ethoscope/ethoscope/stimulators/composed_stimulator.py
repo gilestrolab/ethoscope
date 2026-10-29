@@ -6,7 +6,8 @@ selection model: users choose a trigger condition (WHEN to stimulate) and
 a stimulus action (WHAT to deliver), and this class wires them together.
 
 All mAGO-based hardware uses the same OptoMotor interface; the channel
-mapping is derived automatically from the action's channel_type.
+mapping is chosen automatically from the action's channel_type, what the
+module reports it drives, and the arena's number of ROIs (channel_maps.py).
 """
 
 import inspect
@@ -17,6 +18,57 @@ from ethoscope.stimulators.actions import ACTION_REGISTRY
 from ethoscope.stimulators.channel_maps import get_channel_map
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 from ethoscope.stimulators.triggers import TRIGGER_REGISTRY, ScheduledTrigger
+
+# The count, in the module's reply to T, of what each channel type drives.
+_CAPABILITY_OF = {"motor": "motors", "led": "leds", "valve": "valves"}
+
+
+def _module_capabilities(hardware_connection, action_type):
+    """
+    Read what the attached module drives, and check it can deliver the stimulus.
+
+    Args:
+        hardware_connection: The run's HardwareConnection.
+        action_type (str): The stimulus, a key of ACTION_REGISTRY.
+
+    Returns:
+        dict: The counts the module reports, e.g. ``{"motors": 10, "valves": 0,
+        "leds": 10}``; empty when the module did not answer, in which case the
+        default maps are used.
+
+    Raises:
+        ValueError: If the module reports none of what the stimulus drives.
+            Sent anyway, a motor pulse on an LED module lights the LEDs on the
+            motor channels, and an LED pulse on a valve module opens valves.
+    """
+    try:
+        reply = hardware_connection.interrogate()
+    except Exception as e:
+        logging.warning(f"Could not interrogate module: {e}. Using default maps.")
+        return {}
+
+    capabilities = reply.get("capabilities") if isinstance(reply, dict) else None
+    if not isinstance(capabilities, dict):
+        logging.warning(
+            "The module did not report its capabilities. Using default maps."
+        )
+        return {}
+    capabilities = {k: v for k, v in capabilities.items() if isinstance(v, int)}
+
+    needed = _CAPABILITY_OF[ACTION_REGISTRY[action_type].channel_type]
+    if capabilities.get(needed) == 0:
+        module = reply.get("module")
+        name = module.get("name") if isinstance(module, dict) else None
+        raise ValueError(
+            f"The attached module ({name or 'unnamed'}) has no {needed}, so it "
+            f"cannot deliver a {action_type.replace('_', ' ')}. It drives "
+            f"{capabilities.get('motors', 0)} motors, "
+            f"{capabilities.get('valves', 0)} valves and "
+            f"{capabilities.get('leds', 0)} LEDs."
+        )
+
+    logging.info(f"Module reports {capabilities}")
+    return capabilities
 
 
 class ComposedStimulator(BaseStimulator):
@@ -31,7 +83,8 @@ class ComposedStimulator(BaseStimulator):
     setting time_restricted, which wraps it in a ScheduledTrigger.
 
     The ComposedStimulator handles channel mapping automatically based on the
-    selected action type.
+    selected action type, the attached module and the arena, and refuses a
+    stimulus the module has nothing to deliver with.
     """
 
     _HardwareInterfaceClass = OptoMotor
@@ -345,24 +398,13 @@ class ComposedStimulator(BaseStimulator):
 
         self._action = action_cls(**action_kwargs)
 
-        # Interrogate module to get actual capabilities for channel map selection
-        led_count = None
-        try:
-            module_info = hardware_connection.interrogate()
-            led_count = module_info.get("capabilities", {}).get("leds")
-            logging.info(
-                f"Module reports {led_count} LEDs, "
-                f"{module_info.get('capabilities', {}).get('motors')} motors"
-            )
-        except Exception as e:
-            logging.warning(
-                f"Could not interrogate module: {e}. Using default channel map."
-            )
+        # The module's capabilities choose the channel map, and say whether it
+        # can deliver this stimulus at all.
+        self._capabilities = _module_capabilities(hardware_connection, action_type)
 
-        # Derive channel map from action's channel type and module capabilities
-        self._roi_to_channel = get_channel_map(
-            self._action.channel_type, led_count=led_count
-        )
+        # The arena is not known yet: until bind_arena(), the 20-tube layout.
+        self._n_rois = None
+        self._roi_to_channel = self._channel_map()
 
         logging.info(
             f"ComposedStimulator initialized: trigger={trigger_type}, "
@@ -372,6 +414,33 @@ class ComposedStimulator(BaseStimulator):
         )
 
         super().__init__(hardware_connection, date_range, roi_template_config)
+
+    def _channel_map(self):
+        """Return the ROI-to-channel map for this stimulus, module and arena."""
+        return get_channel_map(
+            self._action.channel_type,
+            led_count=self._capabilities.get("leds"),
+            n_rois=self._n_rois,
+        )
+
+    def bind_arena(self, rois):
+        """
+        Choose the channel map for the arena's layout (10 or 20 tubes).
+
+        Args:
+            rois (list): The arena's ROIs.
+        """
+        self._n_rois = len(rois)
+        self._roi_to_channel = self._channel_map()
+        if self._n_rois not in (10, 20):
+            logging.warning(
+                f"No channel map is made for an arena of {self._n_rois} ROIs; "
+                f"using the {'10' if self._n_rois <= 10 else '20'}-tube layout."
+            )
+        logging.info(
+            f"ComposedStimulator: {self._action.channel_type} channels for "
+            f"{self._n_rois} ROIs: {self._roi_to_channel}"
+        )
 
     def bind_tracker(self, tracker):
         """Bind tracker to both the stimulator and the trigger."""

@@ -200,6 +200,16 @@ class MultiStimulator(BaseStimulator):
         for stimulator_info in self._stimulators:
             stimulator_info["instance"].bind_tracker(tracker)
 
+    def bind_arena(self, rois):
+        """
+        Tell every stimulator of the sequence which ROIs the arena has.
+
+        Args:
+            rois (list): The arena's ROIs.
+        """
+        for stimulator_info in self._stimulators:
+            stimulator_info["instance"].bind_arena(rois)
+
     def _decide(self):
         """
         Decide which stimulator(s) should be active and delegate to them.

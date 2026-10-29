@@ -87,6 +87,17 @@ class BaseStimulator(DescribedObject):
         """
         self._tracker = tracker
 
+    def bind_arena(self, rois):
+        """
+        Tell the stimulator which ROIs the arena has, before tracking starts.
+
+        Stimulators whose ROI-to-channel map depends on the arena's layout
+        override this; the default ignores it.
+
+        :param rois: the arena's ROIs
+        :type rois: list(:class:`~ethoscope.core.roi.ROI`)
+        """
+
     def _decide(self):
         raise NotImplementedError
 

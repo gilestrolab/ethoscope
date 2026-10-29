@@ -1000,6 +1000,48 @@ class ControlThread(Thread):
         self._last_info_t_stamp = wall_time
         self._last_info_frame_idx = frame_idx
 
+    def _build_stimulators(
+        self, rois, hardware_connection, StimulatorClass, stimulator_kwargs
+    ):
+        """
+        Build one stimulator per ROI and tell each one the arena it serves.
+
+        Args:
+            rois (list): The arena's ROIs.
+            hardware_connection (HardwareConnection): The run's connection to
+                the module, shared by every stimulator.
+            StimulatorClass (type): The stimulator class the user asked for.
+            stimulator_kwargs (dict): Its arguments.
+
+        Returns:
+            list: One stimulator per ROI, in ROI order.
+
+        Raises:
+            EthoscopeException: If a stimulator cannot be built.
+        """
+        # Reason: this used to fall back to DefaultStimulator when construction
+        # failed, so a bad parameter or an unknown trigger_type produced an
+        # experiment that tracked perfectly, looked healthy in the UI and
+        # delivered nothing at all — undetectable until the data came back days
+        # later. A stimulator the user asked for must either work or say so.
+        stimulators = []
+        for i, _roi in enumerate(rois):
+            try:
+                stimulator = StimulatorClass(hardware_connection, **stimulator_kwargs)
+                # A module's channel map depends on the arena's layout.
+                stimulator.bind_arena(rois)
+            except Exception as e:
+                raise EthoscopeException(
+                    f"Could not build {StimulatorClass.__name__} for ROI {i+1} "
+                    f"with {stimulator_kwargs}: {e}. Refusing to start an "
+                    f"experiment that would silently deliver no stimulus."
+                ) from e
+            logging.info(
+                f"Successfully created stimulator {i+1}/{len(rois)}: {type(stimulator).__name__}"
+            )
+            stimulators.append(stimulator)
+        return stimulators
+
     def _start_tracking(
         self,
         camera,
@@ -1020,25 +1062,9 @@ class ControlThread(Thread):
         )
         logging.info(f"Number of ROIs: {len(rois)}")
 
-        # Reason: this used to fall back to DefaultStimulator when construction
-        # failed, so a bad parameter or an unknown trigger_type produced an
-        # experiment that tracked perfectly, looked healthy in the UI and
-        # delivered nothing at all — undetectable until the data came back days
-        # later. A stimulator the user asked for must either work or say so.
-        stimulators = []
-        for i, _roi in enumerate(rois):
-            try:
-                stimulator = StimulatorClass(hardware_connection, **stimulator_kwargs)
-            except Exception as e:
-                raise EthoscopeException(
-                    f"Could not build {StimulatorClass.__name__} for ROI {i+1} "
-                    f"with {stimulator_kwargs}: {e}. Refusing to start an "
-                    f"experiment that would silently deliver no stimulus."
-                ) from e
-            logging.info(
-                f"Successfully created stimulator {i+1}/{len(rois)}: {type(stimulator).__name__}"
-            )
-            stimulators.append(stimulator)
+        stimulators = self._build_stimulators(
+            rois, hardware_connection, StimulatorClass, stimulator_kwargs
+        )
 
         kwargs = self._monit_kwargs.copy()
         kwargs.update(tracker_kwargs)
