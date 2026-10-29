@@ -24,10 +24,12 @@ from ethoscope.hardware.interfaces.interfaces import connectedUSB
 logger = logging.getLogger(__name__)
 
 # FQBN mapping from Arduino model names (as reported by connectedUSB) to
-# Fully Qualified Board Names used by arduino-cli
+# Fully Qualified Board Names used by arduino-cli. "nano" is the Nano Every
+# (USB ID 2341:0058), an ATmega4809 board of the megaavr core, not the classic
+# Nano.
 FQBN_MAP = {
     "micro": "arduino:avr:micro",
-    "nano": "arduino:avr:nano",
+    "nano": "arduino:megaavr:nona4809",
     "uno": "arduino:avr:uno",
     "leonardo": "arduino:avr:leonardo",
 }
@@ -234,7 +236,7 @@ def compile_firmware(ino_path=None, fqbn=None, module=None, pcbversion=None):
         ino_path (str, optional): Path to .ino source file.
         fqbn (str, optional): Fully Qualified Board Name.
         module (int, optional): MODULE define value (0-4).
-        pcbversion (int, optional): PCBVERSION define value (10 or 11).
+        pcbversion (int, optional): PCBVERSION define value (10, 11, 12 or 13).
 
     Returns:
         dict: ``{"success": bool, "output": str, "error": str}``
@@ -270,8 +272,15 @@ def compile_firmware(ino_path=None, fqbn=None, module=None, pcbversion=None):
         BUILD_DIR,
     ]
 
+    # Reason: build.extra_flags belongs to the board definition (the Micro's
+    # holds its USB VID/PID flags, the Nano Every's its timer flags), and
+    # setting it replaces them. compiler.cpp.extra_flags is the hook the core's
+    # platform.txt leaves empty for users, and reaches the sketch's compile and
+    # preprocessing steps alike.
     if extra_flags:
-        cmd.extend(["--build-property", f"build.extra_flags={' '.join(extra_flags)}"])
+        cmd.extend(
+            ["--build-property", f"compiler.cpp.extra_flags={' '.join(extra_flags)}"]
+        )
 
     cmd.append(ino_path)
 

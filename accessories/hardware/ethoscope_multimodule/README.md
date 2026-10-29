@@ -65,6 +65,18 @@ Flash the sketch:
 - Select the correct board and port in the Arduino IDE.
 - Compile and upload `ethoscope_multimodule.ino`.
 
+The two values can also be given on the command line, where they take precedence
+over `versions.h`, which is then not needed:
+
+```sh
+arduino-cli compile --fqbn arduino:avr:micro \
+  --build-property "compiler.cpp.extra_flags=-DPCBVERSION=11 -DMODULE=0" .
+```
+
+This is what the ethoscope does itself when the firmware is updated from the node
+(Module Info → Update Firmware): it reads `PCBVERSION` and `MODULE` from the
+running board, so the update keeps the board's configuration.
+
 ## Serial Interface
 
 - **Baud rate**: 115200 (fixed).

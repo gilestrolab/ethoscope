@@ -148,7 +148,18 @@
 // Version and Configuration
 // =============================================================================
 const float VERSION = 1.5;
-#include "versions.h"    // PCBVERSION and MODULE — copy versions.h.example to versions.h
+
+// PCBVERSION and MODULE come from the compiler command line when given there
+// (the ethoscope's "Update Firmware" passes the values read from the running
+// board), otherwise from versions.h: copy versions.h.example to versions.h.
+#if !defined(PCBVERSION) || !defined(MODULE)
+    #if __has_include("versions.h")
+        #include "versions.h"
+    #endif
+#endif
+#if !defined(PCBVERSION) || !defined(MODULE)
+    #error "Set PCBVERSION and MODULE: copy versions.h.example to versions.h, or pass -DPCBVERSION=... -DMODULE=..."
+#endif
 
 // =============================================================================
 // Module-Specific Definitions

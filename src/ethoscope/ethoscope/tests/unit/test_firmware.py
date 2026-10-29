@@ -1,6 +1,8 @@
 """Unit tests for the firmware management module."""
 
 import os
+import shutil
+import subprocess
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -89,7 +91,8 @@ class TestGetFqbn:
         assert _get_fqbn("micro") == "arduino:avr:micro"
 
     def test_nano(self):
-        assert _get_fqbn("nano") == "arduino:avr:nano"
+        # "nano" is the Nano Every (2341:0058), a megaavr board.
+        assert _get_fqbn("nano") == "arduino:megaavr:nona4809"
 
     def test_uno(self):
         assert _get_fqbn("uno") == "arduino:avr:uno"
@@ -99,7 +102,7 @@ class TestGetFqbn:
 
     def test_case_insensitive(self):
         assert _get_fqbn("MICRO") == "arduino:avr:micro"
-        assert _get_fqbn("Nano") == "arduino:avr:nano"
+        assert _get_fqbn("Nano") == "arduino:megaavr:nona4809"
 
     def test_unknown_model(self):
         assert _get_fqbn("unknown_board") is None
@@ -244,3 +247,106 @@ class TestCompileFirmware:
         result = compile_firmware(ino_path="/nonexistent.ino", fqbn="arduino:avr:micro")
         assert result["success"] is False
         assert "not found" in result["error"]
+
+
+class TestCompileCommand:
+    """The arduino-cli command a device runs for "Update Firmware"."""
+
+    def _command(self, module=4, pcbversion=12):
+        from ethoscope.hardware.interfaces.firmware import compile_firmware
+
+        with (
+            patch(
+                "ethoscope.hardware.interfaces.firmware.is_arduino_cli_available",
+                return_value=True,
+            ),
+            patch("ethoscope.hardware.interfaces.firmware.os.makedirs"),
+            patch("ethoscope.hardware.interfaces.firmware.subprocess.run") as run,
+        ):
+            run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+            result = compile_firmware(
+                fqbn="arduino:avr:micro", module=module, pcbversion=pcbversion
+            )
+        assert result["success"] is True
+        return run.call_args[0][0]
+
+    def test_defines_go_through_the_user_flags_hook(self):
+        cmd = self._command()
+        assert "compiler.cpp.extra_flags=-DMODULE=4 -DPCBVERSION=12" in cmd
+
+    def test_board_flags_are_left_alone(self):
+        # build.extra_flags holds the board's own flags (the Micro's USB IDs);
+        # setting it replaced them and the core failed with 'USB_VID' undeclared.
+        cmd = self._command()
+        assert not any(arg.startswith("build.extra_flags") for arg in cmd)
+
+    def test_module_zero_is_passed(self):
+        cmd = self._command(module=0, pcbversion=10)
+        assert "compiler.cpp.extra_flags=-DMODULE=0 -DPCBVERSION=10" in cmd
+
+
+def _core_installed(core):
+    """Whether arduino-cli and the given core (e.g. "arduino:avr") are installed."""
+    if shutil.which("arduino-cli") is None:
+        return False
+    listing = subprocess.run(
+        ["arduino-cli", "core", "list"], capture_output=True, text=True
+    )
+    return f"{core} " in listing.stdout
+
+
+def _sketch_copy(tmp_path, versions_h=None):
+    """Copy the repository's sketch, as a device checkout has it (no versions.h)."""
+    from ethoscope.hardware.interfaces.firmware import DEFAULT_INO_PATH
+
+    sketch_dir = tmp_path / "ethoscope_multimodule"
+    sketch_dir.mkdir()
+    ino = sketch_dir / "ethoscope_multimodule.ino"
+    shutil.copy(DEFAULT_INO_PATH, ino)
+    if versions_h is not None:
+        (sketch_dir / "versions.h").write_text(versions_h)
+    return str(ino)
+
+
+@pytest.mark.slow
+class TestCompileFromCheckout:
+    """Compile the real sketch with the real arduino-cli, as a device does."""
+
+    @pytest.mark.parametrize(
+        "fqbn,core",
+        [
+            ("arduino:avr:micro", "arduino:avr"),
+            ("arduino:megaavr:nona4809", "arduino:megaavr"),
+        ],
+    )
+    def test_compiles_without_versions_h(self, tmp_path, monkeypatch, fqbn, core):
+        if not _core_installed(core):
+            pytest.skip(f"arduino-cli with {core} not installed")
+        from ethoscope.hardware.interfaces import firmware
+
+        monkeypatch.setattr(firmware, "BUILD_DIR", str(tmp_path / "build"))
+        result = firmware.compile_firmware(
+            ino_path=_sketch_copy(tmp_path), fqbn=fqbn, module=4, pcbversion=12
+        )
+        assert result["success"], result.get("error")
+
+    def test_values_read_from_the_board_win_over_versions_h(
+        self, tmp_path, monkeypatch
+    ):
+        if not _core_installed("arduino:avr"):
+            pytest.skip("arduino-cli with arduino:avr not installed")
+        from ethoscope.hardware.interfaces import firmware
+
+        build = tmp_path / "build"
+        monkeypatch.setattr(firmware, "BUILD_DIR", str(build))
+        stale = "#define PCBVERSION 10\n#define MODULE 0\n"
+        result = firmware.compile_firmware(
+            ino_path=_sketch_copy(tmp_path, versions_h=stale),
+            fqbn="arduino:avr:micro",
+            module=4,
+            pcbversion=12,
+        )
+        assert result["success"], result.get("error")
+        binary = (build / "ethoscope_multimodule.ino.elf").read_bytes()
+        assert b"LED Optogenetic Module" in binary
+        assert b"N20 Sleep Deprivation Module" not in binary

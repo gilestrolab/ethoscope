@@ -6,7 +6,15 @@
  * so your local configuration won't be tracked.
  *
  *   cp versions.h.example versions.h
+ *
+ * Values given on the compiler command line (-DPCBVERSION=... -DMODULE=...)
+ * take precedence over the ones below.
  */
 
+#ifndef PCBVERSION
 #define PCBVERSION 10    // PCB Version: 10 for v1.0, 11 for v1.1, 12 for v1.2/1.3
+#endif
+
+#ifndef MODULE
 #define MODULE 0         // Module Type: 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
+#endif
