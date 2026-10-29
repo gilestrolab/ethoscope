@@ -8,7 +8,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from threading import Thread
+from threading import Lock, Thread
 
 import serial
 
@@ -139,6 +139,10 @@ class HardwareConnection(Thread):
         self._interface = interface_class(*args, **kwargs)
         self._instructions = collections.deque()
         self._connection_open = True
+        # Reason: the send loop below and interrogate() write to the same serial
+        # port; a command written between T and its reply would corrupt the reply.
+        self._serial_lock = Lock()
+        self._module_info = None
         super().__init__()
         self.start()
 
@@ -152,11 +156,38 @@ class HardwareConnection(Thread):
             while len(self._instructions) > 0 and self._connection_open:
                 instruc = self._instructions.popleft()
                 try:
-                    self._interface.send(**instruc)
+                    with self._serial_lock:
+                        self._interface.send(**instruc)
                 except Exception:
                     logging.error(
                         f"Could not send the following instruction to the module. Instruction: {instruc}"
                     )
+
+    def interrogate(self):
+        """
+        Return what the attached module reports about itself (its reply to ``T``).
+
+        The module is asked once per connection, on the first call, and the reply
+        is kept. One stimulator is built per ROI and each one asks; asking once
+        also gives every ROI of a run the same answer, where retrying after a
+        failed first reply could put the ROIs on different channel maps. Only
+        stimulators that need the reply call this, so interfaces that do not
+        speak the module protocol (the SSC-32U servo controller) are never sent
+        ``T``.
+
+        Returns:
+            dict: The module's reply (``version``, ``module``, ``capabilities``,
+            ...), or an empty dict if the module did not answer or the interface
+            cannot be interrogated.
+        """
+        with self._serial_lock:
+            if self._module_info is None:
+                try:
+                    self._module_info = self._interface.interrogate()
+                except Exception as e:
+                    logging.warning(f"Could not interrogate the module: {e!r}")
+                    self._module_info = {}
+            return self._module_info
 
     def send_instruction(self, instruction=None):
         """
