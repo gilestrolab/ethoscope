@@ -2,7 +2,10 @@ import time
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
+from ethoscope.hardware.interfaces.interfaces import DefaultInterface
+from ethoscope.hardware.interfaces.optomotor import OptoMotor
 from ethoscope.stimulators.multi_stimulator import MultiStimulator
+from ethoscope.stimulators.registry import STIMULATOR_REGISTRY
 from ethoscope.stimulators.stimulators import DefaultStimulator, HasInteractedVariable
 
 # Optional imports for specific stimulator tests
@@ -405,7 +408,11 @@ class TestMultiStimulator(unittest.TestCase):
         self.assertIs(multi_stim._stimulators, original_stimulators)
 
     def test_unknown_stimulator_class(self):
-        """Test handling of unknown stimulator class name."""
+        """An unknown class refuses the sequence instead of being skipped.
+
+        Skipping it started an experiment that delivered less than asked, with
+        nothing but a log line to show for it.
+        """
         sequence = [
             {
                 "class_name": "NonExistentStimulator",
@@ -414,22 +421,17 @@ class TestMultiStimulator(unittest.TestCase):
             }
         ]
 
-        # Should not raise exception, just skip unknown stimulator
-        multi_stim = MultiStimulator(
-            hardware_connection=self.mock_hardware_connection,
-            stimulator_sequence=sequence,
-        )
-
-        # Should have 0 stimulators since the class doesn't exist
-        self.assertEqual(len(multi_stim._stimulators), 0)
+        with self.assertRaisesRegex(ValueError, "NonExistentStimulator"):
+            MultiStimulator(
+                hardware_connection=self.mock_hardware_connection,
+                stimulator_sequence=sequence,
+            )
 
     def test_stimulator_initialization_exception(self):
-        """Test handling of exception during stimulator initialization."""
-        # Use a mock class that raises exception during instantiation
-        with patch(
-            "ethoscope.stimulators.stimulators.DefaultStimulator",
-            side_effect=Exception("Initialization failed"),
-        ):
+        """A stimulator that cannot be built refuses the whole sequence."""
+        failing = Mock(side_effect=Exception("Initialization failed"))
+        failing._HardwareInterfaceClass = DefaultInterface
+        with patch.dict(STIMULATOR_REGISTRY, {"DefaultStimulator": failing}):
             sequence = [
                 {
                     "class_name": "DefaultStimulator",
@@ -438,25 +440,17 @@ class TestMultiStimulator(unittest.TestCase):
                 }
             ]
 
-            # Should not raise exception, just log error and skip
-            multi_stim = MultiStimulator(
-                hardware_connection=self.mock_hardware_connection,
-                stimulator_sequence=sequence,
-            )
-
-            # Should have 0 stimulators since initialization failed
-            self.assertEqual(len(multi_stim._stimulators), 0)
+            with self.assertRaisesRegex(Exception, "Initialization failed"):
+                MultiStimulator(
+                    hardware_connection=self.mock_hardware_connection,
+                    stimulator_sequence=sequence,
+                )
 
     def test_decide_with_empty_stimulators(self):
         """Test _decide when stimulators list is empty."""
-        # Create with unknown stimulator so list is empty
-        sequence = [
-            {"class_name": "NonExistentStimulator", "arguments": {}, "date_range": ""}
-        ]
-
         multi_stim = MultiStimulator(
             hardware_connection=self.mock_hardware_connection,
-            stimulator_sequence=sequence,
+            stimulator_sequence=[],
         )
 
         mock_tracker = Mock()
@@ -601,6 +595,110 @@ class TestMultiStimulator(unittest.TestCase):
         state = multi_stim.get_stimulator_state()
         # Should return scheduled or inactive depending on if currently active
         self.assertIn(state, ["inactive", "scheduled", "stimulating"])
+
+
+def _date_range(now, start_s, end_s):
+    """A Scheduler date range from start_s to end_s seconds after now."""
+    fmt = "%Y-%m-%d %H:%M:%S"
+    start = time.strftime(fmt, time.localtime(now + start_s))
+    end = time.strftime(fmt, time.localtime(now + end_s))
+    return f"{start} > {end}"
+
+
+class TestMultiStimulatorWithComposedStimulators(unittest.TestCase):
+    """
+    The sequence the node sends when the user adds two or more stimulators.
+
+    "Add Stimulator" always creates a ComposedStimulator; two of them are sent
+    as a MultiStimulator whose sequence names that class.
+    """
+
+    def setUp(self):
+        self.now = time.time()
+        self.hw = Mock()
+        self.hw.interrogate.return_value = {
+            "capabilities": {"motors": 10, "valves": 10, "leds": 0}
+        }
+        periodic = {"trigger_type": "periodic", "interval_seconds": 60}
+        self.sequence = [
+            {
+                "class_name": "ComposedStimulator",
+                "arguments": dict(
+                    periodic, action_type="motor_pulse", pulse_duration=750
+                ),
+                "date_range": _date_range(self.now, -1800, 1800),
+            },
+            {
+                "class_name": "ComposedStimulator",
+                "arguments": dict(
+                    periodic, action_type="valve_pulse", pulse_duration=500
+                ),
+                "date_range": _date_range(self.now, 3600, 7200),
+            },
+        ]
+
+    def _bound_multi(self):
+        multi = MultiStimulator(self.hw, stimulator_sequence=self.sequence)
+        tracker = Mock()
+        tracker._roi.idx = 1
+        tracker.last_time_point = 120_000  # two periodic intervals in
+        multi.bind_tracker(tracker)
+        return multi
+
+    def test_both_stimulators_are_built(self):
+        multi = MultiStimulator(self.hw, stimulator_sequence=self.sequence)
+        self.assertEqual(
+            [s["class_name"] for s in multi._stimulators],
+            ["ComposedStimulator", "ComposedStimulator"],
+        )
+
+    def test_first_stimulator_delivers_in_its_range(self):
+        multi = self._bound_multi()
+        with patch("time.time", return_value=self.now):
+            interact, _ = multi.apply()
+        self.assertEqual(int(interact), 1)
+        self.hw.send_instruction.assert_called_once_with(
+            {"channel": 1, "duration": 750}
+        )
+
+    def test_second_stimulator_delivers_in_its_range(self):
+        multi = self._bound_multi()
+        with patch("time.time", return_value=self.now + 5400):
+            interact, _ = multi.apply()
+        self.assertEqual(int(interact), 1)
+        self.hw.send_instruction.assert_called_once_with(
+            {"channel": 0, "duration": 500}
+        )
+
+    def test_nothing_is_delivered_between_ranges(self):
+        multi = self._bound_multi()
+        with patch("time.time", return_value=self.now + 2700):
+            interact, _ = multi.apply()
+        self.assertEqual(int(interact), 0)
+        self.hw.send_instruction.assert_not_called()
+
+    def test_the_connection_speaks_to_the_module(self):
+        # Reason: tracking.py opens the one hardware connection of a run from
+        # this attribute, read off the class dict. DefaultInterface's send() is
+        # a no-op, so with it no stimulator in a sequence reached the module.
+        self.assertIs(MultiStimulator.__dict__["_HardwareInterfaceClass"], OptoMotor)
+
+    def test_a_stimulator_needing_another_interface_is_refused(self):
+        # SleepDepStimulator drives the servo controller (SSC-32U); sharing an
+        # OptoMotor connection, it would send module commands to whatever is
+        # attached.
+        sequence = [
+            {"class_name": "SleepDepStimulator", "arguments": {}, "date_range": ""}
+        ]
+        with self.assertRaisesRegex(ValueError, "SleepDepStimulator"):
+            MultiStimulator(self.hw, stimulator_sequence=sequence)
+
+    def test_sequences_do_not_nest(self):
+        sequence = [
+            {"class_name": "MultiStimulator", "arguments": {}, "date_range": ""}
+        ]
+        with self.assertRaisesRegex(ValueError, "MultiStimulator"):
+            MultiStimulator(self.hw, stimulator_sequence=sequence)
 
 
 if __name__ == "__main__":

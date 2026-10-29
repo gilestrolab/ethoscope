@@ -8,6 +8,7 @@ __author__ = "giorgio"
 import logging
 
 from ethoscope.hardware.interfaces.interfaces import DefaultInterface
+from ethoscope.hardware.interfaces.optomotor import OptoMotor
 from ethoscope.stimulators.stimulators import BaseStimulator, HasInteractedVariable
 from ethoscope.utils.scheduler import Scheduler
 
@@ -34,7 +35,12 @@ class MultiStimulator(BaseStimulator):
         ],
     }
 
-    _HardwareInterfaceClass = DefaultInterface
+    # Reason: a run opens one hardware connection, from this attribute, before
+    # the sequence is read, and every stimulator in the sequence shares it. It
+    # must be the interface of the stimulators the node puts in a sequence
+    # (ComposedStimulator); DefaultInterface's send() is a no-op, so with it no
+    # stimulator in a sequence ever reached the module.
+    _HardwareInterfaceClass = OptoMotor
 
     def __init__(
         self, hardware_connection, stimulator_sequence=None, roi_template_config=None
@@ -95,86 +101,47 @@ class MultiStimulator(BaseStimulator):
             logging.debug(
                 "MultiStimulator with same config already logged, creating instance silently"
             )
-        from ethoscope.stimulators.odour_stimulators import (
-            DynamicOdourSleepDepriver,
-            MiddleCrossingOdourStimulator,
-            MiddleCrossingOdourStimulatorFlushed,
-        )
-        from ethoscope.stimulators.optomotor_stimulators import (
-            OptoMidlineCrossStimulator,
-        )
-        from ethoscope.stimulators.sleep_depriver_stimulators import (
-            AGO,
-            ExperimentalSleepDepStimulator,
-            MiddleCrossingStimulator,
-            OptomotorSleepDepriver,
-            OptoSleepDepriver,
-            SleepDepStimulator,
-            mAGO,
-        )
-        from ethoscope.stimulators.stimulators import DefaultStimulator  # noqa: F811
-
-        # Map class names to actual classes
-        stimulator_classes = {
-            "DefaultStimulator": DefaultStimulator,
-            "SleepDepStimulator": SleepDepStimulator,
-            "OptomotorSleepDepriver": OptomotorSleepDepriver,
-            "MiddleCrossingStimulator": MiddleCrossingStimulator,
-            "ExperimentalSleepDepStimulator": ExperimentalSleepDepStimulator,
-            "DynamicOdourSleepDepriver": DynamicOdourSleepDepriver,
-            "OptoMidlineCrossStimulator": OptoMidlineCrossStimulator,
-            "OptoSleepDepriver": OptoSleepDepriver,
-            "MiddleCrossingOdourStimulator": MiddleCrossingOdourStimulator,
-            "MiddleCrossingOdourStimulatorFlushed": MiddleCrossingOdourStimulatorFlushed,
-            "mAGO": mAGO,
-            "AGO": AGO,
-        }
 
         # Reset stimulators list
         self._stimulators = []
 
+        # Reason: a stimulator that is unknown or cannot be built raises rather
+        # than being skipped. tracking.py turns the error into a refusal to start;
+        # skipping it started a run that delivered less than the user asked for,
+        # with only a log line to show for it.
         for config in self._stimulator_configs:
             class_name = config.get("class_name", "")
             arguments = config.get("arguments", {})
             date_range = config.get("date_range", "")
 
-            if class_name not in stimulator_classes:
-                logging.error(f"Unknown stimulator class: {class_name}")
-                continue
+            StimulatorClass = self._stimulator_class(class_name)
 
-            StimulatorClass = stimulator_classes[class_name]
+            # Create stimulator instance with its specific date_range
+            stimulator = StimulatorClass(
+                hardware_connection=self._hardware_connection,
+                date_range=date_range,
+                roi_template_config=self._roi_template_config,
+                **arguments,
+            )
 
-            try:
-                # Create stimulator instance with its specific date_range
-                stimulator = StimulatorClass(
-                    hardware_connection=self._hardware_connection,
-                    date_range=date_range,
-                    roi_template_config=self._roi_template_config,
-                    **arguments,
+            self._stimulators.append(
+                {
+                    "instance": stimulator,
+                    "class_name": class_name,
+                    "date_range": date_range,
+                    "scheduler": Scheduler(date_range),
+                }
+            )
+
+            # Only log individual stimulator initialization if this is the first instance for this config
+            if (
+                config_key not in _MULTISTIMULATOR_LOGGED
+                or len(_MULTISTIMULATOR_LOGGED) == 1
+            ):
+                logging.info(
+                    f"Initialized stimulator {class_name} with date_range: {date_range}"
                 )
-
-                self._stimulators.append(
-                    {
-                        "instance": stimulator,
-                        "class_name": class_name,
-                        "date_range": date_range,
-                        "scheduler": Scheduler(date_range),
-                    }
-                )
-
-                # Only log individual stimulator initialization if this is the first instance for this config
-                if (
-                    config_key not in _MULTISTIMULATOR_LOGGED
-                    or len(_MULTISTIMULATOR_LOGGED) == 1
-                ):
-                    logging.info(
-                        f"Initialized stimulator {class_name} with date_range: {date_range}"
-                    )
-                logging.debug(f"Stimulator config: {config}")
-
-            except Exception as e:
-                logging.error(f"Failed to initialize stimulator {class_name}: {e}")
-                continue
+            logging.debug(f"Stimulator config: {config}")
 
         self._initialized = True
         # Only log completion message for the first instance of this configuration
@@ -185,6 +152,40 @@ class MultiStimulator(BaseStimulator):
             logging.info(
                 f"MultiStimulator initialization complete: {len(self._stimulators)} stimulator(s) ready"
             )
+
+    def _stimulator_class(self, class_name):
+        """
+        Resolve a class named in the sequence.
+
+        Args:
+            class_name (str): The stimulator class name, as sent by the node.
+
+        Returns:
+            type: The stimulator class.
+
+        Raises:
+            ValueError: If the class is not a registered stimulator, is itself a
+                MultiStimulator, or needs a hardware interface other than the
+                connection the sequence shares.
+        """
+        # Reason: imported here, as the registry imports this module.
+        from ethoscope.stimulators.registry import STIMULATOR_REGISTRY
+
+        StimulatorClass = STIMULATOR_REGISTRY.get(class_name)
+        if StimulatorClass is None or StimulatorClass is MultiStimulator:
+            raise ValueError(f"Unknown stimulator class in sequence: {class_name!r}")
+
+        # A stimulator that never delivers (DefaultInterface) fits any connection.
+        interface = StimulatorClass._HardwareInterfaceClass
+        if interface is not DefaultInterface and not issubclass(
+            interface, self._HardwareInterfaceClass
+        ):
+            raise ValueError(
+                f"{class_name} drives {interface.__name__}, but the stimulators "
+                f"of a sequence share one {self._HardwareInterfaceClass.__name__} "
+                f"connection"
+            )
+        return StimulatorClass
 
     def bind_tracker(self, tracker):
         """

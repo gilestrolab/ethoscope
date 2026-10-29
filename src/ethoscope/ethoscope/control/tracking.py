@@ -34,28 +34,7 @@ from ethoscope.io import (
 )
 from ethoscope.roi_builders.file_based_roi_builder import FileBasedROIBuilder
 from ethoscope.roi_builders.target_roi_builder import TargetGridROIBuilder
-from ethoscope.stimulators.composed_stimulator import ComposedStimulator
-from ethoscope.stimulators.multi_stimulator import MultiStimulator
-from ethoscope.stimulators.odour_stimulators import (
-    DynamicOdourSleepDepriver,
-    MiddleCrossingOdourStimulator,
-    MiddleCrossingOdourStimulatorFlushed,
-)
-from ethoscope.stimulators.optomotor_stimulators import OptoMidlineCrossStimulator
-from ethoscope.stimulators.sleep_depriver_stimulators import (
-    AGO,
-    ExperimentalSleepDepStimulator,
-    MiddleCrossingStimulator,
-    OptomotorSleepDepriver,
-    OptoSleepDepriver,
-    SleepDepStimulator,
-    mAGO,
-)
-from ethoscope.stimulators.sleep_restriction_stimulators import (
-    SimpleTimeRestrictedStimulator,
-    mAGOSleepRestriction,
-)
-from ethoscope.stimulators.stimulators import DefaultStimulator
+from ethoscope.stimulators.registry import STIMULATOR_CLASSES
 from ethoscope.trackers.adaptive_bg_tracker import AdaptiveBGModel
 from ethoscope.trackers.deep_tube import DeepTubeTracker
 from ethoscope.utils import pi
@@ -243,27 +222,8 @@ class ControlThread(Thread):
             (
                 "interactor",
                 {
-                    "possible_classes": [
-                        DefaultStimulator,
-                        ComposedStimulator,
-                        SleepDepStimulator,
-                        OptomotorSleepDepriver,
-                        MiddleCrossingStimulator,
-                        # SystematicSleepDepInteractor,
-                        ExperimentalSleepDepStimulator,
-                        # GearMotorSleepDepStimulator,
-                        # DynamicOdourDeliverer,
-                        DynamicOdourSleepDepriver,
-                        OptoMidlineCrossStimulator,
-                        OptoSleepDepriver,
-                        MiddleCrossingOdourStimulator,
-                        MiddleCrossingOdourStimulatorFlushed,
-                        mAGO,
-                        AGO,
-                        mAGOSleepRestriction,
-                        SimpleTimeRestrictedStimulator,
-                        MultiStimulator,
-                    ],
+                    # One list, shared with MultiStimulator (stimulators/registry.py).
+                    "possible_classes": list(STIMULATOR_CLASSES),
                 },
             ),
             (
@@ -910,7 +870,13 @@ class ControlThread(Thread):
             logging.warning(f"No field {field}, using default")
             return None, {}
 
-        Class = eval(subdata["name"])
+        # Reason: a class the field offers is resolved from that list, so the
+        # stimulator registry serves both the options and the start request.
+        # eval() remains for names the list does not carry, such as aliases
+        # saved by earlier versions (timedStop).
+        offered = {c.__name__: c for c in self._option_dict[field]["possible_classes"]}
+        name = subdata["name"]
+        Class = offered[name] if name in offered else eval(name)
         kwargs = subdata["arguments"]
 
         return Class, kwargs
