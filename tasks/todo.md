@@ -1629,3 +1629,31 @@ sorting by it does nothing.
       `/backup/status`. The template comment at `ethoscope.html:361` says otherwise. Its
       header line `Last backup {{elapsedtime(device.time_since_backup)}}` (line 98) reads
       a field `/devices` never carries.
+
+# Stimulator modules: delivery, channel maps, firmware update (2026-10-29)
+
+- [x] Two or more stimulators delivered nothing: MultiStimulator's own class list lacked
+      ComposedStimulator, and its connection was DefaultInterface. One registry now
+      (`stimulators/registry.py`), OptoMotor connection, refusal instead of silent skips.
+- [x] `HardwareConnection.interrogate()` did not exist, so module capabilities were never
+      read and MODULE 4's 20-LED map never applied. Now asked once, under the send lock.
+- [x] Channel maps chosen by module and arena: 10-tube arenas get the AGO/OptoSleepDepriver
+      interleaved maps (all ten ROIs); a stimulus the module cannot deliver refuses the run.
+- [x] "Update Firmware" could not compile (gitignored `versions.h`, `build.extra_flags`
+      replacing the Micro's USB flags, `versions.h` overriding `-D`, wrong Nano Every FQBN).
+
+Open, needs hardware or a decision:
+- [ ] PCBVERSION 12/13 pin array: right for the LED PCB build; unchecked for a bare v1.3
+      board wired to motors/valves. Check with `D` (V1, M1, V2, M2 ... in order).
+- [ ] Firmware README/`.ino` header: "Motors: 6-12 V DC, 10 x 500 mA" vs the docs' 4.8 V
+      N20 at 25 mA. Which is right?
+- [ ] 10-tube arena, motors: no legacy class; the map (ROI 1->M1, 2->M6, 3->M2, ...) is
+      inferred from the valve/LED interleave. Confirm on hardware.
+- [ ] 20-tube arena, valves (mAGO map): right column is ROIs 11-19, motors and LEDs use 12-20.
+      On MODULE 1, ROI 11 gets air but no motor and ROI 12 the reverse. Intended?
+- [ ] MODULE 4's 20-LED map (ROI n -> channel n-1) is checked only against the PCBVERSION
+      12/13 pin order.
+- [ ] Nano Every devices: the SD installer installs only `arduino:avr`; "Update Firmware"
+      also needs `arduino-cli core install arduino:megaavr`.
+- [ ] `interrogate()` reads the `T` reply 0.1 s after sending it; untested on hardware.
+      If Module Info shows the module's counts, stimulators get them too.
