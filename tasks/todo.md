@@ -1647,10 +1647,12 @@ Open, needs hardware or a decision:
       board wired to motors/valves. Check with `D` (V1, M1, V2, M2 ... in order).
 - [ ] Firmware README/`.ino` header: "Motors: 6-12 V DC, 10 x 500 mA" vs the docs' 4.8 V
       N20 at 25 mA. Which is right?
-- [ ] 10-tube arena, motors: no legacy class; the map (ROI 1->M1, 2->M6, 3->M2, ...) is
-      inferred from the valve/LED interleave. Confirm on hardware.
-- [ ] 20-tube arena, valves (mAGO map): right column is ROIs 11-19, motors and LEDs use 12-20.
-      On MODULE 1, ROI 11 gets air but no motor and ROI 12 the reverse. Intended?
+- [x] 10-tube arena, motors: no legacy class; the map (ROI 1->M1, 2->M6, 3->M2, ...) is
+      inferred from the valve/LED interleave. Motor modules never run on 10-tube arenas
+      (Giorgio, 2026-10-29); the map stays as a fallback.
+- [x] 20-tube arena, valves (mAGO map): right column was ROIs 11-19 while motors and LEDs use
+      12-20. Giorgio, 2026-10-29: the same tube should get air and motor; valves now serve the
+      motors' ROIs (channel_maps and mAGO).
 - [ ] MODULE 4's 20-LED map (ROI n -> channel n-1) is checked only against the PCBVERSION
       12/13 pin order.
 - [ ] Nano Every devices: the SD installer installs only `arduino:avr`; "Update Firmware"

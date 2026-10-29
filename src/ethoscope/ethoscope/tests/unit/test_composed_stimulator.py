@@ -290,7 +290,7 @@ class TestChannelMaps:
     def test_valve_map(self):
         m = get_channel_map("valve")
         assert m[1] == 0
-        assert m[11] == 10  # mAGO valve numbering
+        assert m[12] == 10  # valves serve the motors' ROIs
         assert len(m) == 10
 
     def test_unknown_type_raises(self):
@@ -515,15 +515,15 @@ class TestComposedStimulator:
             pulse_duration=300,
         )
 
-        # ROI 11 exists in valve map but not in motor/led maps
+        # ROI 12 is motor channel 11 but valve channel 10
         tracker = _make_mock_tracker(
-            positions=[], times=[], last_time_point=31_000, roi_idx=11
+            positions=[], times=[], last_time_point=31_000, roi_idx=12
         )
         stim.bind_tracker(tracker)
 
         interact, result = stim._decide()
         assert int(interact) == 1
-        assert result["channel"] == 10  # ROI 11 -> valve channel 10
+        assert result["channel"] == 10  # ROI 12 -> valve channel 10
         assert result["duration"] == 300
 
     def test_invalid_trigger_type_raises(self):

@@ -893,17 +893,20 @@ class mAGO(SleepDepStimulator):
         20: 19,
     }
 
+    # Reason: the valves serve the motors' ROIs, so a tube gets both air and
+    # rotation; the air reaches its tube through tubing, so any valve can feed
+    # any ROI.
     _roi_to_channel_valves = {
         1: 0,
         3: 2,
         5: 4,
         7: 6,
         9: 8,
-        11: 10,
-        13: 12,
-        15: 14,
-        17: 16,
-        19: 18,
+        12: 10,
+        14: 12,
+        16: 14,
+        18: 16,
+        20: 18,
     }
 
     def __init__(

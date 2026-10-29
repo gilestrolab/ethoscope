@@ -31,7 +31,7 @@ from ethoscope.utils.debug import EthoscopeException
 MOTORS_20 = {1: 1, 3: 3, 5: 5, 7: 7, 9: 9, 12: 11, 14: 13, 16: 15, 18: 17, 20: 19}
 LEDS_10_OF_20 = {1: 0, 3: 2, 5: 4, 7: 6, 9: 8, 12: 10, 14: 12, 16: 14, 18: 16, 20: 18}
 LEDS_20_OF_20 = {roi: roi - 1 for roi in range(1, 21)}
-VALVES_20 = {1: 0, 3: 2, 5: 4, 7: 6, 9: 8, 11: 10, 13: 12, 15: 14, 17: 16, 19: 18}
+VALVES_20 = {1: 0, 3: 2, 5: 4, 7: 6, 9: 8, 12: 10, 14: 12, 16: 14, 18: 16, 20: 18}
 
 # --- 10-tube arena (one column of ten long tubes) ---
 EVEN_10 = {1: 0, 2: 10, 3: 2, 4: 12, 5: 4, 6: 14, 7: 6, 8: 16, 9: 8, 10: 18}
@@ -164,6 +164,14 @@ def test_20_tube_motors_are_mago_and_optomotor_motors():
 
 def test_20_tube_valves_are_mago_valves():
     assert get_channel_map("valve", n_rois=20) == mAGO._roi_to_channel_valves
+
+
+def test_20_tube_valves_serve_the_motor_rois():
+    # On the motors + valves module a tube gets both air and rotation.
+    valves = get_channel_map("valve", n_rois=20)
+    motors = get_channel_map("motor", n_rois=20)
+    assert valves.keys() == motors.keys()
+    assert valves == {roi: ch - 1 for roi, ch in motors.items()}
 
 
 def test_20_tube_10_led_map_is_optomotor_leds():

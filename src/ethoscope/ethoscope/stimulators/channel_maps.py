@@ -12,9 +12,13 @@ ROIs. The maps are those of the legacy classes written for each layout.
 
 - motors: ROIs 1,3,5,7,9,12,14,16,18,20 -> 1,3,...,19 (mAGO,
   OptomotorSleepDepriver)
-- LEDs, 10-LED module: the same ROIs -> 0,2,...,18 (OptomotorSleepDepriver)
+- LEDs, 10-LED module, and valves: the same ROIs -> 0,2,...,18
+  (OptomotorSleepDepriver, mAGO)
 - LEDs, 20-LED module: ROI n -> n-1 (MODULE 4)
-- valves: ROIs 1,3,5,...,19 -> 0,2,...,18 (mAGO)
+
+Valves serve the motors' ROIs so that, on the motors + valves module, a tube
+gets both air and rotation; the air reaches its tube through tubing, so any
+valve can feed any ROI.
 
 10-tube arena (one column of ten long tubes): odd ROIs are served from
 connectors 1-5, even ROIs from connectors 6-10.
@@ -42,33 +46,9 @@ _MOTORS_20_TUBES = {
     20: 19,
 }
 
-_LEDS_10_OF_20_TUBES = {
-    1: 0,
-    3: 2,
-    5: 4,
-    7: 6,
-    9: 8,
-    12: 10,
-    14: 12,
-    16: 14,
-    18: 16,
-    20: 18,
-}
+_EVEN_20_TUBES = {roi: channel - 1 for roi, channel in _MOTORS_20_TUBES.items()}
 
 _LEDS_20_OF_20_TUBES = {i: i - 1 for i in range(1, 21)}
-
-_VALVES_20_TUBES = {
-    1: 0,
-    3: 2,
-    5: 4,
-    7: 6,
-    9: 8,
-    11: 10,
-    13: 12,
-    15: 14,
-    17: 16,
-    19: 18,
-}
 
 # --- 10-tube arena ---
 _EVEN_10_TUBES = {
@@ -114,9 +94,9 @@ def get_channel_map(channel_type, led_count=None, n_rois=None):
         elif isinstance(led_count, (int, float)) and led_count > 10:
             cmap = _LEDS_20_OF_20_TUBES
         else:
-            cmap = _LEDS_10_OF_20_TUBES
+            cmap = _EVEN_20_TUBES
     elif channel_type == "valve":
-        cmap = _EVEN_10_TUBES if ten_tubes else _VALVES_20_TUBES
+        cmap = _EVEN_10_TUBES if ten_tubes else _EVEN_20_TUBES
     else:
         raise ValueError(
             f"Unknown channel_type: {channel_type!r}. "
