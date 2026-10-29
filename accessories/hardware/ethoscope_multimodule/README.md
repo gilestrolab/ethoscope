@@ -30,10 +30,10 @@ and LEDs on even channels, depending on the module.
 ## Hardware Requirements
 
 - Arduino Micro (ATmega32U4).
-- Ethoscope multi-module PCB (v1.0, v1.1, or v1.2/1.3).
+- Ethoscope multi-module PCB (v1.0, v1.1, or v1.2/1.3; v1.2/1.3 optionally with two LED boards).
 - Darlington arrays (e.g. ULN2803) for the output channels.
 - Power supply sized for the actuators in use:
-  - Motors: 6–12 V DC, up to 10 × 500 mA = 5 A.
+  - Motors: as rated; the N20 sleep deprivation module runs 6 V motors from 4.8–5 V.
   - Solenoid valves: as per valve specification.
   - LEDs: driven through current-limiting resistors, up to 20 × 20 mA = 400 mA.
 - Common ground between the Arduino and the actuator power rail.
@@ -55,7 +55,8 @@ cp versions.h.example versions.h
 Then set the two values in `versions.h` to match your board:
 
 ```cpp
-#define PCBVERSION 10    // 10 = v1.0, 11 = v1.1, 12/13 = v1.2/1.3
+#define PCBVERSION 10    // 10 = v1.0, 11 = v1.1, 14 = v1.2/1.3,
+                         // 12/13 = v1.2/1.3 driving two LED boards
 #define MODULE 0         // 0=SD, 1=AGOSD, 2=AGO, 3=mAGOLED, 4=LED
 ```
 

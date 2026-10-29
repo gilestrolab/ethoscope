@@ -1643,8 +1643,11 @@ sorting by it does nothing.
       replacing the Micro's USB flags, `versions.h` overriding `-D`, wrong Nano Every FQBN).
 
 Open, needs hardware or a decision:
-- [ ] PCBVERSION 12/13 pin array: right for the LED PCB build; unchecked for a bare v1.3
-      board wired to motors/valves. Check with `D` (V1, M1, V2, M2 ... in order).
+- [x] PCBVERSION 12/13 pin array: traced from the Fritzing sources (v1.3 board, LED boards
+      v1.1) and Giorgio's connections.ods: 12/13 is the map for two LED boards; on a bare
+      v1.2/v1.3 board it puts motor channels on V connectors. New PCBVERSION 14 = the
+      2026-03-30 map (channel 2k -> V(k+1), 2k+1 -> M(k+1)). Check on hardware with `D`
+      (V1, M1, V2, M2 ... in order).
 - [ ] Firmware README/`.ino` header: "Motors: 6-12 V DC, 10 x 500 mA" vs the docs' 4.8 V
       N20 at 25 mA. Which is right?
 - [x] 10-tube arena, motors: no legacy class; the map (ROI 1->M1, 2->M6, 3->M2, ...) is

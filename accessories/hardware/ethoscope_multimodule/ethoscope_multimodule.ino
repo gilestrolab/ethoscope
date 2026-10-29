@@ -26,11 +26,12 @@
  *       * Designed for CsChrimson activation at 620-630 nm.
  *
  * Hardware Configuration:
- *   - PCB Version: Defined by PCBVERSION (10 for v1.0, 11 for v1.1, 12 for v1.2/1.3)
+ *   - PCB Version: Defined by PCBVERSION (10 for v1.0, 11 for v1.1, 14 for v1.2/1.3,
+ *     12 or 13 for v1.2/1.3 driving two LED boards)
  *   - Module Type: Defined by MODULE (0-4)
  *   - Microcontroller: Arduino Micro
  *   - Power Requirements:
- *     * Motors: 6-12V DC (according to N20 motor specifications)
+ *     * Motors: as rated (the N20 sleep deprivation module runs 6 V motors from 4.8-5 V)
  *     * Solenoids: As per valve specifications
  *     * LEDs: Via current-limiting resistors (intensity set at hardware level)
  *     * Current Budget:
@@ -102,6 +103,8 @@
  *   - Current monitoring (implementation placeholder) for advanced protection.
  *
  * Revision History:
+ *   v1.6 (2026-10-29) - PCBVERSION 14: v1.2/V1.3 board with actuators on its own
+ *                       connectors (the 2026-03-30 map); 12/13 stay the LED-board map.
  *   v1.5 (2026-03-30) - Added PCB V1.2/V1.3 pin mapping (PCBVERSION 12).
  *   v1.4 (2026-03-27) - Removed SerialCommand library dependency; inline serial parser.
  *   v1.3 (2026-02-27) - Added MODULE 3/4 for optogenetic LEDs, pulse train support.
@@ -123,7 +126,7 @@
  *   Q: Channels not activating.
  *   A:
  *      1. Verify power supply connections and ratings.
- *      2. Ensure PCBVERSION (10, 11, or 12) and MODULE are correctly defined.
+ *      2. Ensure PCBVERSION (10, 11, 12, 13 or 14) and MODULE are correctly defined.
  *      3. Check Darlington array orientation and connections.
  *      4. Confirm serial communication settings.
  *
@@ -147,7 +150,7 @@
 // =============================================================================
 // Version and Configuration
 // =============================================================================
-const float VERSION = 1.5;
+const float VERSION = 1.6;
 
 // PCBVERSION and MODULE come from the compiler command line when given there
 // (the ethoscope's "Update Firmware" passes the values read from the running
@@ -214,10 +217,15 @@ const float VERSION = 1.5;
     static const uint8_t pins[] = {1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, A0, A1, A2, A3, A4, A5};
 #elif (PCBVERSION == 11) // PCB Version 1.1
     static const uint8_t pins[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, A0, A1, A2, A3, A4, A5};
-#elif (PCBVERSION == 12) || (PCBVERSION == 13) // PCB Version 1.2 (DEV) or 1.3 (production)
+#elif (PCBVERSION == 12) || (PCBVERSION == 13) // PCB Version 1.2 (DEV) or 1.3 (production) with two LED boards
+    // Reason: ordered for the LED boards' cabling (ROI n on channel n-1); on a bare board
+    // this order puts motor channels on V connectors. Bare boards use PCBVERSION 14.
     static const uint8_t pins[] = {3, 8, 4, 9, 5, 10, 6, 11, 7, 12, A3, 2, A4, 13, A5, A0, 0, A1, 1, A2};
+#elif (PCBVERSION == 14) // PCB Version 1.2 or 1.3, actuators on the board's own connectors
+    // Channel 2k drives V(k+1), channel 2k+1 drives M(k+1), as on v1.0 and v1.1
+    static const uint8_t pins[] = {8, 3, 9, 4, 10, 5, 11, 6, 12, 7, 1, A2, 0, A1, A5, A0, A4, 13, A3, 2};
 #else
-    #error "Invalid PCBVERSION defined. Use 10 for v1.0, 11 for v1.1, or 12/13 for v1.2/1.3."
+    #error "Invalid PCBVERSION defined. Use 10 for v1.0, 11 for v1.1, 14 for v1.2/1.3, or 12/13 for v1.2/1.3 with LED boards."
 #endif
 
 // Channel mapping arrays — sized at compile time per module

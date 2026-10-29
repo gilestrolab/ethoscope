@@ -236,7 +236,7 @@ def compile_firmware(ino_path=None, fqbn=None, module=None, pcbversion=None):
         ino_path (str, optional): Path to .ino source file.
         fqbn (str, optional): Fully Qualified Board Name.
         module (int, optional): MODULE define value (0-4).
-        pcbversion (int, optional): PCBVERSION define value (10, 11, 12 or 13).
+        pcbversion (int, optional): PCBVERSION define value (10, 11, 12, 13 or 14).
 
     Returns:
         dict: ``{"success": bool, "output": str, "error": str}``
