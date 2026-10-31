@@ -35,10 +35,10 @@
  *     * Solenoids: As per valve specifications
  *     * LEDs: Via current-limiting resistors (intensity set at hardware level)
  *     * Current Budget:
- *         - Motors: Max 10x500mA = 5A
- *         - Solenoids: As per usage (not activated unless commanded)
+ *         - Motors: N20 about 25 mA each running at 4.8 V, more at stall
+ *         - Solenoids: about 260 mA each at 5 V, 2.6 A with all ten open
  *         - LEDs: Max 20x20mA = 400mA
- *     * Total System Current: Up to 10A continuous with safety margin
+ *     * Each Darlington output sinks at most 500 mA. A 5 V, 3 A supply runs ten valves.
  *   - Darlington Arrays:
  *     * Example: ULN2803 or similar
  *     * Ensure proper heat sinking and current ratings
@@ -103,7 +103,7 @@
  *   - Current monitoring (implementation placeholder) for advanced protection.
  *
  * Revision History:
- *   v1.6 (2026-10-29) - PCBVERSION 14: v1.2/V1.3 board with actuators on its own
+ *   v1.6 (2026-10-29) - PCBVERSION 14: v1.2/v1.3 board with actuators on its own
  *                       connectors (the 2026-03-30 map); 12/13 stay the LED-board map.
  *   v1.5 (2026-03-30) - Added PCB V1.2/V1.3 pin mapping (PCBVERSION 12).
  *   v1.4 (2026-03-27) - Removed SerialCommand library dependency; inline serial parser.
@@ -113,9 +113,11 @@
  *   v1.1 (2020-07-08) - Original implementation with basic serial commands.
  *
  * Connections:
- *   - Motors: Connected to channels 0-9 via Darlington arrays.
- *   - Valves: Connected to channels 10-19 via Darlington arrays (if applicable).
- *   - LEDs: Connected via Darlington arrays with current-limiting resistors.
+ *   - Motors: odd channels (1, 3, ... 19), via Darlington arrays.
+ *   - Valves: even channels (0, 2, ... 18), via Darlington arrays (if applicable).
+ *   - LEDs: even channels (MODULE 3) or all twenty (MODULE 4), via Darlington arrays
+ *     and the current-limiting resistors on the LED boards.
+ *   - The pin arrays below map channels to Arduino pins for each PCBVERSION.
  *   - Serial Communication: USB connection to host computer/controller.
  *   - Power:
  *     * Motors and valves should have a common ground with the Arduino.

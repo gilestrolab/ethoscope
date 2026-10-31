@@ -113,10 +113,12 @@ illumination would cause depolarization block.
 
 The `T` command returns a JSON description of the firmware version, module type,
 channel counts, and available commands. This lets a host (e.g. the node) learn a
-module's abilities dynamically rather than hard-coding them. Example:
+module's abilities dynamically rather than hard-coding them. Example, without the
+`interface` object that lists the commands:
 
 ```json
-{"version":"FW-1.50;HW-10","module":{"name":"N20 Sleep Deprivation Module","type":0},
+{"version":"FW-1.60;HW-14","module":{"name":"N20 Sleep Deprivation Module",
+ "description":"Rotates up to twenty N20 geared motors independently","type":0},
  "capabilities":{"motors":10,"valves":0,"leds":0,"total_channels":20,"num_actuators":10}}
 ```
 
