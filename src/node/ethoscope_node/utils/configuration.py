@@ -61,6 +61,48 @@ DEFAULT_SSH_KEY_GROUP = "node"
 SSH_CONFIG_MARKER = "# Ethoscope SSH configuration"
 SSH_CONFIG_END_MARKER = "# End of Ethoscope SSH configuration"
 
+# PINs only protect anything while authentication is on, so they are required
+# only then. Turning authentication on with no administrator able to log in
+# would lock everyone out of the node, which is what this message refuses.
+MIN_PIN_LENGTH = 4
+PIN_REQUIRED_MESSAGE = "PIN is required while authentication is enabled"
+ADMIN_PIN_REQUIRED_MESSAGE = (
+    "Authentication cannot be turned on: no active administrator has a PIN. "
+    "Set a PIN for an administrator first."
+)
+
+
+def is_auth_enabled(settings: dict[str, Any]) -> bool:
+    """
+    Read the authentication switch from a settings dictionary.
+
+    Args:
+        settings (dict): The node settings (EthoscopeConfiguration._settings).
+
+    Returns:
+        bool: True if authentication is turned on.
+    """
+    return bool((settings.get("authentication") or {}).get("enabled", False))
+
+
+def check_new_pin(pin: str, auth_enabled: bool) -> str | None:
+    """
+    Check the PIN given for a new user (or set on an administrator).
+
+    Args:
+        pin (str): The PIN as submitted, already stripped; empty if none.
+        auth_enabled (bool): Whether authentication is currently on.
+
+    Returns:
+        str | None: Why the PIN is refused, or None if it is acceptable.
+    """
+    if not pin:
+        return PIN_REQUIRED_MESSAGE if auth_enabled else None
+    if len(pin) < MIN_PIN_LENGTH:
+        return f"PIN must be at least {MIN_PIN_LENGTH} characters"
+    return None
+
+
 # Module-level default configuration file path.
 # Resolved from ETHOSCOPE_CONFIG_DIR / {ETHOSCOPE_DATA_DIR}/config at import time
 # (systemd sets these from the bootstrap env file before the process starts).
@@ -565,11 +607,29 @@ class EthoscopeConfiguration:
                 if key not in userdata and key not in ["created"]:
                     self._logger.warning(f"User '{name}' missing field: {key}")
 
+            # A user with an id is an update. A blank PIN there keeps the stored
+            # one; while authentication is on it is refused, as it would leave
+            # the user unable to log in.
+            is_update = bool(userdata.get("id"))
+            auth_on = is_auth_enabled(self._settings)
+            raw_pin = userdata.get("PIN")
+            pin = "" if raw_pin is None else str(raw_pin).strip()
+            if is_update:
+                pin_error = (
+                    PIN_REQUIRED_MESSAGE
+                    if auth_on and "PIN" in userdata and not pin
+                    else None
+                )
+            else:
+                pin_error = check_new_pin(pin, auth_on)
+            if pin_error:
+                return {"result": "error", "message": pin_error}
+
             # Map configuration fields to database fields
             db_user_data = {
                 "username": userdata["name"],
                 "fullname": userdata.get("fullname", ""),
-                "pin": str(userdata.get("PIN", "")),
+                "pin": pin,
                 "email": userdata.get("email", ""),
                 "telephone": userdata.get("telephone", ""),
                 "labname": userdata.get("group", ""),
@@ -581,7 +641,7 @@ class EthoscopeConfiguration:
             db = ExperimentalDB()
 
             # Check if this is an update (user has id field) or a new user
-            if "id" in userdata and userdata["id"]:
+            if is_update:
                 # Update existing user
                 user_id = userdata["id"]
                 # Remove fields that shouldn't be updated
@@ -590,6 +650,8 @@ class EthoscopeConfiguration:
                     for k, v in db_user_data.items()
                     if k != "username" and k != "created"
                 }
+                if not pin:
+                    update_data.pop("pin")
                 result = db.updateUser(user_id=user_id, **update_data)
 
                 if result >= 0:
@@ -1181,8 +1243,17 @@ class EthoscopeConfiguration:
             Updated authentication configuration
 
         Raises:
-            ValueError: If configuration data is invalid
+            ValueError: If configuration data is invalid, or if it turns
+                authentication on while no active administrator has a PIN.
         """
+        # Reason: every path that switches authentication on comes through here,
+        # so this is where a lock-out is refused, before anything is written.
+        if config_data.get("enabled"):
+            from ethoscope_node.utils.etho_db import ExperimentalDB
+
+            if not ExperimentalDB().has_admin_with_pin():
+                raise ValueError(ADMIN_PIN_REQUIRED_MESSAGE)
+
         if "authentication" not in self._settings:
             self._settings["authentication"] = self.DEFAULT_SETTINGS[
                 "authentication"

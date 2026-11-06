@@ -629,6 +629,7 @@ class TestEthoscopeConfigurationUsers:
         """Test successful user addition."""
         config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
         config._logger = MagicMock()
+        config._settings = {}
 
         mock_db = MagicMock()
         mock_db.addUser.return_value = 1
@@ -652,6 +653,7 @@ class TestEthoscopeConfigurationUsers:
         """Test add_user handles database failure."""
         config = EthoscopeConfiguration.__new__(EthoscopeConfiguration)
         config._logger = MagicMock()
+        config._settings = {}
 
         mock_db = MagicMock()
         mock_db.addUser.return_value = 0  # Failure
@@ -1447,7 +1449,16 @@ class TestEthoscopeConfigurationAuthentication:
             config._settings = {"authentication": {"enabled": False}}
             config._logger = MagicMock()
 
-            with patch.object(config, "save"):
+            # Turning authentication on needs an admin with a PIN.
+            mock_db = MagicMock()
+            mock_db.has_admin_with_pin.return_value = True
+            with (
+                patch.object(config, "save"),
+                patch(
+                    "ethoscope_node.utils.etho_db.ExperimentalDB",
+                    return_value=mock_db,
+                ),
+            ):
                 result = config.update_authentication_config({"enabled": True})
 
             assert result["enabled"] is True
@@ -1462,7 +1473,16 @@ class TestEthoscopeConfigurationAuthentication:
             config._settings = {}
             config._logger = MagicMock()
 
-            with patch.object(config, "save"):
+            # Turning authentication on needs an admin with a PIN.
+            mock_db = MagicMock()
+            mock_db.has_admin_with_pin.return_value = True
+            with (
+                patch.object(config, "save"),
+                patch(
+                    "ethoscope_node.utils.etho_db.ExperimentalDB",
+                    return_value=mock_db,
+                ),
+            ):
                 result = config.update_authentication_config({"enabled": True})
 
             assert "authentication" in config._settings

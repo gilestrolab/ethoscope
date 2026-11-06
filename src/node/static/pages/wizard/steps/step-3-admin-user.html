@@ -60,8 +60,12 @@
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
+                        <!-- justify-content-start: the wizard centres rows, and without the PIN
+                             column Team/Group would sit alone in the middle. -->
+                        <div class="row justify-content-start">
+                            <!-- PINs are only asked for while authentication is on;
+                                 turning it on in the Remote Access step asks for one. -->
+                            <div class="col-md-6" ng-if="authEnabled">
                                 <div class="form-group">
                                     <label for="adminPin">PIN Code <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" id="adminPin"

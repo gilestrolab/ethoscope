@@ -502,7 +502,8 @@ class TestSetupAPI(unittest.TestCase):
     @patch("bottle.request")
     @patch("ethoscope_node.api.setup_api.ExperimentalDB")
     def test_setup_admin_user_missing_pin(self, mock_db_class, mock_request):
-        """Without a PIN the operator would be locked out after wizard finish — refuse here."""
+        """With auth on, an admin without a PIN would be locked out — refuse here."""
+        self.api.config._settings["authentication"] = {"enabled": True}
         mock_request.json = {
             "username": "admin",
             "fullname": "Admin User",
@@ -1987,9 +1988,7 @@ class TestSetupAPI(unittest.TestCase):
         mock_db = Mock()
         mock_db_class.return_value = mock_db
         # An admin row exists but has no PIN — exactly the broken state.
-        mock_db.getAllUsers.return_value = {
-            "admin": {"name": "admin", "isAdmin": True, "PIN": ""}
-        }
+        mock_db.has_admin_with_pin.return_value = False
 
         result = self.api._complete_setup()
 
@@ -2015,9 +2014,7 @@ class TestSetupAPI(unittest.TestCase):
         self.api.config._settings["authentication"] = {"enabled": True}
         mock_db = Mock()
         mock_db_class.return_value = mock_db
-        mock_db.getAllUsers.return_value = {
-            "admin": {"name": "admin", "isAdmin": True, "PIN": "1234"}
-        }
+        mock_db.has_admin_with_pin.return_value = True
 
         result = self.api._complete_setup()
 

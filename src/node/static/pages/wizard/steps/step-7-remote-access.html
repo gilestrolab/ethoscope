@@ -39,6 +39,18 @@
                                 </div>
                             </div>
 
+                            <!-- Turning authentication on: the administrator needs a PIN to log in afterwards -->
+                            <div class="form-group mb-2" ng-if="isTurningAuthOn()">
+                                <label for="authAdminPin">
+                                    PIN for administrator <strong>{{adminUser.username}}</strong>
+                                    <span class="text-danger" ng-if="!adminUser.pin">*</span>
+                                </label>
+                                <input type="text" class="form-control" id="authAdminPin"
+                                       ng-model="tunnel.admin_pin" maxlength="8" autocomplete="off"
+                                       placeholder="{{adminUser.pin ? 'Leave blank to keep the current PIN' : 'At least 4 characters'}}">
+                                <small class="form-text text-muted">Once authentication is on, everyone logs in with their username and PIN. This PIN lets you log in as administrator.</small>
+                            </div>
+
                             <div ng-if="!tunnel.enabled" class="alert alert-info mb-0">
                                 <small>
                                     <i class="fa fa-info-circle"></i>

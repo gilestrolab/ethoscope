@@ -177,7 +177,8 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <!-- PINs are only asked for while authentication is on -->
+                        <div class="col-md-6" ng-if="authEnabled">
                             <div class="form-group">
                                 <label class="form-label">PIN <span class="text-danger">*</span></label>
                                 <input type="text"

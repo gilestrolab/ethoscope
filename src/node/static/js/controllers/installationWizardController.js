@@ -366,10 +366,11 @@
                 case 2:
                     return $scope.basicInfo.dataDir && $scope.basicInfo.configDir;
                 case 3:
-                    // PIN is required: without it the admin cannot log in once auth
-                    // is enabled at the end of the wizard (issue #221).
+                    // A PIN is required only while authentication is on: the admin
+                    // could not log in without one (issue #221). Turning
+                    // authentication on in step 7 asks for it there.
                     return $scope.adminUser.username && $scope.adminUser.email && $scope.adminUser.fullname
-                        && $scope.adminUser.pin && $scope.adminUser.pin.length >= 4;
+                        && (!$scope.authEnabled || ($scope.adminUser.pin && $scope.adminUser.pin.length >= 4));
                 case 4:
                     return true; // Additional users are optional
                 case 5:
@@ -378,6 +379,12 @@
                     if (!$scope.virtualSensor.enabled) return true; // If disabled, always valid
                     return $scope.virtualSensor.sensor_name && $scope.virtualSensor.location; // Name and location required when enabled
                 case 7:
+                    // Turning authentication on needs an administrator PIN, given
+                    // here unless the administrator already has one.
+                    if ($scope.isTurningAuthOn()) {
+                        var adminPin = $scope.tunnel.admin_pin || '';
+                        if (adminPin ? adminPin.length < 4 : !$scope.adminUser.pin) return false;
+                    }
                     if (!$scope.tunnel.enabled) return true; // If disabled, always valid
                     if (!$scope.tunnel.token) return false; // Token always required
                     if ($scope.tunnel.mode === 'custom' && !$scope.tunnel.custom_domain) return false; // Custom domain required for free mode
@@ -440,6 +447,10 @@
 
             $scope.isLoading = true;
             var data = angular.copy($scope.adminUser);
+            if (!$scope.authEnabled) {
+                // The PIN field is hidden: a blank PIN keeps whatever is stored.
+                data.pin = '';
+            }
 
             $http.post('/setup/admin-user', data)
                 .then(function(response) {
@@ -593,9 +604,17 @@
         $scope.processTunnel = function() {
             $scope.isLoading = true;
 
-            $http.post('/setup/tunnel', $scope.tunnel)
+            // The administrator PIN (if any) travels with this step: the server
+            // stores it on that administrator before turning authentication on.
+            var data = angular.copy($scope.tunnel);
+            data.admin_username = $scope.adminUser.username;
+
+            $http.post('/setup/tunnel', data)
                 .then(function(response) {
                     if (response.data.result === 'success') {
+                        // PIN fields elsewhere follow the node's authentication state
+                        $scope.$root.authEnabled = !!$scope.tunnel.authentication_enabled;
+                        $scope.tunnel.admin_pin = '';
                         // Move to next step
                         $scope.nextStep();
                     } else {
@@ -878,6 +897,11 @@
         // Get full tunnel URL preview
         $scope.getTunnelPreview = function() {
             return $scope.getComputedNodeId() + '.' + $scope.getEffectiveDomain();
+        };
+
+        // True while the switch turns authentication on and the node has it off
+        $scope.isTurningAuthOn = function() {
+            return !!$scope.tunnel.authentication_enabled && !$scope.authEnabled;
         };
 
         // Check if authentication can be disabled

@@ -1525,7 +1525,11 @@ class ExperimentalDB(multiprocessing.Process):
             """Map database field names and types to frontend format."""
             # Normalize PIN: old entries may be stored as int (0 instead of "0000")
             raw_pin = row_dict.get("pin", "")
-            if isinstance(raw_pin, int):
+            # Reason: a NULL pin must read as "no PIN". str(None) gave "None",
+            # which the users page then saved back as a working plaintext PIN.
+            if raw_pin is None:
+                raw_pin = ""
+            elif isinstance(raw_pin, int):
                 raw_pin = str(raw_pin).zfill(4)
 
             return {
@@ -2890,6 +2894,25 @@ class ExperimentalDB(multiprocessing.Process):
         except Exception as e:
             logging.error(f"Error verifying PIN for user {username}: {e}")
             return False
+
+    def has_admin_with_pin(self) -> bool:
+        """
+        Tell whether at least one active administrator has a PIN.
+
+        Authentication may only be turned on when this holds, otherwise no-one
+        could log in to administer the node. The raw ``pin`` column is read, as
+        verify_pin() does, rather than getAllUsers(), which rewrites stored values.
+
+        Returns:
+            bool: True if an active admin with a non-empty PIN exists.
+        """
+        sql = (
+            f"SELECT 1 FROM {self._users_table_name} "
+            "WHERE active = 1 AND isadmin = 1 "
+            "AND pin IS NOT NULL AND TRIM(pin) != '' LIMIT 1"
+        )
+        rows = self.executeSQL(sql)
+        return isinstance(rows, list) and len(rows) > 0
 
     def authenticate_user(self, username: str, pin: str) -> dict | None:
         """

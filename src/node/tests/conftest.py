@@ -193,3 +193,28 @@ def mock_zeroconf_service():
     service.addresses = [b"\xc0\xa8\x01\x64"]  # 192.168.1.100
     service.properties = {b"device_id": b"test_device_001", b"version": b"1.0.0"}
     return service
+
+
+@pytest.fixture
+def users_db(tmp_path, monkeypatch):
+    """
+    Provide a real ExperimentalDB with an empty users table under tmp_path.
+
+    Args:
+        tmp_path (Path): pytest temporary directory.
+        monkeypatch (MonkeyPatch): pytest monkeypatch fixture.
+
+    Returns:
+        ExperimentalDB: The temporary database.
+    """
+    from ethoscope_node.utils.etho_db import ExperimentalDB
+
+    # Reason: creating the tables migrates users from the default config file;
+    # point that at tmp_path so no real config is read or rewritten.
+    monkeypatch.setattr(
+        "ethoscope_node.utils.configuration._default_config_file",
+        str(tmp_path / "default.conf"),
+    )
+    database = ExperimentalDB(str(tmp_path / "db"))
+    database.executeSQL(f"DELETE FROM {database._users_table_name}")
+    return database

@@ -134,6 +134,7 @@
             $rootScope.isAuthenticated = AuthService.isAuthenticated;
             $rootScope.currentUser = AuthService.getCurrentUser();
             $rootScope.isAdmin = AuthService.isAdmin;
+            $rootScope.authEnabled = AuthService.authEnabled;
         };
 
         // Watch for authentication state changes globally

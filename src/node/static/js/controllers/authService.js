@@ -13,6 +13,9 @@
         self.currentUser = null;
         self.isAuthenticated = false;
         self.isAdmin = false;
+        // Whether the node has authentication turned on. PINs mean nothing
+        // while it is off, so the UI hides them.
+        self.authEnabled = false;
 
         // Session check interval
         var sessionCheckInterval = null;
@@ -23,6 +26,7 @@
         self.checkAuthenticationStatus = function() {
             return $http.get('/auth/session')
                 .then(function(response) {
+                    self.authEnabled = !!(response.data && response.data.auth_enabled);
                     if (response.data && response.data.authenticated) {
                         self.currentUser = response.data.user;
                         self.isAuthenticated = true;

@@ -45,9 +45,10 @@
                         </div>
                     </div>
                     <div class="row">
-                        <div class="col-md-6">
+                        <!-- PINs are only asked for while authentication is on -->
+                        <div class="col-md-6" ng-if="authEnabled">
                             <div class="form-group">
-                                <label>PIN Code</label>
+                                <label>PIN Code <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" ng-model="editingUser.pin"
                                        placeholder="1234" maxlength="4">
                             </div>

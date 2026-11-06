@@ -159,6 +159,7 @@ class AuthAPI(BaseAPI):
             if not auth_enabled:
                 return {
                     "authenticated": True,
+                    "auth_enabled": False,
                     "user": {
                         "username": "system",
                         "fullname": "System User",
@@ -176,6 +177,7 @@ class AuthAPI(BaseAPI):
             if user:
                 return {
                     "authenticated": True,
+                    "auth_enabled": True,
                     "user": {
                         "username": user.get("username"),
                         "fullname": user.get("fullname", ""),
@@ -187,7 +189,7 @@ class AuthAPI(BaseAPI):
                     },
                 }
             else:
-                return {"authenticated": False, "user": None}
+                return {"authenticated": False, "auth_enabled": True, "user": None}
 
         except Exception as e:
             self.logger.error(f"Error getting session info: {e}")
@@ -370,6 +372,7 @@ class AuthAPI(BaseAPI):
             if not auth_enabled:
                 return {
                     "authenticated": True,
+                    "auth_enabled": False,
                     "user": {
                         "username": "system",
                         "fullname": "System User",
@@ -383,6 +386,7 @@ class AuthAPI(BaseAPI):
             if current_user:
                 return {
                     "authenticated": True,
+                    "auth_enabled": True,
                     "user": {
                         "username": current_user.get("username"),
                         "fullname": current_user.get("fullname"),
@@ -391,7 +395,7 @@ class AuthAPI(BaseAPI):
                     },
                 }
             else:
-                return {"authenticated": False, "user": None}
+                return {"authenticated": False, "auth_enabled": True, "user": None}
 
         except Exception as e:
             self.logger.error(f"Error checking authentication: {e}")

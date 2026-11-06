@@ -96,10 +96,10 @@
                                 </div>
                             </li>
                             <li role="separator" class="divider"></li>
-                            <li><a href="#" ng-click="showChangePin()" onclick="return false;">
+                            <li ng-if="authEnabled"><a href="#" ng-click="showChangePin()" onclick="return false;">
                                 <i class="fa fa-key"></i> Change PIN
                             </a></li>
-                            <li role="separator" class="divider"></li>
+                            <li ng-if="authEnabled" role="separator" class="divider"></li>
                             <li><a href="#" ng-click="logout()" onclick="return false;">
                                 <i class="fa fa-sign-out-alt"></i> Logout
                             </a></li>

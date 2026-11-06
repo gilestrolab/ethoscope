@@ -15,6 +15,11 @@ from ethoscope_node.incubators.hierarchy import (
     children_of,
     validate_parent,
 )
+from ethoscope_node.utils.configuration import (
+    PIN_REQUIRED_MESSAGE,
+    check_new_pin,
+    is_auth_enabled,
+)
 from ethoscope_node.utils.etho_db import ExperimentalDB
 
 from .base import BaseAPI, error_decorator
@@ -117,6 +122,15 @@ class SetupAPI(BaseAPI):
     def _get_setup_status(self):
         """Get current setup status and progress."""
         return self.config.get_setup_status()
+
+    def _auth_enabled(self) -> bool:
+        """
+        Tell whether authentication is currently turned on.
+
+        Returns:
+            bool: True if authentication is on.
+        """
+        return is_auth_enabled(self.config._settings)
 
     def _get_system_info(self):
         """Get system information for setup validation."""
@@ -358,7 +372,7 @@ class SetupAPI(BaseAPI):
                 "username": data.get("username", "").strip(),
                 "fullname": data.get("fullname", "").strip(),
                 "email": data.get("email", "").strip(),
-                "pin": data.get("pin", "").strip(),
+                "pin": (data.get("pin") or "").strip(),
                 "telephone": data.get("telephone", "").strip(),
                 "labname": data.get("labname", "").strip(),
                 "active": 1,
@@ -370,16 +384,13 @@ class SetupAPI(BaseAPI):
                 return {"result": "error", "message": "Username is required"}
             if not user_data["email"]:
                 return {"result": "error", "message": "Email is required"}
-            # PIN is the only credential the login screen accepts — refusing it
-            # here is what stops the wizard from leaving the node in a locked-out
-            # state with auth enabled and no usable admin (issue #221).
-            if not user_data["pin"]:
-                return {"result": "error", "message": "PIN is required"}
-            if len(user_data["pin"]) < 4:
-                return {
-                    "result": "error",
-                    "message": "PIN must be at least 4 characters",
-                }
+            # The PIN is only needed while authentication is on: it is then the
+            # only credential the login screen accepts, and an admin without one
+            # would be locked out (issue #221). Turning authentication on later
+            # asks for it (see _setup_tunnel).
+            pin_error = check_new_pin(user_data["pin"], self._auth_enabled())
+            if pin_error:
+                return {"result": "error", "message": pin_error}
 
             # Check if user already exists
             existing_user = db.getUserByName(user_data["username"])
@@ -387,6 +398,9 @@ class SetupAPI(BaseAPI):
             if existing_user:
                 # Update existing user
                 updates_data = {k: v for k, v in user_data.items() if k != "username"}
+                if not user_data["pin"]:
+                    # A blank PIN keeps the one already stored.
+                    updates_data.pop("pin")
                 self.logger.info(
                     f"Updating user {user_data['username']} with data: {updates_data}"
                 )
@@ -443,7 +457,7 @@ class SetupAPI(BaseAPI):
                 "username": data.get("username", "").strip(),
                 "fullname": data.get("fullname", "").strip(),
                 "email": data.get("email", "").strip(),
-                "pin": data.get("pin", "").strip(),
+                "pin": (data.get("pin") or "").strip(),
                 "telephone": data.get("telephone", "").strip(),
                 "labname": data.get("labname", "").strip(),
                 "active": 1,
@@ -455,6 +469,9 @@ class SetupAPI(BaseAPI):
                 return {"result": "error", "message": "Username is required"}
             if not user_data["email"]:
                 return {"result": "error", "message": "Email is required"}
+            pin_error = check_new_pin(user_data["pin"], self._auth_enabled())
+            if pin_error:
+                return {"result": "error", "message": pin_error}
 
             # Add user
             result = db.addUser(**user_data)
@@ -499,7 +516,13 @@ class SetupAPI(BaseAPI):
             if "email" in data:
                 update_data["email"] = data["email"].strip()
             if "pin" in data:
-                update_data["pin"] = data["pin"].strip()
+                pin = (data["pin"] or "").strip()
+                if pin:
+                    update_data["pin"] = pin
+                elif self._auth_enabled():
+                    # Clearing the PIN would stop this user logging in.
+                    return {"result": "error", "message": PIN_REQUIRED_MESSAGE}
+                # Otherwise a blank PIN keeps the one already stored.
             if "telephone" in data:
                 update_data["telephone"] = data["telephone"].strip()
             if "labname" in data:
@@ -1248,9 +1271,19 @@ class SetupAPI(BaseAPI):
                         "message": "Authentication must be enabled when remote access is active for security reasons",
                     }
 
-            # Update configuration using the existing methods
-            self.config.update_tunnel_config(tunnel_config)
+            # Turning authentication on needs an administrator who can log in.
+            # The wizard sends that administrator's PIN with this step, so it is
+            # stored first; update_authentication_config() then refuses if no
+            # active administrator has a PIN. Authentication is written before
+            # the tunnel so that a refusal never leaves a tunnel open without it.
+            admin_pin = (data.get("admin_pin") or "").strip()
+            if auth_config["enabled"] and admin_pin:
+                pin_error = self._set_admin_pin(data.get("admin_username"), admin_pin)
+                if pin_error:
+                    return {"result": "error", "message": pin_error}
+
             self.config.update_authentication_config(auth_config)
+            self.config.update_tunnel_config(tunnel_config)
 
             # Update the tunnel environment file if server is available
             if hasattr(self, "server") and self.server:
@@ -1267,6 +1300,38 @@ class SetupAPI(BaseAPI):
         except Exception as e:
             self.logger.error(f"Error updating tunnel settings: {e}")
             return {"result": "error", "message": str(e)}
+
+    def _set_admin_pin(self, username: str | None, pin: str) -> str | None:
+        """
+        Store the PIN of the administrator who will log in once authentication is on.
+
+        Args:
+            username (str | None): The administrator named in the wizard. When
+                empty, the only active administrator is used.
+            pin (str): The PIN to store, already stripped.
+
+        Returns:
+            str | None: Why the PIN was not stored, or None on success.
+        """
+        pin_error = check_new_pin(pin, auth_enabled=True)
+        if pin_error:
+            return pin_error
+
+        db = ExperimentalDB()
+        admins = db.getAllUsers(active_only=True, admin_only=True, asdict=True)
+        username = (username or "").strip()
+        if not username:
+            if len(admins) != 1:
+                return "Name the administrator this PIN is for."
+            username = next(iter(admins))
+        if username not in admins:
+            return f"{username} is not an active administrator."
+
+        hashed_pin = db.hash_pin(pin)
+        if not hashed_pin or db.updateUser(username=username, pin=hashed_pin) < 0:
+            return f"Could not store the PIN for {username}."
+        self.logger.info(f"PIN set for administrator {username}")
+        return None
 
     def _test_notifications(self):
         """Test notification configuration."""
@@ -1653,19 +1718,9 @@ Ethoscope Node Setup Wizard
             # skipped the admin step, the wizard happily flipped setup.completed
             # and authentication.enabled, and the login screen then had nothing
             # to accept). Refuse and point them back to the admin step.
-            auth_enabled = bool(
-                self.config._settings.get("authentication", {}).get("enabled", False)
-            )
-            if auth_enabled:
+            if self._auth_enabled():
                 try:
-                    db = ExperimentalDB()
-                    admins = db.getAllUsers(
-                        active_only=True, admin_only=True, asdict=True
-                    )
-                    has_usable_admin = any(
-                        (u.get("PIN") or u.get("pin") or "").strip()
-                        for u in admins.values()
-                    )
+                    has_usable_admin = ExperimentalDB().has_admin_with_pin()
                 except Exception:
                     # Couldn't reach the DB — safer to block than to lock out.
                     has_usable_admin = False
