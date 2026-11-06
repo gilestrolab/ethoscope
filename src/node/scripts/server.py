@@ -545,14 +545,17 @@ class EthoscopeNodeServer:
         # (but skip if reconfigure is explicitly requested)
         if not reconfigure:
             try:
-                if self.config and self.config.is_setup_required():
-                    self.logger.info(
-                        "Setup required, redirecting to installation wizard"
-                    )
-                    return bottle.redirect("/#!/installation-wizard")
+                setup_required = bool(self.config and self.config.is_setup_required())
             except Exception as e:
                 self.logger.warning(f"Error checking setup status: {e}")
                 # Continue to serve index.html if there's an error checking setup
+                setup_required = False
+            # Reason: bottle.redirect() works by raising HTTPResponse, so it must not sit
+            # inside the try above, whose except used to swallow it. The target must not be
+            # "/": browsers do not send the "#!..." part, so "/#!/..." would redirect forever.
+            if setup_required:
+                self.logger.info("Setup required, redirecting to installation wizard")
+                return bottle.redirect("/installation-wizard#!/installation-wizard")
 
         return bottle.static_file("index.html", root=STATIC_DIR)
 
