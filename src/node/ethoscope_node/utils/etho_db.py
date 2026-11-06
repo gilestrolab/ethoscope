@@ -1330,7 +1330,7 @@ class ExperimentalDB(multiprocessing.Process):
             username: Username (required)
             fullname: Full name of the user
             pin: User's PIN code
-            email: Email address (required)
+            email: Email address, unique when given (the web forms require one)
             telephone: Phone number
             labname: Laboratory/group name
             active: Whether user is active (1) or not (0)
@@ -1344,10 +1344,6 @@ class ExperimentalDB(multiprocessing.Process):
             logging.error("Username is required for adding user")
             return -1
 
-        if not email:
-            logging.error("Email is required for adding user")
-            return -1
-
         if created is None:
             created = datetime.datetime.now().timestamp()
 
@@ -1358,9 +1354,9 @@ class ExperimentalDB(multiprocessing.Process):
                 logging.error(f"User with username '{username}' already exists")
                 return -1
 
-            # Check if email already exists
-            existing = self.getUserByEmail(email)
-            if existing:
+            # Reason: users migrated from an old node's configuration often have no email; they
+            # must still be imported, so the email is checked for uniqueness only when given.
+            if email and self.getUserByEmail(email):
                 logging.error(f"User with email '{email}' already exists")
                 return -1
 

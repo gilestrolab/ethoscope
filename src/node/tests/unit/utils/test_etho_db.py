@@ -311,11 +311,12 @@ class TestUserCRUD:
 
         assert result == -1
 
-    def test_add_user_without_email(self, test_db):
-        """Test adding user without email fails."""
-        result = test_db.addUser(username="testuser", email="")
+    def test_add_users_without_email(self, test_db):
+        """Users without email are added (old nodes' users have none), several of them."""
+        assert test_db.addUser(username="first", email="") > 0
+        assert test_db.addUser(username="second", email="") > 0
 
-        assert result == -1
+        assert test_db.getUserByName("second", asdict=True)["email"] == ""
 
     def test_add_duplicate_username(self, populated_db):
         """Test adding user with duplicate username fails."""
@@ -1542,6 +1543,46 @@ class TestDatabaseMigrations:
             # Verify users were migrated
             users = db.getAllUsers()
             assert len(users) >= 2
+
+    def test_migrate_users_from_old_node_config(self, temp_config_dir):
+        """Users of a pre-2025 node configuration (no email, numeric PIN) are all imported."""
+        mock_config = Mock()
+        mock_config.content = {
+            "users": {
+                # The old default admin, as written by node code before mid-2025.
+                "admin": {
+                    "id": 1,
+                    "name": "admin",
+                    "fullname": "",
+                    "PIN": 9999,
+                    "email": "",
+                    "telephone": "",
+                    "group": "",
+                    "active": False,
+                    "isAdmin": True,
+                },
+                "alice": {
+                    "id": 2,
+                    "name": "alice",
+                    "fullname": "Alice Example",
+                    "PIN": 1234,
+                    "email": "",
+                    "telephone": "",
+                    "group": "",
+                    "active": True,
+                    "isAdmin": False,
+                },
+            }
+        }
+
+        with patch(
+            "ethoscope_node.utils.configuration.EthoscopeConfiguration"
+        ) as mock_config_class:
+            mock_config_class.return_value = mock_config
+            db = ExperimentalDB(config_dir=temp_config_dir)
+
+        assert db.getUserByName("alice", asdict=True)["active"] == 1
+        assert db.getUserByName("admin", asdict=True)["active"] == 0
 
     def test_migrate_users_from_config_skips_populated_db(self, populated_db):
         """Test that user migration is skipped if database already has users."""
