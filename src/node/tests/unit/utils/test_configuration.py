@@ -57,13 +57,16 @@ class TestConfigurationConstants:
 
     def test_set_default_config_file(self):
         """Test setting the default configuration file path."""
-        original_path = "/etc/ethoscope/ethoscope.conf"
+        # Import the module variable to check it was set
+        from ethoscope_node.utils import configuration
+
+        # Reason: restore the real previous value. Restoring a hard-coded
+        # /etc/ethoscope/ethoscope.conf made every later EthoscopeConfiguration()
+        # in the run load and re-save the developer's real config file.
+        original_path = configuration._default_config_file
         test_path = "/tmp/test-config.conf"
 
         set_default_config_file(test_path)
-
-        # Import the module variable to check it was set
-        from ethoscope_node.utils import configuration
 
         assert configuration._default_config_file == test_path
 
