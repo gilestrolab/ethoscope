@@ -212,6 +212,12 @@ class EthoscopeConfiguration:
             }
         },
         "sensors": {},
+        "video_backup": {
+            # When True, each video chunk is deleted from the ethoscope once it
+            # was copied to the node successfully (rsync --remove-source-files).
+            # Results/databases are never deleted from the ethoscope.
+            "delete_remote": False,
+        },
         "commands": {
             "command_1": {
                 "name": "List ethoscope files.",

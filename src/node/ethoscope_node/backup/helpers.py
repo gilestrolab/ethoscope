@@ -74,7 +74,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from ethoscope_node.backup.mysql import DBNotReadyError, MySQLdbToSQLite
-from ethoscope_node.utils.configuration import get_ssh_key_paths
+from ethoscope_node.utils.configuration import EthoscopeConfiguration, get_ssh_key_paths
 from ethoscope_node.utils.network import open_http_url
 from ethoscope_node.utils.video_helpers import list_local_video_files
 
@@ -1110,6 +1110,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                     destination_dir=self._videos_dir,
                     private_key_path=private_key_path,
                     operation_name="videos",
+                    remove_source=self._delete_remote_videos(),
                 )
                 if not success:
                     yield self._yield_status("error", "Videos backup failed")
@@ -1134,12 +1135,23 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             yield self._yield_status("error", error_msg)
             return False
 
+    def _delete_remote_videos(self) -> bool:
+        """Read video_backup.delete_remote from the node configuration (default False)."""
+        try:
+            return bool(
+                EthoscopeConfiguration().content.get("video_backup", {}).get("delete_remote", False)
+            )
+        except Exception as e:
+            self._logger.warning(f"[{self._device_id}] Could not read video_backup config, keeping videos on device: {e}")
+            return False
+
     def _rsync_directory(
         self,
         source_dir: str,
         destination_dir: str,
         private_key_path: str,
         operation_name: str,
+        remove_source: bool = False,
     ) -> Iterator[bool]:
         """
         Perform rsync for a specific directory.
@@ -1181,6 +1193,11 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                 rsync_source,
                 destination_dir,
             ]
+
+            if remove_source:
+                # Deletes each source file on the ethoscope only after it was transferred successfully
+                rsync_command.insert(-2, "--remove-source-files")
+                self._logger.info(f"[{self._device_id}] {operation_name} will be removed from the device once copied")
 
             self._logger.info(
                 f"[{self._device_id}] Starting {operation_name} rsync: {' '.join(rsync_command)}"
