@@ -19,7 +19,7 @@ import netifaces
 from .base import BaseAPI, error_decorator
 
 # Report version for tracking schema changes
-REPORT_VERSION = "1.0"
+REPORT_VERSION = "1.1"
 
 # Default and maximum log lines
 DEFAULT_LOG_LINES = 500
@@ -27,6 +27,47 @@ MAX_LOG_LINES = 5000
 
 # Device request timeout in seconds
 DEVICE_TIMEOUT = 5
+
+# Units whose systemd state goes into node.services
+SERVICE_NAMES = [
+    "ethoscope_node",
+    "ethoscope_backup_mysql",
+    "ethoscope_backup_unified",
+    "ethoscope_backup_sqlite",
+    "ethoscope_backup_video",
+    "ethoscope_update_node",
+    "ethoscope_tunnel",
+    "ethoscope_virtuascope",
+]
+
+# systemd's own lines per backup unit (Started, Stopping, Failed with result...).
+# Reason: a few per start or stop, so these reach back days, where the unit's own
+# output reaches back minutes and loses the event once the unit is running again.
+EVENT_LINES = 100
+
+# Units whose journal goes into backup_services.logs and .events
+BACKUP_UNITS = [
+    "ethoscope_backup_unified",
+    "ethoscope_backup_sqlite",
+    "ethoscope_backup_video",
+    "ethoscope_backup_mysql",
+]
+
+# Reason: is-active says "failed" but not why. Result (timeout, exit-code, signal,
+# start-limit-hit) with the exit status and the time the unit went down tells a stop
+# that hung from a crash, and UnitFileState shows conflicting units enabled together.
+SERVICE_PROPERTIES = [
+    "LoadState",
+    "ActiveState",
+    "SubState",
+    "Result",
+    "ExecMainCode",
+    "ExecMainStatus",
+    "NRestarts",
+    "UnitFileState",
+    "ActiveEnterTimestamp",
+    "InactiveEnterTimestamp",
+]
 
 
 class BugReportAPI(BaseAPI):
@@ -68,7 +109,9 @@ class BugReportAPI(BaseAPI):
         report["devices"] = self._collect_devices_info(report["errors"], log_lines)
 
         # Collect backup service status
-        report["backup_services"] = self._collect_backup_status(report["errors"])
+        report["backup_services"] = self._collect_backup_status(
+            report["errors"], log_lines
+        )
 
         # Collect configuration
         report["configuration"] = self._collect_configuration(report["errors"])
@@ -125,7 +168,7 @@ class BugReportAPI(BaseAPI):
         node_info["services"] = self._get_services_status(errors)
 
         # Node logs
-        node_info["log"] = self._get_node_logs(errors, log_lines)
+        node_info["log"] = self._get_unit_log("ethoscope_node", errors, log_lines)
 
         return node_info
 
@@ -284,52 +327,42 @@ class BugReportAPI(BaseAPI):
             return {}
 
     def _get_services_status(self, errors: list[str]) -> dict[str, Any]:
-        """Get status of ethoscope-related systemd services."""
-        services = {}
-        service_names = [
-            "ethoscope_node",
-            "ethoscope_backup_mysql",
-            "ethoscope_backup_unified",
-            "ethoscope_backup_sqlite",
-            "ethoscope_backup_video",
-            "ethoscope_update_node",
-            "ethoscope_tunnel",
-            "ethoscope_virtuascope",
-        ]
+        """
+        Get the systemd state of the ethoscope services.
 
+        Args:
+            errors (list[str]): Collection errors (unused; a unit that cannot be
+                queried is reported as ``"unknown"`` instead).
+
+        Returns:
+            dict[str, Any]: Per unit, ``active`` (the ActiveState), ``since`` when
+                active, and ``systemd`` with the raw SERVICE_PROPERTIES values.
+        """
+        services = {}
         systemctl = getattr(self.server, "systemctl", "/usr/bin/systemctl")
 
-        for service_name in service_names:
+        for service_name in SERVICE_NAMES:
             try:
-                # Check if active
                 result = subprocess.run(
-                    [systemctl, "is-active", service_name],
+                    [
+                        systemctl,
+                        "show",
+                        service_name,
+                        f"--property={','.join(SERVICE_PROPERTIES)}",
+                    ],
                     capture_output=True,
                     text=True,
                     timeout=5,
                 )
-                is_active = result.stdout.strip()
-
-                # Get service status details if active
-                service_info = {"active": is_active}
-
-                if is_active == "active":
-                    result = subprocess.run(
-                        [
-                            systemctl,
-                            "show",
-                            service_name,
-                            "--property=ActiveEnterTimestamp",
-                        ],
-                        capture_output=True,
-                        text=True,
-                        timeout=5,
-                    )
-                    if result.returncode == 0:
-                        timestamp = result.stdout.strip().split("=", 1)
-                        if len(timestamp) > 1:
-                            service_info["since"] = timestamp[1]
-
+                props = dict(
+                    line.split("=", 1)
+                    for line in result.stdout.splitlines()
+                    if "=" in line
+                )
+                service_info = {"active": props.get("ActiveState", "unknown")}
+                if service_info["active"] == "active":
+                    service_info["since"] = props.get("ActiveEnterTimestamp", "")
+                service_info["systemd"] = props
                 services[service_name] = service_info
             except Exception:
                 services[service_name] = {"active": "unknown"}
@@ -361,18 +394,35 @@ class BugReportAPI(BaseAPI):
             raise RuntimeError(str(log_data["error"]).strip().splitlines()[-1])
         return log_data.get("message", "").splitlines()[:log_lines]
 
-    def _get_node_logs(self, errors: list[str], log_lines: int) -> list[str]:
-        """Get recent node service logs."""
+    def _get_unit_log(
+        self,
+        unit: str,
+        errors: list[str],
+        log_lines: int,
+        systemd_only: bool = False,
+    ) -> list[str]:
+        """
+        Get the last journal lines of a systemd unit.
+
+        With ``-u``, journalctl also returns systemd's own lines about the unit
+        ("Failed with result 'timeout'", "Main process exited, status=1"), which say
+        why a unit stopped when its own output does not.
+
+        Args:
+            unit (str): The systemd unit name.
+            errors (list[str]): Collection errors; a failure is appended here.
+            log_lines (int): Maximum number of lines to return.
+            systemd_only (bool): Keep only systemd's own lines about the unit.
+
+        Returns:
+            list[str]: The newest ``log_lines`` lines, oldest first.
+        """
+        cmd = ["journalctl", "-u", unit, "-n", str(log_lines), "--no-pager"]
+        if systemd_only:
+            cmd += ["-t", "systemd"]
         try:
             result = subprocess.run(
-                [
-                    "journalctl",
-                    "-u",
-                    "ethoscope_node",
-                    "-n",
-                    str(log_lines),
-                    "--no-pager",
-                ],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -381,7 +431,7 @@ class BugReportAPI(BaseAPI):
                 return result.stdout.strip().split("\n")
             return []
         except Exception as e:
-            errors.append(f"Failed to get node logs: {e}")
+            errors.append(f"Failed to get {unit} logs: {e}")
             return []
 
     def _collect_devices_info(
@@ -442,8 +492,20 @@ class BugReportAPI(BaseAPI):
 
         return devices_info
 
-    def _collect_backup_status(self, errors: list[str]) -> dict[str, Any]:
-        """Collect backup service status."""
+    def _collect_backup_status(
+        self, errors: list[str], log_lines: int = DEFAULT_LOG_LINES
+    ) -> dict[str, Any]:
+        """
+        Collect backup service status and the backup units' journals.
+
+        Args:
+            errors (list[str]): Collection errors; failures are appended here.
+            log_lines (int): Maximum journal lines per backup unit.
+
+        Returns:
+            dict[str, Any]: ``mysql`` and ``rsync`` (the unified unit) status, and
+                ``logs`` and ``events`` keyed by BACKUP_UNITS.
+        """
         backup_status = {}
 
         systemctl = getattr(self.server, "systemctl", "/usr/bin/systemctl")
@@ -477,6 +539,17 @@ class BugReportAPI(BaseAPI):
             }
         except Exception as e:
             backup_status["rsync"] = {"available": False, "error": str(e)}
+
+        # Reason: node.log is ethoscope_node's journal alone, and a backup unit that
+        # fails leaves the reason only in its own (2026-11-16: a report showed
+        # ethoscope_backup_unified "failed" and nothing that said why).
+        backup_status["logs"] = {
+            unit: self._get_unit_log(unit, errors, log_lines) for unit in BACKUP_UNITS
+        }
+        backup_status["events"] = {
+            unit: self._get_unit_log(unit, errors, EVENT_LINES, systemd_only=True)
+            for unit in BACKUP_UNITS
+        }
 
         return backup_status
 
@@ -536,6 +609,14 @@ class BugReportAPI(BaseAPI):
                 lines.append(
                     f"Git: {git.get('branch', '?')} @ {git.get('commit', '?')}"
                 )
+
+            failed = [
+                f"{name} ({svc.get('systemd', {}).get('Result', '?')})"
+                for name, svc in node.get("services", {}).items()
+                if svc.get("active") == "failed"
+            ]
+            if failed:
+                lines.append(f"Failed services: {', '.join(failed)}")
 
         # Device summary
         devices = report.get("devices", {})

@@ -10,7 +10,9 @@ import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 from ethoscope_node.api.bugreport_api import (
+    BACKUP_UNITS,
     DEFAULT_LOG_LINES,
+    EVENT_LINES,
     MAX_LOG_LINES,
     REPORT_VERSION,
     BugReportAPI,
@@ -259,12 +261,14 @@ Buffers:         1000000 kB
         # Mock systemctl calls
         def mock_systemctl(*args, **kwargs):
             cmd = args[0]
-            if "is-active" in cmd:
-                return Mock(returncode=0, stdout="active\n")
-            elif "show" in cmd:
+            if "show" in cmd:
                 return Mock(
                     returncode=0,
-                    stdout="ActiveEnterTimestamp=Mon 2024-01-01 12:00:00 UTC\n",
+                    stdout=(
+                        "ActiveState=active\n"
+                        "Result=success\n"
+                        "ActiveEnterTimestamp=Mon 2024-01-01 12:00:00 UTC\n"
+                    ),
                 )
             return Mock(returncode=1, stdout="")
 
@@ -275,34 +279,100 @@ Buffers:         1000000 kB
 
         self.assertIn("ethoscope_node", result)
         self.assertEqual(result["ethoscope_node"]["active"], "active")
+        self.assertEqual(
+            result["ethoscope_node"]["since"], "Mon 2024-01-01 12:00:00 UTC"
+        )
         self.assertEqual(len(errors), 0)
 
     @patch("subprocess.run")
-    def test_get_node_logs(self, mock_run):
-        """Test node logs collection."""
+    def test_get_services_status_failed_unit_says_why(self, mock_run):
+        """A failed unit carries its Result, exit status and when it went down."""
+
+        def mock_systemctl(*args, **kwargs):
+            cmd = args[0]
+            if "ethoscope_backup_unified" in cmd:
+                return Mock(
+                    returncode=0,
+                    stdout=(
+                        "LoadState=loaded\n"
+                        "ActiveState=failed\n"
+                        "SubState=failed\n"
+                        "Result=timeout\n"
+                        "ExecMainCode=2\n"
+                        "ExecMainStatus=9\n"
+                        "UnitFileState=enabled\n"
+                        "InactiveEnterTimestamp=Mon 2026-11-16 15:40:48 GMT\n"
+                    ),
+                )
+            return Mock(returncode=0, stdout="ActiveState=inactive\n")
+
+        mock_run.side_effect = mock_systemctl
+
+        result = self.api._get_services_status([])
+
+        unified = result["ethoscope_backup_unified"]
+        self.assertEqual(unified["active"], "failed")
+        self.assertNotIn("since", unified)
+        self.assertEqual(unified["systemd"]["Result"], "timeout")
+        self.assertEqual(unified["systemd"]["ExecMainStatus"], "9")
+        self.assertEqual(unified["systemd"]["UnitFileState"], "enabled")
+        self.assertEqual(
+            unified["systemd"]["InactiveEnterTimestamp"],
+            "Mon 2026-11-16 15:40:48 GMT",
+        )
+        # One systemctl call per unit, asking for every property at once
+        for call in mock_run.call_args_list:
+            self.assertIn("show", call[0][0])
+            self.assertIn("Result", call[0][0][-1])
+
+    @patch("subprocess.run")
+    def test_get_services_status_systemctl_unusable(self, mock_run):
+        """No output (e.g. no systemd) reports 'unknown', not a crash."""
+        mock_run.return_value = Mock(returncode=1, stdout="")
+
+        result = self.api._get_services_status([])
+
+        self.assertEqual(result["ethoscope_node"]["active"], "unknown")
+        self.assertEqual(result["ethoscope_node"]["systemd"], {})
+
+    @patch("subprocess.run")
+    def test_get_services_status_exception(self, mock_run):
+        """A systemctl that cannot run reports 'unknown' for every unit."""
+        mock_run.side_effect = FileNotFoundError("systemctl")
+
+        result = self.api._get_services_status([])
+
+        self.assertEqual(result["ethoscope_node"], {"active": "unknown"})
+
+    @patch("subprocess.run")
+    def test_get_unit_log(self, mock_run):
+        """Test journal collection for a unit."""
         mock_run.return_value = Mock(
             returncode=0,
             stdout="Jan 01 12:00:00 node[1234]: Log line 1\nJan 01 12:00:01 node[1234]: Log line 2",
         )
         errors = []
 
-        result = self.api._get_node_logs(errors, 500)
+        result = self.api._get_unit_log("ethoscope_node", errors, 500)
 
         self.assertEqual(len(result), 2)
         self.assertIn("Log line 1", result[0])
         self.assertEqual(len(errors), 0)
+        cmd = mock_run.call_args[0][0]
+        self.assertEqual(cmd[:3], ["journalctl", "-u", "ethoscope_node"])
+        self.assertIn("500", cmd)
 
     @patch("subprocess.run")
-    def test_get_node_logs_exception(self, mock_run):
-        """Test node logs handles exceptions."""
+    def test_get_unit_log_exception(self, mock_run):
+        """Test unit log collection handles exceptions."""
         mock_run.side_effect = Exception("Journalctl error")
         errors = []
 
-        result = self.api._get_node_logs(errors, 500)
+        result = self.api._get_unit_log("ethoscope_node", errors, 500)
 
         self.assertEqual(result, [])
         self.assertEqual(len(errors), 1)
-        self.assertIn("Failed to get node logs", errors[0])
+        self.assertIn("Failed to get ethoscope_node logs", errors[0])
 
     def test_collect_devices_info_no_scanner(self):
         """Test device collection when scanner not available."""
@@ -426,6 +496,88 @@ Buffers:         1000000 kB
         self.assertTrue(result["mysql"]["available"])
         self.assertTrue(result["rsync"]["available"])
 
+    @patch("subprocess.run")
+    def test_collect_backup_status_includes_each_backup_units_journal(self, mock_run):
+        """Every backup unit's journal lands under logs, at the requested length."""
+
+        def mock_commands(*args, **kwargs):
+            cmd = args[0]
+            if cmd[0] == "journalctl":
+                unit = cmd[cmd.index("-u") + 1]
+                return Mock(returncode=0, stdout=f"{unit}: line 1\n{unit}: line 2\n")
+            return Mock(returncode=3, stdout="failed\n")
+
+        mock_run.side_effect = mock_commands
+        errors = []
+
+        result = self.api._collect_backup_status(errors, 42)
+
+        self.assertEqual(set(result["logs"]), set(BACKUP_UNITS))
+        self.assertEqual(
+            result["logs"]["ethoscope_backup_unified"],
+            ["ethoscope_backup_unified: line 1", "ethoscope_backup_unified: line 2"],
+        )
+        journal_calls = [
+            c[0][0]
+            for c in mock_run.call_args_list
+            if c[0][0][0] == "journalctl" and "-t" not in c[0][0]
+        ]
+        self.assertEqual(len(journal_calls), len(BACKUP_UNITS))
+        self.assertTrue(all("42" in cmd for cmd in journal_calls))
+        self.assertEqual(errors, [])
+
+    @patch("subprocess.run")
+    def test_collect_backup_status_includes_systemd_events_per_unit(self, mock_run):
+        """systemd's own lines per unit land under events, at EVENT_LINES."""
+
+        def mock_commands(*args, **kwargs):
+            cmd = args[0]
+            if cmd[0] == "journalctl" and "-t" in cmd:
+                unit = cmd[cmd.index("-u") + 1]
+                return Mock(
+                    returncode=0,
+                    stdout=f"systemd[1]: {unit}: Failed with result 'timeout'.\n",
+                )
+            if cmd[0] == "journalctl":
+                return Mock(returncode=0, stdout="cycle chatter\n")
+            return Mock(returncode=3, stdout="failed\n")
+
+        mock_run.side_effect = mock_commands
+
+        result = self.api._collect_backup_status([], 500)
+
+        self.assertEqual(set(result["events"]), set(BACKUP_UNITS))
+        self.assertEqual(
+            result["events"]["ethoscope_backup_unified"],
+            ["systemd[1]: ethoscope_backup_unified: Failed with result 'timeout'."],
+        )
+        self.assertEqual(result["logs"]["ethoscope_backup_unified"], ["cycle chatter"])
+        event_calls = [c[0][0] for c in mock_run.call_args_list if "-t" in c[0][0]]
+        for cmd in event_calls:
+            self.assertEqual(cmd[cmd.index("-t") + 1], "systemd")
+            self.assertEqual(cmd[cmd.index("-n") + 1], str(EVENT_LINES))
+
+    @patch("subprocess.run")
+    def test_collect_backup_status_journal_unreadable(self, mock_run):
+        """A journal that cannot be read records an error per unit, not a crash."""
+
+        def mock_commands(*args, **kwargs):
+            if args[0][0] == "journalctl":
+                raise PermissionError("no journal access")
+            return Mock(returncode=0, stdout="active\n")
+
+        mock_run.side_effect = mock_commands
+        errors = []
+
+        result = self.api._collect_backup_status(errors, 10)
+
+        self.assertTrue(result["rsync"]["available"])
+        self.assertEqual(result["logs"]["ethoscope_backup_unified"], [])
+        self.assertEqual(result["events"]["ethoscope_backup_unified"], [])
+        # One error per unit for the logs, and one per unit for the events
+        self.assertEqual(len(errors), 2 * len(BACKUP_UNITS))
+        self.assertIn("ethoscope_backup_unified", errors[0])
+
     def test_collect_configuration(self):
         """Test configuration collection."""
         errors = []
@@ -473,6 +625,31 @@ Buffers:         1000000 kB
         self.assertIn("main", result)
         self.assertIn("1/2 online", result)
         self.assertIn("1", result)  # Collection errors
+        self.assertNotIn("Failed services", result)
+
+    def test_generate_summary_names_failed_services(self):
+        """Failed units, with their systemd Result, are named in the summary."""
+        report = {
+            "report_metadata": {"generated_at": "2026-11-16T16:00:57", "hostname": "n"},
+            "node": {
+                "services": {
+                    "ethoscope_node": {"active": "active", "systemd": {}},
+                    "ethoscope_backup_unified": {
+                        "active": "failed",
+                        "systemd": {"Result": "timeout"},
+                    },
+                    "ethoscope_backup_sqlite": {"active": "failed"},
+                }
+            },
+        }
+
+        result = self.api._generate_summary(report)
+
+        self.assertIn(
+            "Failed services: ethoscope_backup_unified (timeout), "
+            "ethoscope_backup_sqlite (?)",
+            result,
+        )
 
     @patch.object(BugReportAPI, "_get_report_metadata")
     @patch.object(BugReportAPI, "_collect_node_info")
@@ -587,7 +764,7 @@ class TestBugReportAPIConstants(unittest.TestCase):
 
     def test_report_version(self):
         """Test report version is set."""
-        self.assertEqual(REPORT_VERSION, "1.0")
+        self.assertEqual(REPORT_VERSION, "1.1")
 
     def test_default_log_lines(self):
         """Test default log lines."""
