@@ -1662,3 +1662,24 @@ Open, needs hardware or a decision:
       also needs `arduino-cli core install arduino:megaavr`.
 - [ ] `interrogate()` reads the `T` reply 0.1 s after sending it; untested on hardware.
       If Module Info shows the module's counts, stimulators get them too.
+
+# Backup unit failed, and the bug report could not say why (2026-11-16)
+
+A user's node (dev @ f7afcafb) reported `ethoscope_backup_unified` and
+`ethoscope_backup_sqlite` as `failed`, and `ethoscope_backup_video` active since 15:40:48.
+The report carried only `ethoscope_node`'s journal; the backup units' own were missing.
+
+- [x] Bug report 1.1: each unit's systemd `Result`, exit status, timestamps and
+      `UnitFileState`; the backup units' journals, and systemd's own lines about each
+      (`backup_services.events`, reaching back days); failed units named in the summary.
+- [ ] Read the user's next report. `Result` separates two readings:
+      - `timeout`/`signal`: the unit was stopped (starting video stops unified through
+        `Conflicts=`) and did not exit in time. Possible mechanism, not yet reproduced:
+        SIGTERM ends the running rsync, the job starts its next step (checkpoint, results,
+        videos), and interpreter exit waits for the `ThreadPoolExecutor` workers.
+      - `exit-code`: a real failure. The two failed modes share the results path;
+        `--videos-only` runs with the same script, config and port.
+- [ ] Video and sqlite units both bind 8093 but do not conflict with each other
+      (`services/*.service`, `SYSTEM_DAEMONS` in `node_api.py`).
+- [ ] `install_services.sh --node` does not list `ethoscope_backup_sqlite.service`, yet the
+      unit was loaded on that node.
