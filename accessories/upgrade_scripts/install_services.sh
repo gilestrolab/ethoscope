@@ -188,6 +188,7 @@ case "$1" in
             "ethoscope_backup_incremental.service"
             "ethoscope_backup_static.service"
             "ethoscope_backup_video.service"
+            "ethoscope_backup_sqlite.service"
             "ethoscope_backup_unified.service"
             "ethoscope_backup_mysql.service"
             "ethoscope_node.service"

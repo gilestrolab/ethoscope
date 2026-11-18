@@ -27,7 +27,8 @@ SYSTEM_DAEMONS = {
     },
     "ethoscope_backup_video": {
         "description": "The service that collects videos in h264 chunks from the ethoscopes and syncs them with the node",
-        "conflicts_with": ["ethoscope_backup_unified"],
+        # Reason: all three rsync backup services serve their status on port 8093
+        "conflicts_with": ["ethoscope_backup_unified", "ethoscope_backup_sqlite"],
         "docker_container": None,  # Covered by ethoscope_backup_unified in Docker
     },
     "ethoscope_backup_unified": {
@@ -37,7 +38,7 @@ SYSTEM_DAEMONS = {
     },
     "ethoscope_backup_sqlite": {
         "description": "The service that collects SQLite db from the ethoscopes and syncs them with the node",
-        "conflicts_with": ["ethoscope_backup_unified"],
+        "conflicts_with": ["ethoscope_backup_unified", "ethoscope_backup_video"],
         "docker_container": None,  # Covered by ethoscope_backup_unified in Docker
     },
     "ethoscope_update_node": {

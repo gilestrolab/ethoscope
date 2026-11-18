@@ -1,5 +1,5 @@
 [Unit]
-Description=Ethoscope node server
+Description=Ethoscope MariaDB backup service
 Wants=ntpd.service clock.service
 After=ntpd.service clock.service
 
