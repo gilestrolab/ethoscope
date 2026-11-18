@@ -1672,14 +1672,24 @@ The report carried only `ethoscope_node`'s journal; the backup units' own were m
 - [x] Bug report 1.1: each unit's systemd `Result`, exit status, timestamps and
       `UnitFileState`; the backup units' journals, and systemd's own lines about each
       (`backup_services.events`, reaching back days); failed units named in the summary.
-- [ ] Read the user's next report. `Result` separates two readings:
-      - `timeout`/`signal`: the unit was stopped (starting video stops unified through
-        `Conflicts=`) and did not exit in time. Possible mechanism, not yet reproduced:
-        SIGTERM ends the running rsync, the job starts its next step (checkpoint, results,
-        videos), and interpreter exit waits for the `ThreadPoolExecutor` workers.
-      - `exit-code`: a real failure. The two failed modes share the results path;
-        `--videos-only` runs with the same script, config and port.
-- [ ] Video and sqlite units both bind 8093 but do not conflict with each other
-      (`services/*.service`, `SYSTEM_DAEMONS` in `node_api.py`).
-- [ ] `install_services.sh --node` does not list `ethoscope_backup_sqlite.service`, yet the
-      unit was loaded on that node.
+- [x] Read the user's next report (2026-11-17): both `Result=timeout`, killed by signal 9.
+      - Unified was stopped twice on 2026-11-13 (11:20, 16:01) when sqlite, then video,
+        were started. Each time it logged "Shutdown complete." and then kept starting
+        queued backups (13 devices the second time) until systemd killed it at 90 s.
+      - Nothing copied results from 13 Nov 15:58 until at least the report; video-only ran.
+      - Unified and sqlite are both enabled at report time; at the 26 Oct boot only sqlite
+        started.
+      - What started sqlite and video on 13 Nov is outside the report's node log.
+- [x] Fix the stop: no job or step starts once stopped, and running rsyncs are ended
+      (`GenericBackupWrapper.stop()`). Reproduced with the real `rsync_backup_tool.py`
+      and fake 30 s rsyncs: before, 90 s and SIGKILL; after, it exits at once.
+- [x] Video and sqlite conflict with each other and with unified (unit files and
+      `SYSTEM_DAEMONS`); the installer links the sqlite unit; the MariaDB unit's
+      Description no longer says "Ethoscope node server".
+- [ ] On the user's node: disable sqlite and video, enable unified, check that
+      `curl -s localhost:8093/` shows a recent `last_backup`.
+- [ ] The installer stops and disables every `ethoscope_*` unit before enabling unified,
+      so it cannot leave two enabled; how that node got both is unknown. The web UI's
+      toggle starts and stops but never enables, so after a reboot the enabled set wins.
+- [ ] A job blocked in a request to an unresponsive device (`_validate_sqlite_database`,
+      30 s) still finishes that request after a stop.
