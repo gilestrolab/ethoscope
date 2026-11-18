@@ -328,6 +328,19 @@ class BaseBackupClass:
         self._ip = device_info.get("ip", "")
         self._results_dir = results_dir
         self._logger = logging.getLogger(f"{self.__class__.__name__}_{self._device_id}")
+        # The subprocess (Popen) this job is running, so that a stop can end it
+        self._process = None
+
+    def terminate(self) -> None:
+        """
+        End the subprocess this job is running, if any.
+
+        Reason: under Docker only the main process receives SIGTERM, and a running
+        rsync holds its job, which holds the interpreter's exit.
+        """
+        process = self._process
+        if process is not None and process.poll() is None:
+            process.terminate()
 
     def _yield_status(self, status: str, message: str) -> str:
         """Helper method to yield consistent status messages."""
@@ -1185,6 +1198,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                 universal_newlines=True,
                 bufsize=1,
             )
+            self._process = process
 
             files_transferred = 0
             current_file = ""
@@ -1364,6 +1378,12 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             self._logger.error(f"[{self._device_id}] Full traceback:", exc_info=True)
             yield self._yield_status("error", error_msg)
             return False
+
+        finally:
+            # Reason: when the service stops, this generator is closed mid-transfer;
+            # the rsync must not outlive it.
+            self.terminate()
+            self._process = None
 
     def _checkpoint_sqlite_databases(
         self, private_key_path: str, source_dir: str = "/ethoscope_data/results/"
@@ -1925,7 +1945,13 @@ class GenericBackupWrapper(threading.Thread):
         """Execute backup job and track progress using new comprehensive device data."""
         try:
             backup_success = True
-            for message in backup_job.backup():
+            messages = backup_job.backup()
+            for message in messages:
+                if self._stop_event.is_set():
+                    # Reason: a backup announces each step before it starts that
+                    # step's ssh or rsync, so closing it here starts nothing more.
+                    messages.close()
+                    return False
                 with self._lock:
                     progress_data = json.loads(message)
 
@@ -2496,6 +2522,13 @@ class GenericBackupWrapper(threading.Thread):
         device_id = device.get("id", "unknown")
         device_name = device.get("name", "unknown")
 
+        if self._stop_event.is_set():
+            # Reason: a cycle queues every device at once, and the interpreter's exit
+            # waits for the queue to drain. After SIGTERM on 2026-11-13 the unified
+            # service started jobs for 13 more devices until systemd killed it at
+            # 90 s, which left the unit failed and the node with no results backup.
+            return False
+
         try:
             # Use the existing initiate_backup_job method which already has error handling
             return self.initiate_backup_job(device)
@@ -2538,6 +2571,9 @@ class GenericBackupWrapper(threading.Thread):
         timed_out_jobs = 0
 
         for future, device_id, device_name in futures:
+            if self._stop_event.is_set():
+                self._logger.info("Stopping: not waiting for the remaining backups")
+                break
             try:
                 self._logger.info(
                     f"Waiting for backup completion: {device_name} (ID: {device_id})"
@@ -2653,9 +2689,14 @@ class GenericBackupWrapper(threading.Thread):
             setattr(self.backup_status[device_id], key, value)
 
     def stop(self):
-        """Stop the backup wrapper gracefully."""
+        """
+        Stop the backup wrapper: no job or step starts after this, and the
+        subprocesses of running jobs are ended, so the service exits in seconds.
+        """
         self._logger.info("Stopping backup wrapper...")
         self._stop_event.set()
+        for job in list(self._backup_instances.values()):
+            job.terminate()
 
     def is_running(self) -> bool:
         """Check if the backup wrapper is running."""
