@@ -1,3 +1,4 @@
+import functools
 import logging
 import os
 import subprocess
@@ -25,6 +26,35 @@ class UnexpectedAction(Exception):
     """Exception raised when an unexpected action is requested"""
 
     pass
+
+
+# Reason: a GitPython Repo is not thread-safe. It reads objects through one long-lived
+# `git cat-file --batch` pipe, and cheroot serves requests on several threads; the
+# updater page asks for /bare/update and /devices at once. Two readers interleaving on
+# the pipe leave it out of step for good, and every later read parses garbage
+# ("binascii.Error: Odd-length string", 2026-11-19) until the service restarts. One lock
+# covers both repositories (the bare one and this checkout); the git work is short.
+GIT_LOCK = threading.RLock()
+
+
+def git_serialised(fn):
+    """
+    Run *fn* holding GIT_LOCK, so that no other request touches a repository meanwhile.
+
+    Args:
+        fn (Callable): A function that uses GitPython objects, including lazy reads of
+            the commits it returns.
+
+    Returns:
+        Callable: *fn*, serialised.
+    """
+
+    @functools.wraps(fn)
+    def serialised(*args, **kwargs):
+        with GIT_LOCK:
+            return fn(*args, **kwargs)
+
+    return serialised
 
 
 # Action constants
@@ -82,6 +112,7 @@ def _schedule_reboot(delay=5):
     timer.start()
 
 
+@git_serialised
 def handle_node_update():
     """Handle local node update operation"""
     try:
@@ -98,6 +129,7 @@ def handle_node_update():
         return {"status": "error", "device_id": "node", "error": str(e)}
 
 
+@git_serialised
 def handle_node_branch_change(new_branch):
     """Handle local node branch change operation"""
     try:
@@ -256,6 +288,7 @@ def index():
 
 
 @app.get("/device/<action>/<id>")
+@git_serialised
 def device(action, id):
     """
     Control update state / get info about a node or device
@@ -348,6 +381,7 @@ def device(action, id):
 
 
 @app.post("/device/<action>/<id>")
+@git_serialised
 def change_branch(action, id):
 
     if id != device_id:
@@ -383,6 +417,7 @@ def name():
 
 
 @app.get("/bare/<action>")
+@git_serialised
 def bare(action):
     try:
         assert_node(is_node)
@@ -414,6 +449,7 @@ def node_info():  # , device):
         return {"error": traceback.format_exc()}
 
 
+@git_serialised
 def judge_devices_locally(devices_map):
     """
     Re-decide `up_to_date` for every device from the node's own bare repository.

@@ -5,6 +5,11 @@ import traceback
 
 from git import GitCommandError, Remote, Repo
 
+# Seconds a fetch of the bare repository from its upstream may take before it is
+# killed. Reason: the update server holds its git lock for the whole fetch, so a fetch
+# stuck on a dead connection would otherwise stall every request that touches git.
+FETCH_TIMEOUT = 300
+
 
 class DeviceUpdateError(Exception):
     """Custom exception raised when device updates fail."""
@@ -547,7 +552,7 @@ class BareRepoUpdater:
             logging.info(
                 f"Attempting to fetch from remote '{self._remote_name}' with prune=True."
             )
-            self._remote.fetch(prune=True)
+            self._remote.fetch(prune=True, kill_after_timeout=FETCH_TIMEOUT)
             logging.info("Fetch operation completed.")
         except GitCommandError as e:
             logging.error(f"Failed to fetch all remote branches: {e}")
@@ -713,7 +718,12 @@ class BareRepoUpdater:
         try:
             logging.debug(f"Fetching all references from remote '{self._remote_name}'.")
             # Using refspec to fetch all branches
-            self._working_repo.git.fetch(self._remote_name, "--prune", "--all")
+            self._working_repo.git.fetch(
+                self._remote_name,
+                "--prune",
+                "--all",
+                kill_after_timeout=FETCH_TIMEOUT,
+            )
             logging.debug("All references fetched successfully.")
         except GitCommandError as e:
             logging.error(
