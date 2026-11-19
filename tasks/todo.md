@@ -1693,3 +1693,13 @@ The report carried only `ethoscope_node`'s journal; the backup units' own were m
       toggle starts and stops but never enables, so after a reboot the enabled set wins.
 - [ ] A job blocked in a request to an unresponsive device (`_validate_sqlite_database`,
       30 s) still finishes that request after a stop.
+
+# Updater: /devices fails with "Odd-length string" (2026-11-19)
+
+The update server shared one GitPython Repo across cheroot's request threads; the updater
+page's simultaneous /bare/update and /devices interleaved on its `cat-file` pipe and left
+it out of step until the service restarted.
+
+- [x] One lock around every route that touches git; bare-repo fetches killed after 300 s.
+- [ ] On each node already showing the error: `sudo systemctl restart ethoscope_update_node`,
+      then update the node, which installs the fix.
