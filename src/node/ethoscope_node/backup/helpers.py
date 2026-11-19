@@ -1194,6 +1194,11 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                 destination_dir,
             ]
 
+            if operation_name == "videos":
+                # The recorder writes videoname.h264.tmp and renames it when the chunk is complete.
+                # Skip the unfinished chunk so it is neither copied nor deleted while being written.
+                rsync_command.insert(-2, "--exclude=*.tmp")
+
             if remove_source:
                 # Deletes each source file on the ethoscope only after it was transferred successfully
                 rsync_command.insert(-2, "--remove-source-files")
