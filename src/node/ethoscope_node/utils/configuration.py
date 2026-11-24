@@ -217,6 +217,9 @@ class EthoscopeConfiguration:
             # was copied to the node successfully (rsync --remove-source-files).
             # Results/databases are never deleted from the ethoscope.
             "delete_remote": False,
+            # ssh user the videos rsync logs in as on the ethoscope. Use "root" if the
+            # ethoscope user cannot delete the recorded chunks (they are root-owned).
+            "ssh_user": "ethoscope",
         },
         "commands": {
             "command_1": {

@@ -1111,6 +1111,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
                     private_key_path=private_key_path,
                     operation_name="videos",
                     remove_source=self._delete_remote_videos(),
+                    ssh_user=self._videos_ssh_user(),
                 )
                 if not success:
                     yield self._yield_status("error", "Videos backup failed")
@@ -1135,15 +1136,21 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             yield self._yield_status("error", error_msg)
             return False
 
+    def _video_backup_config(self) -> dict:
+        """Read the video_backup section of the node configuration (empty dict on error)."""
+        try:
+            return EthoscopeConfiguration().content.get("video_backup", {}) or {}
+        except Exception as e:
+            self._logger.warning(f"[{self._device_id}] Could not read video_backup config, using defaults: {e}")
+            return {}
+
     def _delete_remote_videos(self) -> bool:
         """Read video_backup.delete_remote from the node configuration (default False)."""
-        try:
-            return bool(
-                EthoscopeConfiguration().content.get("video_backup", {}).get("delete_remote", False)
-            )
-        except Exception as e:
-            self._logger.warning(f"[{self._device_id}] Could not read video_backup config, keeping videos on device: {e}")
-            return False
+        return bool(self._video_backup_config().get("delete_remote", False))
+
+    def _videos_ssh_user(self) -> str:
+        """ssh user for the videos rsync, from video_backup.ssh_user (default "ethoscope")."""
+        return self._video_backup_config().get("ssh_user") or "ethoscope"
 
     def _rsync_directory(
         self,
@@ -1152,6 +1159,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
         private_key_path: str,
         operation_name: str,
         remove_source: bool = False,
+        ssh_user: str = "ethoscope",
     ) -> Iterator[bool]:
         """
         Perform rsync for a specific directory.
@@ -1176,7 +1184,7 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             os.makedirs(destination_dir, exist_ok=True)
 
             # Construct rsync command with enhanced verbosity for file size capture
-            rsync_source = f"ethoscope@{self._ip}:{source_dir}"
+            rsync_source = f"{ssh_user}@{self._ip}:{source_dir}"
             rsync_command = [
                 "rsync",
                 "-rlptvz",  # recursive, links, perms, times, verbose, compress (no -o/-g to avoid root ownership)
