@@ -220,6 +220,9 @@ class EthoscopeConfiguration:
             # ssh user the videos rsync logs in as on the ethoscope. Use "root" if the
             # ethoscope user cannot delete the recorded chunks (they are root-owned).
             "ssh_user": "ethoscope",
+            # Files modified more recently than this many minutes are still being
+            # written by the recorder, so they are skipped until the next backup.
+            "recent_minutes": 10,
         },
         "commands": {
             "command_1": {

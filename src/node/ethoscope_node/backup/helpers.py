@@ -1152,6 +1152,43 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
         """ssh user for the videos rsync, from video_backup.ssh_user (default "ethoscope")."""
         return self._video_backup_config().get("ssh_user") or "ethoscope"
 
+    def _video_recent_minutes(self) -> int:
+        """video_backup.recent_minutes: files modified more recently than this are not copied (default 10)."""
+        try:
+            return int(self._video_backup_config().get("recent_minutes", 10))
+        except (TypeError, ValueError):
+            return 10
+
+    def _list_recent_videos(
+        self, ssh_user: str, private_key_path: str, source_dir: str, minutes: int
+    ) -> list[str]:
+        """
+        Ask the ethoscope which files under source_dir were modified in the last `minutes`.
+
+        Runs find on the device, so the device clock is used and no clock sync is needed.
+        Returns paths relative to source_dir. Raises RuntimeError if the device cannot be
+        asked, so the caller does not run rsync (and delete) without knowing what to skip.
+        """
+        import shlex
+        import subprocess
+
+        root = source_dir.rstrip("/")
+        remote_cmd = f"find {shlex.quote(root)} -type f -mmin -{int(minutes)} -printf '%P\\n'"
+        cmd = [
+            "ssh",
+            "-i", private_key_path,
+            "-o", "BatchMode=yes",
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "UserKnownHostsFile=/dev/null",
+            f"{ssh_user}@{self._ip}",
+            remote_cmd,
+        ]
+        p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           universal_newlines=True, timeout=120)
+        if p.returncode != 0:
+            raise RuntimeError(f"could not list recent videos on device: {p.stderr.strip()}")
+        return [line for line in p.stdout.splitlines() if line.strip()]
+
     def _rsync_directory(
         self,
         source_dir: str,
@@ -1203,8 +1240,19 @@ class UnifiedRsyncBackupClass(BaseBackupClass):
             ]
 
             if operation_name == "videos":
-                # The recorder writes videoname.h264.tmp and renames it when the chunk is complete.
-                # Skip the unfinished chunk so it is neither copied nor deleted while being written.
+                # Skip files still being written: a chunk modified in the last few minutes is
+                # the one the recorder is writing. Skipping it means it is neither copied nor
+                # deleted. Raises if the device cannot be asked, so nothing is deleted blind.
+                recent = self._list_recent_videos(
+                    ssh_user, private_key_path, source_dir, self._video_recent_minutes()
+                )
+                for rel_path in recent:
+                    rsync_command.insert(-2, f"--exclude=/{rel_path}")
+                if recent:
+                    self._logger.info(
+                        f"[{self._device_id}] Skipping {len(recent)} recently modified video file(s) still being written"
+                    )
+                # Also skip the old unfinished-chunk name, in case the device runs older software
                 rsync_command.insert(-2, "--exclude=*.tmp")
 
             if remove_source:
